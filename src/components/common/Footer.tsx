@@ -13,16 +13,15 @@ export function Footer({ branding }: { branding?: PublicBranding | null }) {
           <div>
             <p className="text-lg font-bold tracking-tight text-slate-900">{displayName}</p>
             <p className="mt-2 text-sm text-slate-600 max-w-xs leading-relaxed">
-              Precision event planning, transparent quotes, synchronized crew calendars, and
-              milestone-tracked delivery.
+              Simple event planning, clear pricing, easy team scheduling, and on-time delivery.
             </p>
           </div>
 
           <div className="text-sm text-slate-600 space-y-1.5">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Studio Contact
+              Contact Us
             </p>
-            {contact?.phone ? <p>Phone: {contact.phone}</p> : <p>Direct concierge available</p>}
+            {contact?.phone ? <p>Phone: {contact.phone}</p> : <p>Message us anytime</p>}
             {contact?.email && <p>Email: {contact.email}</p>}
             {contact?.address && <p>{contact.address}</p>}
           </div>

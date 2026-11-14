@@ -41,27 +41,27 @@ export function LoginForm() {
               <span>Softilo Platform</span>
             </Link>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mt-6 leading-tight">
-              Studio &amp; Event Command Portal
+              Team Login
             </h1>
             <p className="mt-3 text-sm text-slate-300 leading-relaxed">
-              Sign in with your studio credentials to manage inquiries, versioned quotes, verified
-              advance ledgers, crew reservations, and deliverables.
+              Sign in to check requests, send price quotes, track payments, manage your schedule,
+              and deliver client files.
             </p>
           </div>
 
           <div className="relative pt-8 border-t border-white/10 space-y-2 text-xs text-slate-300">
             <div className="flex items-center gap-2 text-white font-semibold">
               <ShieldCheckIcon className="w-4 h-4 text-emerald-400" />
-              <span>Role-Based Studio Access</span>
+              <span>Team Access</span>
             </div>
-            <p>Owners, Coordinators, Accountants, and Crew see role-appropriate workspaces.</p>
+            <p>Everyone on your team sees only the tools they need for their job.</p>
           </div>
         </div>
 
         <div className="lg:col-span-7 p-8 sm:p-10 bg-white">
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Sign In</h2>
           <p className="text-sm text-slate-500 mt-1">
-            Enter your email and password to access your studio workspace.
+            Enter your email and password to open your dashboard.
           </p>
 
           <form action={formAction} className="mt-6 space-y-4">

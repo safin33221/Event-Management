@@ -92,11 +92,11 @@ export function InquiryForm({
           <CheckCircleIcon className="w-6 h-6" />
         </div>
         <h3 className="text-2xl font-bold tracking-tight text-slate-900">
-          Inquiry Received
+          Request Sent!
         </h3>
         <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-          Thank you. Your inquiry has been logged with {branding.displayName}. Our coordinator will
-          prepare your tailored quote shortly.
+          Thank you. {branding.displayName} has received your request and will send you a price
+          quote soon.
         </p>
         <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2">
           <span className="text-xs text-slate-500">Reference:</span>
@@ -136,10 +136,10 @@ export function InquiryForm({
       <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
         <div>
           <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-            Request a Custom Quote
+            Ask for a Quote
           </h3>
           <p className="text-sm text-slate-500 mt-1">
-            Tell us about your event date, format, and preferred collection.
+            Tell us your event date, details, and the package you like.
           </p>
         </div>
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 shrink-0">
@@ -278,7 +278,7 @@ export function InquiryForm({
         className="inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.99] disabled:opacity-60"
         style={{ backgroundColor: accent }}
       >
-        <span>{isPending ? 'Submitting Inquiry...' : 'Request Quote & Availability'}</span>
+        <span>{isPending ? 'Sending...' : 'Send Request'}</span>
         <ArrowRightIcon className="w-4 h-4" />
       </button>
     </form>

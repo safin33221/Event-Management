@@ -63,13 +63,12 @@ export function PublicAgencyHome({
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold tracking-tight text-slate-900 leading-[1.1]">
-                Every milestone crafted with calm precision.
+                Plan your event simply and clearly.
               </h1>
 
               <p className="text-base sm:text-lg text-slate-600 max-w-xl leading-relaxed">
-                Explore curated packages, transparent itemized quotes, synchronized multi-day event
-                schedules, and real-time deliverable tracking tailored to your celebration or
-                gathering.
+                See clear packages, get an exact price quote, check open dates, and track your
+                event from start to finish.
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -78,14 +77,14 @@ export function PublicAgencyHome({
                   className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
                   style={{ backgroundColor: accent }}
                 >
-                  <span>Request a Date &amp; Quote</span>
+                  <span>Ask for a Date &amp; Price</span>
                   <ArrowRightIcon className="w-4 h-4" />
                 </a>
                 <a
                   href="#packages"
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-colors"
                 >
-                  Browse Packages
+                  See Packages
                 </a>
               </div>
             </div>
@@ -96,10 +95,10 @@ export function PublicAgencyHome({
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600">
-                      Booking Workflow
+                      How It Works
                     </p>
                     <p className="text-lg font-bold tracking-tight text-slate-900 mt-0.5">
-                      Transparent From Inquiry to Delivery
+                      3 Easy Steps to Book
                     </p>
                   </div>
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
@@ -111,18 +110,18 @@ export function PublicAgencyHome({
                   {[
                     {
                       step: '01',
-                      title: 'Date Inquiry & Curated Quote',
-                      desc: 'Locked line-item pricing snapshots with versioned revisions.',
+                      title: 'Ask for a Date & Price',
+                      desc: 'Tell us your event date and get a clear, itemized price list.',
                     },
                     {
                       step: '02',
-                      title: 'Verified Advance & Crew Lock',
-                      desc: 'Atomic slot reservations prevent double-booking across sessions.',
+                      title: 'Pay Advance & Book',
+                      desc: 'Confirm your booking so no one else can take your date.',
                     },
                     {
                       step: '03',
-                      title: 'Independent Deliverable Tracking',
-                      desc: 'Each gallery, film, or report tracks its own deadline & review.',
+                      title: 'Get Your Photos & Files',
+                      desc: 'Track every photo gallery, video, or item until it is delivered.',
                     },
                   ].map((item) => (
                     <li key={item.step} className="flex items-start gap-3.5">
@@ -150,21 +149,21 @@ export function PublicAgencyHome({
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
-              Curated Offerings
+              Our Offerings
             </p>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
-              Packages &amp; Collections
+              Event Packages
             </h2>
           </div>
           <p className="text-sm text-slate-500 max-w-md">
-            Every package can be customized in a formal quote version before acceptance.
+            Every package can be adjusted to fit your event before you book.
           </p>
         </div>
 
         {packages.length === 0 ? (
           <div className="atelier-card p-10 text-center text-sm text-slate-500">
-            No published packages yet. Submit a custom inquiry below and our coordinator will tailor
-            a quote for your event.
+            No packages listed yet. Send us a message below and we will make a custom price quote
+            for your event.
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -245,10 +244,10 @@ export function PublicAgencyHome({
           <div className="flex items-end justify-between mb-10">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
-                Selected Works
+                Our Work
               </p>
               <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
-                Approved Showcase
+                Past Events
               </h2>
             </div>
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">

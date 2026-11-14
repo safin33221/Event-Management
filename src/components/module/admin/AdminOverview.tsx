@@ -85,9 +85,9 @@ export function AdminOverview({
           </span>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
-              Inquiries ({newInquiriesCount} new)
+              Requests ({newInquiriesCount} new)
             </p>
-            <p className="text-xs text-slate-500 truncate">Log client requests &amp; dates</p>
+            <p className="text-xs text-slate-500 truncate">Write down client event requests</p>
           </div>
         </Link>
 
@@ -100,7 +100,7 @@ export function AdminOverview({
           </span>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
-              Quotes ({openQuotesCount} open)
+              Price Quotes ({openQuotesCount} open)
             </p>
             <p className="text-xs text-slate-500 truncate">Send price &amp; confirm booking</p>
           </div>
@@ -117,7 +117,7 @@ export function AdminOverview({
             <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
               Bookings ({confirmedCount} confirmed)
             </p>
-            <p className="text-xs text-slate-500 truncate">Track payments &amp; deliverables</p>
+            <p className="text-xs text-slate-500 truncate">Track payments &amp; files</p>
           </div>
         </Link>
       </div>
@@ -126,7 +126,7 @@ export function AdminOverview({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="atelier-card p-5">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold text-slate-500">New Inquiries</span>
+            <span className="text-xs font-semibold text-slate-500">New Requests</span>
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
               <SparklesIcon className="w-4 h-4" />
             </span>
@@ -134,7 +134,7 @@ export function AdminOverview({
           <p className="text-3xl font-bold tracking-tight text-slate-900 mt-2.5 tabular-nums">
             {newInquiriesCount}
           </p>
-          <p className="text-xs text-slate-500 mt-1">{inquiries.length} total inquiries</p>
+          <p className="text-xs text-slate-500 mt-1">{inquiries.length} total requests</p>
         </div>
 
         <div className="atelier-card p-5">
@@ -152,7 +152,7 @@ export function AdminOverview({
 
         <div className="atelier-card p-5">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold text-slate-500">Confirmed Events</span>
+            <span className="text-xs font-semibold text-slate-500">Confirmed Bookings</span>
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
               <UsersIcon className="w-4 h-4" />
             </span>
@@ -170,7 +170,7 @@ export function AdminOverview({
 
         <div className="atelier-card p-5">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold text-slate-500">Upcoming Sessions</span>
+            <span className="text-xs font-semibold text-slate-500">Upcoming Events</span>
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
               <CalendarIcon className="w-4 h-4" />
             </span>

@@ -30,20 +30,20 @@ export function StaffWorkspace({
     <div className="space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
-          Crew &amp; Editor Portal
+          Team Portal
         </p>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
-          My Assigned Work
+          My Tasks
         </h1>
       </div>
 
       {assignments.length === 0 ? (
         <div className="atelier-card p-10 text-center space-y-2">
           <UsersIcon className="w-7 h-7 mx-auto text-slate-400" />
-          <p className="text-sm font-semibold text-slate-900">No active assignments</p>
+          <p className="text-sm font-semibold text-slate-900">No tasks right now</p>
           <p className="text-xs text-slate-500 max-w-md mx-auto">
-            When a coordinator assigns you to a booking or session, it will appear here with client
-            contact details and schedule times.
+            When a manager assigns you to an event, you will see the client details and time
+            here.
           </p>
         </div>
       ) : (

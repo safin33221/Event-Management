@@ -35,7 +35,7 @@ export function Navbar({ branding }: NavbarProps) {
               {displayName}
             </span>
             <span className="text-[11px] font-medium text-slate-500 block">
-              Event &amp; Studio Operations
+              Event Management
             </span>
           </div>
         </Link>
@@ -51,13 +51,13 @@ export function Navbar({ branding }: NavbarProps) {
             href="#portfolio"
             className="rounded-full px-4 py-1.5 hover:bg-white hover:text-slate-900 hover:shadow-xs transition-all"
           >
-            Showcase
+            Past Events
           </a>
           <a
             href="#inquire"
             className="rounded-full px-4 py-1.5 hover:bg-white hover:text-slate-900 hover:shadow-xs transition-all"
           >
-            Request Quote
+            Ask for Quote
           </a>
         </nav>
 
@@ -67,13 +67,13 @@ export function Navbar({ branding }: NavbarProps) {
             className="inline-flex items-center rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
             style={{ backgroundColor: accent }}
           >
-            Inquire Now
+            Book Now
           </a>
           <Link
             href="/login"
             className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-colors"
           >
-            Studio Portal
+            Team Login
           </Link>
         </div>
       </div>

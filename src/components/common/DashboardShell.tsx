@@ -103,7 +103,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
             href="/"
             className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors"
           >
-            View Public Storefront ↗
+            View Public Website ↗
           </Link>
 
           <div className="flex items-center justify-between gap-2 pt-1">
