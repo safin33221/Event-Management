@@ -138,10 +138,10 @@ export function CalendarWorkspace({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#6B655D]">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#64748B]">
             Studio Calendar • {timezone}
           </p>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold text-[#141312] mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A] mt-1">
             Shoot & Event Schedule
           </h1>
         </div>
@@ -151,20 +151,20 @@ export function CalendarWorkspace({
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="rounded-xl border border-[#D8CFC2] bg-white px-3 py-2 text-xs"
+            className="rounded-xl border border-[#CBD5E1] bg-white px-3 py-2 text-xs"
           />
-          <span className="text-xs text-[#6B655D]">to</span>
+          <span className="text-xs text-[#64748B]">to</span>
           <input
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="rounded-xl border border-[#D8CFC2] bg-white px-3 py-2 text-xs"
+            className="rounded-xl border border-[#CBD5E1] bg-white px-3 py-2 text-xs"
           />
           <button
             type="button"
             disabled={isPending}
             onClick={() => refreshCalendar(from, to)}
-            className="rounded-xl bg-[#141312] px-4 py-2 text-xs font-semibold text-white"
+            className="rounded-xl bg-[#0F172A] px-4 py-2 text-xs font-semibold text-white"
           >
             Filter
           </button>
@@ -188,8 +188,8 @@ export function CalendarWorkspace({
         {/* Left: Schedule Session & Resources */}
         <div className="lg:col-span-5 space-y-6">
           <form onSubmit={handleCreateSession} className="atelier-card p-5 space-y-3">
-            <h2 className="font-display text-2xl font-semibold">Schedule Session</h2>
-            <p className="text-xs text-[#6B655D]">
+            <h2 className="text-lg font-bold tracking-tight">Schedule Session</h2>
+            <p className="text-xs text-[#64748B]">
               Half-open slots <span className="font-mono-code">[start, end)</span> allow adjacent
               bookings while blocking overlaps atomically.
             </p>
@@ -197,7 +197,7 @@ export function CalendarWorkspace({
               required
               value={bookingId}
               onChange={(e) => setBookingId(e.target.value)}
-              className="w-full rounded-xl border border-[#D8CFC2] bg-[#FAF8F5] px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
             >
               <option value="">Select a booking...</option>
               {bookings.map((b) => (
@@ -211,11 +211,11 @@ export function CalendarWorkspace({
               value={sessionTitle}
               onChange={(e) => setSessionTitle(e.target.value)}
               placeholder="Session title (e.g. Holud Coverage / Keynote)"
-              className="w-full rounded-xl border border-[#D8CFC2] bg-[#FAF8F5] px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
             />
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] font-semibold uppercase text-[#6B655D] mb-1">
+                <label className="block text-[10px] font-semibold uppercase text-[#64748B] mb-1">
                   Start
                 </label>
                 <input
@@ -223,11 +223,11 @@ export function CalendarWorkspace({
                   required
                   value={startLocal}
                   onChange={(e) => setStartLocal(e.target.value)}
-                  className="w-full rounded-xl border border-[#D8CFC2] bg-[#FAF8F5] px-2.5 py-2 text-xs"
+                  className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-2.5 py-2 text-xs"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold uppercase text-[#6B655D] mb-1">
+                <label className="block text-[10px] font-semibold uppercase text-[#64748B] mb-1">
                   End
                 </label>
                 <input
@@ -235,7 +235,7 @@ export function CalendarWorkspace({
                   required
                   value={endLocal}
                   onChange={(e) => setEndLocal(e.target.value)}
-                  className="w-full rounded-xl border border-[#D8CFC2] bg-[#FAF8F5] px-2.5 py-2 text-xs"
+                  className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-2.5 py-2 text-xs"
                 />
               </div>
             </div>
@@ -243,12 +243,12 @@ export function CalendarWorkspace({
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Venue / Location (optional)"
-              className="w-full rounded-xl border border-[#D8CFC2] bg-[#FAF8F5] px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
             />
 
             {resources.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold uppercase text-[#6B655D] mb-1.5">
+                <p className="text-[11px] font-semibold uppercase text-[#64748B] mb-1.5">
                   Reserve Crew & Resources
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -262,8 +262,8 @@ export function CalendarWorkspace({
                         className={cn(
                           'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                           active
-                            ? 'bg-[#141312] text-white border-[#141312]'
-                            : 'bg-[#FAF8F5] text-[#4A453F] border-[#D8CFC2]',
+                            ? 'bg-[#0F172A] text-white border-[#0F172A]'
+                            : 'bg-[#F8FAFC] text-[#475569] border-[#CBD5E1]',
                         )}
                       >
                         {r.name} ({r.type})
@@ -277,7 +277,7 @@ export function CalendarWorkspace({
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#141312] px-4 py-2.5 text-xs font-semibold text-white"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2.5 text-xs font-semibold text-white"
             >
               <CalendarIcon className="w-4 h-4" />
               <span>Reserve Slot</span>
@@ -285,19 +285,19 @@ export function CalendarWorkspace({
           </form>
 
           <form onSubmit={handleAddResource} className="atelier-card p-5 space-y-3">
-            <h3 className="font-display text-xl font-semibold">Crew & Equipment Pool</h3>
+            <h3 className="text-base font-bold tracking-tight">Crew & Equipment Pool</h3>
             <div className="flex gap-2">
               <input
                 required
                 value={resName}
                 onChange={(e) => setResName(e.target.value)}
                 placeholder="Resource name"
-                className="flex-1 rounded-xl border border-[#D8CFC2] bg-[#FAF8F5] px-3 py-2 text-xs"
+                className="flex-1 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
               />
               <select
                 value={resType}
                 onChange={(e) => setResType(e.target.value as ResourceType)}
-                className="rounded-xl border border-[#D8CFC2] bg-[#FAF8F5] px-2.5 py-2 text-xs"
+                className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-2.5 py-2 text-xs"
               >
                 <option value="CREW">Crew</option>
                 <option value="EQUIPMENT">Equipment</option>
@@ -307,7 +307,7 @@ export function CalendarWorkspace({
               <button
                 type="submit"
                 disabled={isPending}
-                className="rounded-xl border border-[#D8CFC2] px-3 py-2 text-xs font-semibold hover:bg-[#F3EFE9]"
+                className="rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold hover:bg-[#F1F5F9]"
               >
                 <PlusIcon className="w-4 h-4" />
               </button>
@@ -317,9 +317,9 @@ export function CalendarWorkspace({
 
         {/* Right: Local-Date Grouped Timeline */}
         <div className="lg:col-span-7 atelier-card p-6 space-y-5">
-          <h2 className="font-display text-2xl font-semibold">Scheduled Sessions</h2>
+          <h2 className="text-lg font-bold tracking-tight">Scheduled Sessions</h2>
           {Object.keys(grouped).length === 0 ? (
-            <p className="text-sm text-[#6B655D] py-10 text-center">
+            <p className="text-sm text-[#64748B] py-10 text-center">
               No sessions scheduled between {from} and {to} ({timezone}).
             </p>
           ) : (
@@ -328,11 +328,11 @@ export function CalendarWorkspace({
                 .sort(([a], [b]) => a.localeCompare(b))
                 .map(([localDate, items]) => (
                   <div key={localDate} className="space-y-2.5">
-                    <div className="flex items-center gap-2 border-b border-[#E6DFD5] pb-1.5">
-                      <span className="font-mono-code text-xs font-semibold text-[#B45309]">
+                    <div className="flex items-center gap-2 border-b border-[#E2E8F0] pb-1.5">
+                      <span className="font-mono-code text-xs font-semibold text-[#4F46E5]">
                         {localDate}
                       </span>
-                      <span className="text-[11px] text-[#6B655D]">
+                      <span className="text-[11px] text-[#64748B]">
                         ({items.length} session{items.length === 1 ? '' : 's'})
                       </span>
                     </div>
@@ -340,20 +340,20 @@ export function CalendarWorkspace({
                     {items.map((s) => (
                       <div
                         key={s.id}
-                        className="rounded-xl border border-[#E6DFD5] bg-[#FAF8F5] p-4 flex flex-wrap items-center justify-between gap-3"
+                        className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 flex flex-wrap items-center justify-between gap-3"
                       >
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-semibold text-sm">{s.title}</p>
                             <StatusBadge status={s.status} />
                           </div>
-                          <p className="text-xs text-[#6B655D] mt-1">
+                          <p className="text-xs text-[#64748B] mt-1">
                             {formatDateTimeInTz(s.startAt, timezone)} →{' '}
                             {formatDateTimeInTz(s.endAt, timezone)}
                             {s.location ? ` • ${s.location}` : ''}
                           </p>
                           {s.booking && (
-                            <p className="text-[11px] text-[#4A453F] mt-1">
+                            <p className="text-[11px] text-[#475569] mt-1">
                               {s.booking.reference} • {s.booking.eventTitle} ({s.booking.clientName})
                             </p>
                           )}
@@ -362,7 +362,7 @@ export function CalendarWorkspace({
                               {s.reservations.map((r) => (
                                 <span
                                   key={r.id}
-                                  className="rounded-full bg-white border border-[#D8CFC2] px-2.5 py-0.5 text-[10px] font-medium"
+                                  className="rounded-full bg-white border border-[#CBD5E1] px-2.5 py-0.5 text-[10px] font-medium"
                                 >
                                   {r.resource?.name || r.resourceId}
                                 </span>
@@ -376,7 +376,7 @@ export function CalendarWorkspace({
                             type="button"
                             disabled={isPending}
                             onClick={() => handleCompleteSession(s.id)}
-                            className="rounded-xl border border-[#D8CFC2] bg-white px-3 py-1.5 text-xs font-semibold hover:bg-[#141312] hover:text-white transition-colors"
+                            className="rounded-xl border border-[#CBD5E1] bg-white px-3 py-1.5 text-xs font-semibold hover:bg-[#0F172A] hover:text-white transition-colors"
                           >
                             Complete
                           </button>

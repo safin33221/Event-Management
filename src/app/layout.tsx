@@ -1,14 +1,8 @@
 import type { Metadata } from 'next';
-import { Cormorant_Garamond, JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 
-const displayFont = Cormorant_Garamond({
-  variable: '--font-display',
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-});
-
-const sansFont = Plus_Jakarta_Sans({
+const sansFont = Inter({
   variable: '--font-sans',
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
@@ -34,9 +28,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${displayFont.variable} ${sansFont.variable} ${monoFont.variable} h-full antialiased`}
+      className={`${sansFont.variable} ${monoFont.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#FAF8F5] text-[#141312] font-sans selection:bg-[#C69C6D]/25 selection:text-[#141312]">
+      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-indigo-500/15 selection:text-indigo-950">
         {children}
       </body>
     </html>
