@@ -43,15 +43,32 @@ export function BookingReceiptModal({ bookingId, onClose }: BookingReceiptModalP
               Verified studio financial summary &amp; accepted package terms
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {receipt && (
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
-              >
-                Print / Save PDF
-              </button>
+              <>
+                <a
+                  href={`/api/bookings/${encodeURIComponent(bookingId)}/invoice.pdf?disposition=inline`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                >
+                  Preview PDF
+                </a>
+                <a
+                  href={`/api/bookings/${encodeURIComponent(bookingId)}/invoice.pdf`}
+                  download
+                  className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                >
+                  Download PDF Invoice
+                </a>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Print
+                </button>
+              </>
             )}
             <button
               type="button"

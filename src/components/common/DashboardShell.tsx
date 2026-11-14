@@ -55,9 +55,9 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
 
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-900">
-      {/* Sidebar */}
-      <aside className="hidden lg:flex w-64 flex-col border-r border-slate-200 bg-white">
-        <div className="p-5 border-b border-slate-200">
+      {/* Fixed Sidebar */}
+      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 w-64 flex-col border-r border-slate-200 bg-white">
+        <div className="p-5 border-b border-slate-200 shrink-0">
           <Link href="/admin" className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
               <SparklesIcon className="w-4 h-4" />
@@ -73,7 +73,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
           </Link>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active =
@@ -130,7 +130,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
         {/* Mobile Header */}
         <header className="lg:hidden sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 py-3 space-y-2.5">
           <div className="flex items-center justify-between">

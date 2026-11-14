@@ -84,6 +84,12 @@ interface BookingsWorkspaceProps {
   timezone: string;
   initialTab?: 'inquiries' | 'quotes' | 'bookings';
   initialSelectedBookingId?: string;
+  initialSelectedBooking?: Booking | null;
+  initialLedger?: {
+    summary: BookingLedgerSummary;
+    entries: PaymentEntry[];
+  } | null;
+  isDetailPage?: boolean;
 }
 
 function getDefaultSlotFromEventDate(eventDate?: string | null): { start: string; end: string } {
@@ -114,6 +120,9 @@ export function BookingsWorkspace({
   timezone,
   initialTab = 'bookings',
   initialSelectedBookingId,
+  initialSelectedBooking = null,
+  initialLedger = null,
+  isDetailPage = false,
 }: BookingsWorkspaceProps) {
   const [tab, setTab] = useState<'inquiries' | 'quotes' | 'bookings'>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,11 +132,11 @@ export function BookingsWorkspace({
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [resources, setResources] = useState<Resource[]>(initialResources);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(initialSelectedBooking);
   const [ledger, setLedger] = useState<{
     summary: BookingLedgerSummary;
     entries: PaymentEntry[];
-  } | null>(null);
+  } | null>(initialLedger);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [renderNowMs] = useState(() => Date.now());
@@ -829,72 +838,76 @@ export function BookingsWorkspace({
 
   return (
     <div className="space-y-6">
-      {/* Header & Step Tabs */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            Bookings &amp; Payments
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            3 easy steps: 1. Client Request → 2. Price Quote → 3. Booking &amp; Payments
-          </p>
-        </div>
+      {/* Header & Step Tabs (hidden on dedicated booking detail route) */}
+      {!isDetailPage && (
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              Bookings &amp; Payments
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              3 easy steps: 1. Client Request → 2. Price Quote → 3. Booking &amp; Payments
+            </p>
+          </div>
 
-        <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-white p-1 gap-1">
-          {[
-            { key: 'inquiries' as const, label: `1. Requests (${inquiries.length})` },
-            { key: 'quotes' as const, label: `2. Quotes (${quotes.length})` },
-            { key: 'bookings' as const, label: `3. Bookings (${bookings.length})` },
-          ].map((item) => (
+          <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-white p-1 gap-1">
+            {[
+              { key: 'inquiries' as const, label: `1. Requests (${inquiries.length})` },
+              { key: 'quotes' as const, label: `2. Quotes (${quotes.length})` },
+              { key: 'bookings' as const, label: `3. Bookings (${bookings.length})` },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setTab(item.key)}
+                className={cn(
+                  'rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors',
+                  tab === item.key
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Search + Quick Add Bar (hidden when viewing a single booking detail) */}
+      {!(tab === 'bookings' && selectedBooking) && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by client name, event, or reference..."
+            className="w-full sm:max-w-sm rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+          />
+
+          {tab === 'inquiries' && (
             <button
-              key={item.key}
               type="button"
-              onClick={() => setTab(item.key)}
-              className={cn(
-                'rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors',
-                tab === item.key
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
-              )}
+              onClick={() => setShowInquiryForm((v) => !v)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
             >
-              {item.label}
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span>{showInquiryForm ? 'Close Form' : 'New Request'}</span>
             </button>
-          ))}
+          )}
+
+          {tab === 'quotes' && (
+            <button
+              type="button"
+              onClick={() => setShowQuoteForm((v) => !v)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span>{showQuoteForm ? 'Close Form' : 'New Quote'}</span>
+            </button>
+          )}
         </div>
-      </div>
-
-      {/* Search + Quick Add Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by client name, event, or reference..."
-          className="w-full sm:max-w-sm rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
-        />
-
-        {tab === 'inquiries' && (
-          <button
-            type="button"
-            onClick={() => setShowInquiryForm((v) => !v)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-          >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span>{showInquiryForm ? 'Close Form' : 'New Request'}</span>
-          </button>
-        )}
-
-        {tab === 'quotes' && (
-          <button
-            type="button"
-            onClick={() => setShowQuoteForm((v) => !v)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-          >
-            <PlusIcon className="w-3.5 h-3.5" />
-            <span>{showQuoteForm ? 'Close Form' : 'New Quote'}</span>
-          </button>
-        )}
-      </div>
+      )}
 
       {feedback && (
         <div
@@ -1361,58 +1374,87 @@ export function BookingsWorkspace({
       )}
 
       {/* TAB 3: BOOKINGS */}
-      {tab === 'bookings' && (
-        <div className="grid gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-5 atelier-card p-5 space-y-3 h-fit">
+      {tab === 'bookings' && !selectedBooking && (
+        <div className="atelier-card p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h2 className="text-base font-bold tracking-tight text-slate-900">
               All Bookings ({filteredBookings.length})
             </h2>
-            {filteredBookings.length === 0 ? (
-              <p className="text-sm text-slate-500 py-8 text-center">
-                No bookings yet. Accept a quote to create your first booking.
-              </p>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {filteredBookings.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => openBookingDetail(b.id)}
-                    className={cn(
-                      'w-full text-left py-3 px-3 rounded-xl transition-colors flex items-center justify-between gap-2',
-                      selectedBooking?.id === b.id
-                        ? 'bg-indigo-50/70 ring-1 ring-indigo-200'
-                        : 'hover:bg-slate-50',
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono-code text-xs font-semibold text-slate-500">
-                          {b.reference}
+            <p className="text-xs text-slate-500">Click any booking to open details &amp; payments</p>
+          </div>
+          {filteredBookings.length === 0 ? (
+            <p className="text-sm text-slate-500 py-10 text-center">
+              No bookings yet. Accept a quote to create your first booking.
+            </p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {filteredBookings.map((b) => (
+                <Link
+                  key={b.id}
+                  href={`/admin/bookings/${b.id}`}
+                  className="w-full text-left py-4 px-3 rounded-xl hover:bg-slate-50 transition-colors flex flex-wrap items-center justify-between gap-4 group"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono-code text-xs font-semibold text-slate-500">
+                        {b.reference}
+                      </span>
+                      <StatusBadge status={b.status} />
+                      {b.eventType && (
+                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                          {b.eventType.name}
                         </span>
-                        <StatusBadge status={b.status} />
-                      </div>
-                      <p className="text-sm font-semibold text-slate-900 truncate mt-1">
-                        {b.eventTitle}
-                      </p>
-                      <p className="text-xs text-slate-500">{b.clientName}</p>
+                      )}
                     </div>
-                    <span className="font-mono-code text-xs font-semibold text-slate-900 shrink-0 tabular-nums">
-                      {formatPoisha(b.agreedTotalPoisha, b.currency)}
+                    <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
+                      {b.eventTitle}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {b.clientName} ({b.clientPhone}) • Event Date: {formatLocalDate(b.eventDate)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="text-right">
+                      <p className="text-[10px] font-semibold uppercase text-slate-400">Total Price</p>
+                      <p className="font-mono-code text-sm font-semibold text-slate-900 tabular-nums">
+                        {formatPoisha(b.agreedTotalPoisha, b.currency)}
+                      </p>
+                    </div>
+                    <span className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 group-hover:border-indigo-300 group-hover:text-indigo-600 transition-colors">
+                      View Details →
                     </span>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'bookings' && selectedBooking && (
+        <div className="space-y-6">
+          <div>
+            {isDetailPage ? (
+              <Link
+                href="/admin/bookings"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+              >
+                <span>← Back to All Bookings</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBooking(null);
+                  setLedger(null);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+              >
+                <span>← Back to All Bookings</span>
+              </button>
             )}
           </div>
-
-          <div className="lg:col-span-7 space-y-6">
-            {!selectedBooking ? (
-              <div className="atelier-card p-12 text-center text-sm text-slate-500">
-                Click any booking on the left to view payments, confirm the event, or track
-                deliverables.
-              </div>
-            ) : (
+          <div className="space-y-6">
               <>
                 <div className="atelier-card p-6 space-y-5">
                   <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
@@ -1445,8 +1487,15 @@ export function BookingsWorkspace({
                         className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                       >
                         <ReceiptIcon className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Money Receipt</span>
+                        <span>Receipt View</span>
                       </button>
+                      <a
+                        href={`/api/bookings/${encodeURIComponent(selectedBooking.id)}/invoice.pdf`}
+                        download
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                      >
+                        <span>PDF Invoice</span>
+                      </a>
 
                       {selectedBooking.status === 'PENDING_CONFIRMATION' && (
                         <>
@@ -2273,7 +2322,6 @@ export function BookingsWorkspace({
                   )}
                 </div>
               </>
-            )}
           </div>
         </div>
       )}
