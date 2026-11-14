@@ -21,17 +21,33 @@ export async function getBooking(id: string): Promise<ActionResult<Booking>> {
   return parseApiResponse<Booking>(res);
 }
 
+export interface ConfirmBookingSessionInput {
+  title: string;
+  startAt: string;
+  endAt: string;
+  location?: string;
+  notes?: string;
+  resourceIds?: string[];
+  reason?: string;
+}
+
 export async function confirmBooking(
   id: string,
   expectedVersion?: number,
+  sessions?: ConfirmBookingSessionInput[],
 ): Promise<ActionResult<{ booking: Booking }>> {
+  const body: { expectedVersion?: number; sessions?: ConfirmBookingSessionInput[] } = {};
+  if (expectedVersion !== undefined) body.expectedVersion = expectedVersion;
+  if (sessions && sessions.length > 0) body.sessions = sessions;
+
   const res = await serverFetch.post(`/bookings/${encodeURIComponent(id)}/confirm`, {
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(expectedVersion !== undefined ? { expectedVersion } : {}),
+    body: JSON.stringify(body),
   });
   const result = await parseApiResponse<{ booking: Booking }>(res);
   if (result.ok) {
     revalidatePath('/admin/bookings');
+    revalidatePath('/admin/calendar');
     revalidatePath('/admin');
   }
   return result;
@@ -45,6 +61,7 @@ export async function completeBooking(id: string): Promise<ActionResult<{ bookin
   const result = await parseApiResponse<{ booking: Booking }>(res);
   if (result.ok) {
     revalidatePath('/admin/bookings');
+    revalidatePath('/admin/calendar');
     revalidatePath('/admin');
   }
   return result;

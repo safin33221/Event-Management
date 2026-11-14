@@ -1,15 +1,19 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
+import Link from 'next/link';
 import {
   AcceptanceChannel,
   Booking,
   BookingLedgerSummary,
   Deliverable,
+  EventSession,
   Inquiry,
   PaymentEntry,
   PaymentMethod,
   Quote,
+  Resource,
+  ResourceType,
   StudioPackage,
 } from '@/types/event-management';
 import { createPhoneInquiry } from '@/service/inquiries/inquiries.service';
@@ -28,16 +32,41 @@ import {
   createDeliverable,
   deliverDeliverable,
 } from '@/service/operations/operations.service';
-import { cn, formatLocalDate, formatPoisha } from '@/lib/utils';
+import {
+  cancelSession,
+  completeSession,
+  createResource,
+  createSession,
+  rescheduleSession,
+} from '@/service/schedule/schedule.service';
+import { cn, formatDateTimeInTz, formatLocalDate, formatPoisha } from '@/lib/utils';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { PlusIcon } from '@/components/shared/Icons';
+import { CalendarIcon, PlusIcon } from '@/components/shared/Icons';
 
 interface BookingsWorkspaceProps {
   initialInquiries: Inquiry[];
   initialQuotes: Quote[];
   initialBookings: Booking[];
   packages: StudioPackage[];
+  initialResources: Resource[];
   currency: string;
+  timezone: string;
+}
+
+function getDefaultSlotFromEventDate(eventDate?: string | null): { start: string; end: string } {
+  const datePart = eventDate ? eventDate.slice(0, 10) : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return { start: '', end: '' };
+  }
+  return { start: `${datePart}T10:00`, end: `${datePart}T18:00` };
+}
+
+function toLocalDateTimeInput(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function BookingsWorkspace({
@@ -45,7 +74,9 @@ export function BookingsWorkspace({
   initialQuotes,
   initialBookings,
   packages,
+  initialResources,
   currency,
+  timezone,
 }: BookingsWorkspaceProps) {
   const [tab, setTab] = useState<'inquiries' | 'quotes' | 'bookings'>('bookings');
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,6 +85,7 @@ export function BookingsWorkspace({
   const [inquiries, setInquiries] = useState<Inquiry[]>(initialInquiries);
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
+  const [resources, setResources] = useState<Resource[]>(initialResources);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [ledger, setLedger] = useState<{
     summary: BookingLedgerSummary;
@@ -83,16 +115,58 @@ export function BookingsWorkspace({
   const [payRef, setPayRef] = useState('');
   const [payIdemKey, setPayIdemKey] = useState('');
 
+  // Integrated Schedule & Crew state
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [scheduleOnConfirm, setScheduleOnConfirm] = useState(false);
+  const [schedTitle, setSchedTitle] = useState('');
+  const [schedStart, setSchedStart] = useState('');
+  const [schedEnd, setSchedEnd] = useState('');
+  const [schedLocation, setSchedLocation] = useState('');
+  const [schedResourceIds, setSchedResourceIds] = useState<string[]>([]);
+
+  // Inline quick resource creation
+  const [showQuickResource, setShowQuickResource] = useState(false);
+  const [newResName, setNewResName] = useState('');
+  const [newResType, setNewResType] = useState<ResourceType>('CREW');
+
+  // Inline session reschedule / cancel state
+  const [reschedSessionId, setReschedSessionId] = useState<string | null>(null);
+  const [reschedStart, setReschedStart] = useState('');
+  const [reschedEnd, setReschedEnd] = useState('');
+  const [reschedReason, setReschedReason] = useState('');
+  const [reschedResourceIds, setReschedResourceIds] = useState<string[]>([]);
+  const [cancellingSessionId, setCancellingSessionId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+
   // Deliverable state
   const [delivLabel, setDelivLabel] = useState('');
 
   const notify = (type: 'ok' | 'err', text: string) => setFeedback({ type, text });
 
-  const openBookingDetail = (bookingId: string) => {
+  const prefillScheduleDefaults = (booking: Booking) => {
+    const slot = getDefaultSlotFromEventDate(booking.eventDate);
+    setSchedTitle(booking.eventTitle);
+    setSchedStart(slot.start);
+    setSchedEnd(slot.end);
+    setSchedLocation('');
+    setSchedResourceIds([]);
+    setScheduleOnConfirm(false);
+    setShowScheduleForm(false);
+    setReschedSessionId(null);
+    setCancellingSessionId(null);
+  };
+
+  const openBookingDetail = (bookingId: string, resetScheduleForm = true) => {
     startTransition(async () => {
       const [bRes, lRes] = await Promise.all([getBooking(bookingId), getBookingLedger(bookingId)]);
       if (bRes.ok && bRes.data) {
         setSelectedBooking(bRes.data);
+        setBookings((prev) =>
+          prev.map((item) => (item.id === bRes.data!.id ? { ...item, ...bRes.data! } : item)),
+        );
+        if (resetScheduleForm) {
+          prefillScheduleDefaults(bRes.data);
+        }
       }
       if (lRes.ok && lRes.data) {
         setLedger(lRes.data);
@@ -230,8 +304,31 @@ export function BookingsWorkspace({
 
   const handleConfirmBooking = () => {
     if (!selectedBooking) return;
+
+    const existingSessionsCount = selectedBooking.sessions?.length ?? 0;
+    const includeInitialSession = scheduleOnConfirm && existingSessionsCount === 0;
+    if (includeInitialSession && (!schedTitle.trim() || !schedStart || !schedEnd)) {
+      notify('err', 'Enter shoot title, start time, and end time to schedule on confirmation');
+      return;
+    }
+
     startTransition(async () => {
-      const res = await confirmBooking(selectedBooking.id, selectedBooking.version);
+      const res = await confirmBooking(
+        selectedBooking.id,
+        selectedBooking.version,
+        includeInitialSession
+          ? [
+              {
+                title: schedTitle.trim(),
+                startAt: new Date(schedStart).toISOString(),
+                endAt: new Date(schedEnd).toISOString(),
+                location: schedLocation.trim() || undefined,
+                resourceIds: schedResourceIds,
+                reason: 'Scheduled during booking confirmation',
+              },
+            ]
+          : undefined,
+      );
       if (!res.ok || !res.data) {
         notify('err', res.message || 'Unable to confirm booking');
         return;
@@ -240,7 +337,129 @@ export function BookingsWorkspace({
         bookings.map((b) => (b.id === selectedBooking.id ? res.data!.booking : b)),
       );
       openBookingDetail(selectedBooking.id);
-      notify('ok', `Booking ${selectedBooking.reference} confirmed`);
+      notify(
+        'ok',
+        includeInitialSession
+          ? `Booking ${selectedBooking.reference} confirmed and shoot scheduled`
+          : `Booking ${selectedBooking.reference} confirmed`,
+      );
+    });
+  };
+
+  const toggleSchedResource = (id: string) => {
+    setSchedResourceIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const toggleReschedResource = (id: string) => {
+    setReschedResourceIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const handleQuickAddResource = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newResName.trim()) return;
+    startTransition(async () => {
+      const res = await createResource({ name: newResName.trim(), type: newResType });
+      if (!res.ok || !res.data) {
+        notify('err', res.message || 'Failed to add crew/resource');
+        return;
+      }
+      setResources((prev) => [...prev, res.data!]);
+      setSchedResourceIds((prev) => [...prev, res.data!.id]);
+      setNewResName('');
+      setShowQuickResource(false);
+      notify('ok', `Added ${res.data.type}: ${res.data.name}`);
+    });
+  };
+
+  const handleCreateSession = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBooking) return;
+    if (!schedTitle.trim() || !schedStart || !schedEnd) {
+      notify('err', 'Enter shoot title, start time, and end time');
+      return;
+    }
+    startTransition(async () => {
+      const res = await createSession(selectedBooking.id, {
+        title: schedTitle.trim(),
+        startAt: new Date(schedStart).toISOString(),
+        endAt: new Date(schedEnd).toISOString(),
+        location: schedLocation.trim() || undefined,
+        resourceIds: schedResourceIds,
+      });
+      if (!res.ok) {
+        notify('err', res.message || 'Crew/resource conflict or invalid time slot');
+        return;
+      }
+      openBookingDetail(selectedBooking.id);
+      notify('ok', 'Shoot session scheduled and crew reserved');
+    });
+  };
+
+  const openReschedule = (s: EventSession) => {
+    setReschedSessionId(s.id);
+    setReschedStart(toLocalDateTimeInput(s.startAt));
+    setReschedEnd(toLocalDateTimeInput(s.endAt));
+    setReschedReason('');
+    setReschedResourceIds(s.reservations?.map((r) => r.resourceId) || []);
+    setCancellingSessionId(null);
+  };
+
+  const handleRescheduleSession = (e: React.FormEvent, sessionId: string) => {
+    e.preventDefault();
+    if (!selectedBooking || !reschedStart || !reschedEnd || !reschedReason.trim()) {
+      notify('err', 'Provide new time range and a reschedule reason');
+      return;
+    }
+    startTransition(async () => {
+      const res = await rescheduleSession(sessionId, {
+        startAt: new Date(reschedStart).toISOString(),
+        endAt: new Date(reschedEnd).toISOString(),
+        reason: reschedReason.trim(),
+        resourceIds: reschedResourceIds,
+      });
+      if (!res.ok) {
+        notify('err', res.message || 'Reschedule failed (check for resource conflict)');
+        return;
+      }
+      setReschedSessionId(null);
+      openBookingDetail(selectedBooking.id, false);
+      notify('ok', 'Session rescheduled');
+    });
+  };
+
+  const handleCompleteSession = (sessionId: string) => {
+    if (!selectedBooking) return;
+    startTransition(async () => {
+      const res = await completeSession(sessionId);
+      if (!res.ok) {
+        notify('err', res.message || 'Failed to mark session completed');
+        return;
+      }
+      openBookingDetail(selectedBooking.id, false);
+      notify('ok', 'Shoot session marked completed (balance & deliverables preserved)');
+    });
+  };
+
+  const handleCancelSession = (e: React.FormEvent, sessionId: string) => {
+    e.preventDefault();
+    if (!selectedBooking || !cancelReason.trim()) {
+      notify('err', 'Please provide a cancellation reason');
+      return;
+    }
+    startTransition(async () => {
+      const res = await cancelSession(sessionId, cancelReason.trim());
+      if (!res.ok) {
+        notify('err', res.message || 'Failed to cancel session');
+        return;
+      }
+      setCancellingSessionId(null);
+      setCancelReason('');
+      openBookingDetail(selectedBooking.id, false);
+      notify('ok', 'Session cancelled and reserved crew released');
     });
   };
 
@@ -704,14 +923,33 @@ export function BookingsWorkspace({
 
                     <div className="flex flex-wrap gap-2">
                       {selectedBooking.status === 'PENDING_CONFIRMATION' && (
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={handleConfirmBooking}
-                          className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
-                        >
-                          Confirm Booking
-                        </button>
+                        <>
+                          {(selectedBooking.sessions?.length ?? 0) === 0 && (
+                            <button
+                              type="button"
+                              disabled={isPending}
+                              onClick={() => setScheduleOnConfirm((v) => !v)}
+                              className={cn(
+                                'rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors',
+                                scheduleOnConfirm
+                                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                              )}
+                            >
+                              {scheduleOnConfirm ? 'Hide Shoot Slot' : '+ Add Shoot on Confirm'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            onClick={handleConfirmBooking}
+                            className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                          >
+                            {scheduleOnConfirm && (selectedBooking.sessions?.length ?? 0) === 0
+                              ? 'Confirm & Schedule'
+                              : 'Confirm Booking'}
+                          </button>
+                        </>
                       )}
                       {selectedBooking.status === 'CONFIRMED' && (
                         <button
@@ -725,6 +963,69 @@ export function BookingsWorkspace({
                       )}
                     </div>
                   </div>
+
+                  {selectedBooking.status === 'PENDING_CONFIRMATION' &&
+                    scheduleOnConfirm &&
+                    (selectedBooking.sessions?.length ?? 0) === 0 && (
+                      <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-3">
+                        <p className="text-xs font-semibold text-indigo-900">
+                          Initial Shoot &amp; Crew Slot (confirmed together atomically)
+                        </p>
+                        <div className="grid sm:grid-cols-2 gap-2.5">
+                          <input
+                            value={schedTitle}
+                            onChange={(e) => setSchedTitle(e.target.value)}
+                            placeholder="Session title"
+                            className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs"
+                          />
+                          <input
+                            value={schedLocation}
+                            onChange={(e) => setSchedLocation(e.target.value)}
+                            placeholder="Venue / Location (optional)"
+                            className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs"
+                          />
+                          <div>
+                            <label className="block text-[10px] font-semibold uppercase text-indigo-700 mb-1">
+                              Start ({timezone})
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={schedStart}
+                              onChange={(e) => setSchedStart(e.target.value)}
+                              className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-mono-code"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold uppercase text-indigo-700 mb-1">
+                              End ({timezone})
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={schedEnd}
+                              onChange={(e) => setSchedEnd(e.target.value)}
+                              className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-mono-code"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {resources.map((r) => (
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => toggleSchedResource(r.id)}
+                              className={cn(
+                                'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                                schedResourceIds.includes(r.id)
+                                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                                  : 'border-indigo-200 bg-white text-slate-700 hover:bg-indigo-100/50',
+                              )}
+                            >
+                              {r.name} ({r.type})
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                   {ledger && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -824,6 +1125,323 @@ export function BookingsWorkspace({
                               </button>
                             )}
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Shoot & Event Schedule (managed directly inside Booking Management) */}
+                <div className="atelier-card p-6 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-base font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                        <CalendarIcon className="w-4 h-4 text-indigo-600" />
+                        <span>Shoot &amp; Event Schedule ({selectedBooking.sessions?.length ?? 0})</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Manage shoot slots &amp; crew directly for {selectedBooking.reference} •{' '}
+                        <Link href="/admin/calendar" className="underline underline-offset-2 hover:text-slate-800">
+                          View Master Calendar ↗
+                        </Link>
+                      </p>
+                    </div>
+                    {selectedBooking.status !== 'CANCELLED' && (
+                      <button
+                        type="button"
+                        onClick={() => setShowScheduleForm((v) => !v)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <PlusIcon className="w-3.5 h-3.5" />
+                        <span>{showScheduleForm ? 'Close' : 'Schedule Session'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {showScheduleForm && selectedBooking.status !== 'CANCELLED' && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                      <form onSubmit={handleCreateSession} className="space-y-3">
+                        <div className="grid sm:grid-cols-2 gap-2.5">
+                          <input
+                            required
+                            value={schedTitle}
+                            onChange={(e) => setSchedTitle(e.target.value)}
+                            placeholder="Session title (e.g. Holud, Reception)"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                          />
+                          <input
+                            value={schedLocation}
+                            onChange={(e) => setSchedLocation(e.target.value)}
+                            placeholder="Venue / Location (optional)"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                          />
+                          <div>
+                            <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">
+                              Start ({timezone})
+                            </label>
+                            <input
+                              required
+                              type="datetime-local"
+                              value={schedStart}
+                              onChange={(e) => setSchedStart(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono-code"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">
+                              End ({timezone})
+                            </label>
+                            <input
+                              required
+                              type="datetime-local"
+                              value={schedEnd}
+                              onChange={(e) => setSchedEnd(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono-code"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-slate-600">
+                              Reserve Crew / Gear
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowQuickResource((v) => !v)}
+                              className="text-[11px] font-semibold text-indigo-600 hover:underline"
+                            >
+                              {showQuickResource ? 'Cancel Quick Add' : '+ Quick Add Crew/Gear'}
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {resources.length === 0 ? (
+                              <span className="text-[11px] text-slate-500">
+                                No crew or equipment added yet.
+                              </span>
+                            ) : (
+                              resources.map((r) => (
+                                <button
+                                  key={r.id}
+                                  type="button"
+                                  onClick={() => toggleSchedResource(r.id)}
+                                  className={cn(
+                                    'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                                    schedResourceIds.includes(r.id)
+                                      ? 'border-slate-900 bg-slate-900 text-white'
+                                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
+                                  )}
+                                >
+                                  {r.name} ({r.type})
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isPending}
+                          className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                        >
+                          Save Shoot Session &amp; Reserve Crew
+                        </button>
+                      </form>
+
+                      {showQuickResource && (
+                        <form
+                          onSubmit={handleQuickAddResource}
+                          className="pt-3 border-t border-slate-200 flex flex-wrap gap-2 items-center"
+                        >
+                          <input
+                            required
+                            value={newResName}
+                            onChange={(e) => setNewResName(e.target.value)}
+                            placeholder="Crew or kit name"
+                            className="flex-1 min-w-[160px] rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs"
+                          />
+                          <select
+                            value={newResType}
+                            onChange={(e) => setNewResType(e.target.value as ResourceType)}
+                            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
+                          >
+                            <option value="CREW">Crew</option>
+                            <option value="EQUIPMENT">Equipment</option>
+                            <option value="ROOM">Studio / Room</option>
+                          </select>
+                          <button
+                            type="submit"
+                            disabled={isPending}
+                            className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white"
+                          >
+                            Add Resource
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  )}
+
+                  {!selectedBooking.sessions || selectedBooking.sessions.length === 0 ? (
+                    <p className="text-xs text-slate-500">
+                      No shoot sessions scheduled yet for this booking. Click &ldquo;Schedule Session&rdquo;
+                      above (prefilled with this booking&apos;s date &amp; title).
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {selectedBooking.sessions.map((s) => (
+                        <div key={s.id} className="py-3 space-y-2.5">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-sm text-slate-900">{s.title}</span>
+                                <StatusBadge status={s.status} />
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5 font-mono-code">
+                                {s.agencyLocalDate || formatLocalDate(s.startAt)} •{' '}
+                                {formatDateTimeInTz(s.startAt, timezone)} →{' '}
+                                {formatDateTimeInTz(s.endAt, timezone)}
+                                {s.location ? ` • ${s.location}` : ''}
+                              </p>
+                              {s.reservations && s.reservations.length > 0 && (
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  {s.reservations.map((r) => (
+                                    <span
+                                      key={r.id}
+                                      className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-700"
+                                    >
+                                      {r.resource?.name || r.resourceId}
+                                      {r.resource?.type ? ` (${r.resource.type})` : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {s.status === 'SCHEDULED' && (
+                              <div className="flex flex-wrap gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => openReschedule(s)}
+                                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                  Reschedule
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => handleCompleteSession(s.id)}
+                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                                >
+                                  Done
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => {
+                                    setCancellingSessionId(s.id);
+                                    setReschedSessionId(null);
+                                  }}
+                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {reschedSessionId === s.id && (
+                            <form
+                              onSubmit={(e) => handleRescheduleSession(e, s.id)}
+                              className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2"
+                            >
+                              <div className="grid sm:grid-cols-2 gap-2">
+                                <input
+                                  required
+                                  type="datetime-local"
+                                  value={reschedStart}
+                                  onChange={(e) => setReschedStart(e.target.value)}
+                                  className="rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-mono-code"
+                                />
+                                <input
+                                  required
+                                  type="datetime-local"
+                                  value={reschedEnd}
+                                  onChange={(e) => setReschedEnd(e.target.value)}
+                                  className="rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-mono-code"
+                                />
+                              </div>
+                              <input
+                                required
+                                value={reschedReason}
+                                onChange={(e) => setReschedReason(e.target.value)}
+                                placeholder="Reason for reschedule (required for audit log)"
+                                className="w-full rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs"
+                              />
+                              <div className="flex flex-wrap gap-1.5">
+                                {resources.map((r) => (
+                                  <button
+                                    key={r.id}
+                                    type="button"
+                                    onClick={() => toggleReschedResource(r.id)}
+                                    className={cn(
+                                      'rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                                      reschedResourceIds.includes(r.id)
+                                        ? 'border-slate-900 bg-slate-900 text-white'
+                                        : 'border-amber-200 bg-white text-slate-700',
+                                    )}
+                                  >
+                                    {r.name}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  type="submit"
+                                  disabled={isPending}
+                                  className="rounded-lg bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white"
+                                >
+                                  Save New Slot
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setReschedSessionId(null)}
+                                  className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600"
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            </form>
+                          )}
+
+                          {cancellingSessionId === s.id && (
+                            <form
+                              onSubmit={(e) => handleCancelSession(e, s.id)}
+                              className="rounded-xl border border-rose-200 bg-rose-50/50 p-3 flex flex-wrap gap-2 items-center"
+                            >
+                              <input
+                                required
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                placeholder="Reason for cancelling shoot session"
+                                className="flex-1 min-w-[200px] rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs"
+                              />
+                              <button
+                                type="submit"
+                                disabled={isPending}
+                                className="rounded-lg bg-rose-600 px-3 py-1.5 text-[11px] font-semibold text-white"
+                              >
+                                Confirm Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCancellingSessionId(null)}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600"
+                              >
+                                Keep Slot
+                              </button>
+                            </form>
+                          )}
                         </div>
                       ))}
                     </div>

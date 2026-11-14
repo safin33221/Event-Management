@@ -20,7 +20,10 @@ export async function createResource(payload: {
     body: JSON.stringify(payload),
   });
   const result = await parseApiResponse<Resource>(res);
-  if (result.ok) revalidatePath('/admin/calendar');
+  if (result.ok) {
+    revalidatePath('/admin/calendar');
+    revalidatePath('/admin/bookings');
+  }
   return result;
 }
 
@@ -61,7 +64,28 @@ export async function rescheduleSession(
     body: JSON.stringify(payload),
   });
   const result = await parseApiResponse<EventSession>(res);
-  if (result.ok) revalidatePath('/admin/calendar');
+  if (result.ok) {
+    revalidatePath('/admin/calendar');
+    revalidatePath('/admin/bookings');
+    revalidatePath('/admin');
+  }
+  return result;
+}
+
+export async function cancelSession(
+  sessionId: string,
+  reason: string,
+): Promise<ActionResult<EventSession>> {
+  const res = await serverFetch.post(`/sessions/${encodeURIComponent(sessionId)}/cancel`, {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+  const result = await parseApiResponse<EventSession>(res);
+  if (result.ok) {
+    revalidatePath('/admin/calendar');
+    revalidatePath('/admin/bookings');
+    revalidatePath('/admin');
+  }
   return result;
 }
 
@@ -71,7 +95,11 @@ export async function completeSession(sessionId: string): Promise<ActionResult<E
     body: JSON.stringify({}),
   });
   const result = await parseApiResponse<EventSession>(res);
-  if (result.ok) revalidatePath('/admin/calendar');
+  if (result.ok) {
+    revalidatePath('/admin/calendar');
+    revalidatePath('/admin/bookings');
+    revalidatePath('/admin');
+  }
   return result;
 }
 

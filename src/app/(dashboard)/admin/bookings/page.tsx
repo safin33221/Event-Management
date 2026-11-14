@@ -6,6 +6,7 @@ import { listInquiries } from '@/service/inquiries/inquiries.service';
 import { listQuotes } from '@/service/quotes/quotes.service';
 import { listBookings } from '@/service/bookings/bookings.service';
 import { listPackages } from '@/service/catalog/catalog.service';
+import { listResources } from '@/service/schedule/schedule.service';
 import { BookingsWorkspace } from '@/components/module/admin/BookingsWorkspace';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
 
@@ -14,12 +15,13 @@ async function AdminBookingsContent() {
   if (!session) redirect('/login');
   if (session.role === 'STAFF') redirect('/staff');
 
-  const [settingsRes, inqRes, quotesRes, bookingsRes, pkgRes] = await Promise.all([
+  const [settingsRes, inqRes, quotesRes, bookingsRes, pkgRes, resourcesRes] = await Promise.all([
     getAgencySettings(),
     listInquiries(),
     listQuotes(),
     listBookings(),
     listPackages(),
+    listResources(),
   ]);
 
   return (
@@ -28,7 +30,9 @@ async function AdminBookingsContent() {
       initialQuotes={quotesRes.ok && quotesRes.data ? quotesRes.data.data : []}
       initialBookings={bookingsRes.ok && bookingsRes.data ? bookingsRes.data.data : []}
       packages={pkgRes.ok && pkgRes.data ? pkgRes.data.data : []}
+      initialResources={resourcesRes.ok && resourcesRes.data ? resourcesRes.data : []}
       currency={settingsRes.ok && settingsRes.data ? settingsRes.data.currency : 'BDT'}
+      timezone={settingsRes.ok && settingsRes.data ? settingsRes.data.timezone : 'Asia/Dhaka'}
     />
   );
 }
