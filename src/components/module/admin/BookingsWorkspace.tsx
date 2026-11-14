@@ -48,6 +48,9 @@ export function BookingsWorkspace({
   currency,
 }: BookingsWorkspaceProps) {
   const [tab, setTab] = useState<'inquiries' | 'quotes' | 'bookings'>('bookings');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showInquiryForm, setShowInquiryForm] = useState(false);
+  const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [inquiries, setInquiries] = useState<Inquiry[]>(initialInquiries);
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
@@ -132,6 +135,7 @@ export function BookingsWorkspace({
       setQuoteItemDesc(inq.eventTitle);
     }
     setTab('quotes');
+    setShowQuoteForm(true);
   };
 
   const handleCreateQuote = (e: React.FormEvent) => {
@@ -202,8 +206,8 @@ export function BookingsWorkspace({
       notify(
         'ok',
         res.data.idempotentReplay
-          ? 'Idempotent replay returned existing payment entry'
-          : 'Recorded payment as PENDING verification',
+          ? 'This payment was already recorded.'
+          : 'Payment recorded. Click Verify to add it to the paid balance.',
       );
       setPayRef('');
       setPayIdemKey('');
@@ -249,7 +253,7 @@ export function BookingsWorkspace({
         return;
       }
       openBookingDetail(selectedBooking.id);
-      notify('ok', 'Booking marked completed (outstanding dues & deliverables preserved)');
+      notify('ok', 'Booking marked as completed.');
     });
   };
 
@@ -277,37 +281,103 @@ export function BookingsWorkspace({
         return;
       }
       openBookingDetail(selectedBooking.id);
-      notify('ok', `Delivered "${d.label}" without affecting siblings or balance`);
+      notify('ok', `"${d.label}" marked as delivered.`);
     });
   };
 
+  const q = searchQuery.trim().toLowerCase();
+  const filteredInquiries = inquiries.filter(
+    (i) =>
+      !q ||
+      i.eventTitle.toLowerCase().includes(q) ||
+      i.clientName.toLowerCase().includes(q) ||
+      i.reference.toLowerCase().includes(q),
+  );
+  const filteredQuotes = quotes.filter(
+    (item) =>
+      !q ||
+      item.eventTitle.toLowerCase().includes(q) ||
+      item.clientName.toLowerCase().includes(q) ||
+      item.reference.toLowerCase().includes(q),
+  );
+  const filteredBookings = bookings.filter(
+    (b) =>
+      !q ||
+      b.eventTitle.toLowerCase().includes(q) ||
+      b.clientName.toLowerCase().includes(q) ||
+      b.reference.toLowerCase().includes(q),
+  );
+
+  const inputClass =
+    'w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/15 transition-all';
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      {/* Header & Step Tabs */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#64748B]">
-            Pipeline & Finance
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A] mt-1">
-            Inquiries, Quotes, Bookings & Ledger
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            Bookings &amp; Payments
           </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Follow the flow: 1. Log Inquiry → 2. Send Quote → 3. Track Booking &amp; Payments
+          </p>
         </div>
 
-        <div className="inline-flex rounded-xl border border-[#CBD5E1] bg-white p-1">
-          {(['inquiries', 'quotes', 'bookings'] as const).map((key) => (
+        <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-white p-1 gap-1">
+          {[
+            { key: 'inquiries' as const, label: `1. Inquiries (${inquiries.length})` },
+            { key: 'quotes' as const, label: `2. Quotes (${quotes.length})` },
+            { key: 'bookings' as const, label: `3. Bookings (${bookings.length})` },
+          ].map((item) => (
             <button
-              key={key}
+              key={item.key}
               type="button"
-              onClick={() => setTab(key)}
+              onClick={() => setTab(item.key)}
               className={cn(
-                'rounded-lg px-4 py-1.5 text-xs font-semibold capitalize transition-colors',
-                tab === key ? 'bg-[#0F172A] text-white' : 'text-[#475569] hover:text-[#0F172A]',
+                'rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors',
+                tab === item.key
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
               )}
             >
-              {key}
+              {item.label}
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Search + Quick Add Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by client name, event, or reference..."
+          className="w-full sm:max-w-sm rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+        />
+
+        {tab === 'inquiries' && (
+          <button
+            type="button"
+            onClick={() => setShowInquiryForm((v) => !v)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            <span>{showInquiryForm ? 'Close Form' : 'New Phone Inquiry'}</span>
+          </button>
+        )}
+
+        {tab === 'quotes' && (
+          <button
+            type="button"
+            onClick={() => setShowQuoteForm((v) => !v)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            <span>{showQuoteForm ? 'Close Form' : 'New Quote'}</span>
+          </button>
+        )}
       </div>
 
       {feedback && (
@@ -326,71 +396,96 @@ export function BookingsWorkspace({
         </div>
       )}
 
+      {/* TAB 1: INQUIRIES */}
       {tab === 'inquiries' && (
-        <div className="grid gap-6 lg:grid-cols-12">
-          <form onSubmit={handleCreateInquiry} className="lg:col-span-4 atelier-card p-5 space-y-3 h-fit">
-            <h2 className="text-lg font-bold tracking-tight">Log Phone Inquiry</h2>
-            <input
-              required
-              value={inqTitle}
-              onChange={(e) => setInqTitle(e.target.value)}
-              placeholder="Event title (e.g. Q4 Product Launch)"
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
-            <input
-              type="date"
-              value={inqDate}
-              onChange={(e) => setInqDate(e.target.value)}
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
-            <input
-              required
-              value={inqClient}
-              onChange={(e) => setInqClient(e.target.value)}
-              placeholder="Client name"
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
-            <input
-              required
-              value={inqPhone}
-              onChange={(e) => setInqPhone(e.target.value)}
-              placeholder="Client phone"
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
-            <button
-              type="submit"
-              disabled={isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2.5 text-xs font-semibold text-white"
+        <div className="space-y-5">
+          {showInquiryForm && (
+            <form
+              onSubmit={(e) => {
+                handleCreateInquiry(e);
+                setShowInquiryForm(false);
+              }}
+              className="atelier-card p-6 space-y-4"
             >
-              <PlusIcon className="w-4 h-4" />
-              <span>Record Inquiry</span>
-            </button>
-          </form>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h2 className="text-base font-bold tracking-tight text-slate-900">
+                  Log Phone / Walk-In Inquiry
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowInquiryForm(false)}
+                  className="text-xs font-semibold text-slate-500 hover:text-slate-900"
+                >
+                  Cancel
+                </button>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <input
+                  required
+                  value={inqTitle}
+                  onChange={(e) => setInqTitle(e.target.value)}
+                  placeholder="Event title *"
+                  className={inputClass}
+                />
+                <input
+                  type="date"
+                  value={inqDate}
+                  onChange={(e) => setInqDate(e.target.value)}
+                  className={inputClass}
+                />
+                <input
+                  required
+                  value={inqClient}
+                  onChange={(e) => setInqClient(e.target.value)}
+                  placeholder="Client name *"
+                  className={inputClass}
+                />
+                <input
+                  required
+                  value={inqPhone}
+                  onChange={(e) => setInqPhone(e.target.value)}
+                  placeholder="Client phone *"
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  <span>Save Inquiry</span>
+                </button>
+              </div>
+            </form>
+          )}
 
-          <div className="lg:col-span-8 atelier-card p-5 space-y-3">
-            <h2 className="text-lg font-bold tracking-tight">All Inquiries</h2>
-            {inquiries.length === 0 ? (
-              <p className="text-sm text-[#64748B] py-6 text-center">No inquiries logged yet.</p>
+          <div className="atelier-card p-6 space-y-3">
+            {filteredInquiries.length === 0 ? (
+              <p className="text-sm text-slate-500 py-8 text-center">
+                No inquiries found. Click &ldquo;New Phone Inquiry&rdquo; to log one.
+              </p>
             ) : (
-              <div className="divide-y divide-[#E2E8F0]">
-                {inquiries.map((inq) => (
+              <div className="divide-y divide-slate-100">
+                {filteredInquiries.map((inq) => (
                   <div key={inq.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono-code text-xs font-semibold text-[#64748B]">
+                        <span className="font-mono-code text-xs font-semibold text-slate-500">
                           {inq.reference}
                         </span>
                         <StatusBadge status={inq.status} />
                       </div>
-                      <p className="font-semibold text-sm mt-1">{inq.eventTitle}</p>
-                      <p className="text-xs text-[#64748B]">
-                        {inq.clientName} ({inq.clientPhone}) • Requested: {formatLocalDate(inq.requestedDate)}
+                      <p className="font-semibold text-sm text-slate-900 mt-1">{inq.eventTitle}</p>
+                      <p className="text-xs text-slate-500">
+                        {inq.clientName} ({inq.clientPhone}) • Date: {formatLocalDate(inq.requestedDate)}
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => prefillQuoteFromInquiry(inq)}
-                      className="rounded-xl border border-[#CBD5E1] px-3 py-1.5 text-xs font-semibold hover:bg-[#F1F5F9]"
+                      className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors"
                     >
                       Create Quote →
                     </button>
@@ -402,106 +497,127 @@ export function BookingsWorkspace({
         </div>
       )}
 
+      {/* TAB 2: QUOTES */}
       {tab === 'quotes' && (
-        <div className="grid gap-6 lg:grid-cols-12">
-          <form onSubmit={handleCreateQuote} className="lg:col-span-4 atelier-card p-5 space-y-3 h-fit">
-            <h2 className="text-lg font-bold tracking-tight">Create Quote</h2>
-            <input
-              required
-              value={quoteEventTitle}
-              onChange={(e) => setQuoteEventTitle(e.target.value)}
-              placeholder="Event title"
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
-            <input
-              type="date"
-              value={quoteDate}
-              onChange={(e) => setQuoteDate(e.target.value)}
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
-            <input
-              required
-              value={quoteClientName}
-              onChange={(e) => setQuoteClientName(e.target.value)}
-              placeholder="Client name"
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
-            <input
-              required
-              value={quoteClientPhone}
-              onChange={(e) => setQuoteClientPhone(e.target.value)}
-              placeholder="Client phone"
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
-            <input
-              required
-              value={quoteItemDesc}
-              onChange={(e) => setQuoteItemDesc(e.target.value)}
-              placeholder="Line item description"
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-[#64748B] mb-1">
-                Amount ({currency})
-              </label>
-              <input
-                required
-                type="number"
-                min="0"
-                value={quoteAmountTk}
-                onChange={(e) => setQuoteAmountTk(e.target.value)}
-                className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm font-mono-code"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2.5 text-xs font-semibold text-white"
+        <div className="space-y-5">
+          {showQuoteForm && (
+            <form
+              onSubmit={(e) => {
+                handleCreateQuote(e);
+                setShowQuoteForm(false);
+              }}
+              className="atelier-card p-6 space-y-4"
             >
-              <span>Create Quote Snapshot</span>
-            </button>
-          </form>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h2 className="text-base font-bold tracking-tight text-slate-900">
+                  Create Price Quote
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowQuoteForm(false)}
+                  className="text-xs font-semibold text-slate-500 hover:text-slate-900"
+                >
+                  Cancel
+                </button>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <input
+                  required
+                  value={quoteEventTitle}
+                  onChange={(e) => setQuoteEventTitle(e.target.value)}
+                  placeholder="Event title *"
+                  className={inputClass}
+                />
+                <input
+                  type="date"
+                  value={quoteDate}
+                  onChange={(e) => setQuoteDate(e.target.value)}
+                  className={inputClass}
+                />
+                <input
+                  required
+                  value={quoteClientName}
+                  onChange={(e) => setQuoteClientName(e.target.value)}
+                  placeholder="Client name *"
+                  className={inputClass}
+                />
+                <input
+                  required
+                  value={quoteClientPhone}
+                  onChange={(e) => setQuoteClientPhone(e.target.value)}
+                  placeholder="Client phone *"
+                  className={inputClass}
+                />
+                <input
+                  required
+                  value={quoteItemDesc}
+                  onChange={(e) => setQuoteItemDesc(e.target.value)}
+                  placeholder="Package / service description *"
+                  className={inputClass}
+                />
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  value={quoteAmountTk}
+                  onChange={(e) => setQuoteAmountTk(e.target.value)}
+                  placeholder={`Total price (${currency}) *`}
+                  className={`${inputClass} font-mono-code`}
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                >
+                  <span>Save Quote</span>
+                </button>
+              </div>
+            </form>
+          )}
 
-          <div className="lg:col-span-8 atelier-card p-5 space-y-3">
-            <h2 className="text-lg font-bold tracking-tight">Quotes</h2>
-            {quotes.length === 0 ? (
-              <p className="text-sm text-[#64748B] py-6 text-center">No quotes created yet.</p>
+          <div className="atelier-card p-6 space-y-3">
+            {filteredQuotes.length === 0 ? (
+              <p className="text-sm text-slate-500 py-8 text-center">
+                No quotes found. Click &ldquo;New Quote&rdquo; or create one from an inquiry.
+              </p>
             ) : (
-              <div className="divide-y divide-[#E2E8F0]">
-                {quotes.map((q) => {
-                  const latest = q.versions?.[0] || q.currentVersion;
+              <div className="divide-y divide-slate-100">
+                {filteredQuotes.map((item) => {
+                  const latest = item.versions?.[0] || item.currentVersion;
                   return (
-                    <div key={q.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
+                    <div key={item.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono-code text-xs font-semibold text-[#64748B]">
-                            {q.reference}
+                          <span className="font-mono-code text-xs font-semibold text-slate-500">
+                            {item.reference}
                           </span>
-                          <StatusBadge status={q.status} />
+                          <StatusBadge status={item.status} />
                           {latest && (
-                            <span className="text-[11px] font-mono-code text-[#64748B]">
+                            <span className="text-[11px] font-mono-code text-slate-400">
                               v{latest.versionNumber}
                             </span>
                           )}
                         </div>
-                        <p className="font-semibold text-sm mt-1">{q.eventTitle}</p>
-                        <p className="text-xs text-[#64748B]">{q.clientName}</p>
+                        <p className="font-semibold text-sm text-slate-900 mt-1">{item.eventTitle}</p>
+                        <p className="text-xs text-slate-500">{item.clientName}</p>
                       </div>
 
                       <div className="flex items-center gap-3">
                         {latest && (
-                          <span className="font-mono-code text-sm font-semibold">
-                            {formatPoisha(latest.totalPoisha, q.currency)}
+                          <span className="font-mono-code text-sm font-semibold text-slate-900 tabular-nums">
+                            {formatPoisha(latest.totalPoisha, item.currency)}
                           </span>
                         )}
-                        {q.status !== 'ACCEPTED' && (
+                        {item.status !== 'ACCEPTED' && (
                           <button
                             type="button"
                             disabled={isPending}
-                            onClick={() => handleAcceptQuote(q)}
-                            className="rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
+                            onClick={() => handleAcceptQuote(item)}
+                            className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
                           >
-                            Accept & Create Booking
+                            Accept &amp; Create Booking
                           </button>
                         )}
                       </div>
@@ -514,37 +630,44 @@ export function BookingsWorkspace({
         </div>
       )}
 
+      {/* TAB 3: BOOKINGS */}
       {tab === 'bookings' && (
         <div className="grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-5 atelier-card p-5 space-y-3 h-fit">
-            <h2 className="text-lg font-bold tracking-tight">Bookings</h2>
-            {bookings.length === 0 ? (
-              <p className="text-sm text-[#64748B] py-6 text-center">
-                Accept a quote to generate your first booking.
+            <h2 className="text-base font-bold tracking-tight text-slate-900">
+              All Bookings ({filteredBookings.length})
+            </h2>
+            {filteredBookings.length === 0 ? (
+              <p className="text-sm text-slate-500 py-8 text-center">
+                No bookings yet. Accept a quote to create your first booking.
               </p>
             ) : (
-              <div className="divide-y divide-[#E2E8F0]">
-                {bookings.map((b) => (
+              <div className="divide-y divide-slate-100">
+                {filteredBookings.map((b) => (
                   <button
                     key={b.id}
                     type="button"
                     onClick={() => openBookingDetail(b.id)}
                     className={cn(
-                      'w-full text-left py-3 px-2 rounded-lg transition-colors flex items-center justify-between gap-2',
-                      selectedBooking?.id === b.id ? 'bg-[#F1F5F9]' : 'hover:bg-[#F8FAFC]',
+                      'w-full text-left py-3 px-3 rounded-xl transition-colors flex items-center justify-between gap-2',
+                      selectedBooking?.id === b.id
+                        ? 'bg-indigo-50/70 ring-1 ring-indigo-200'
+                        : 'hover:bg-slate-50',
                     )}
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono-code text-xs font-semibold text-[#64748B]">
+                        <span className="font-mono-code text-xs font-semibold text-slate-500">
                           {b.reference}
                         </span>
                         <StatusBadge status={b.status} />
                       </div>
-                      <p className="text-sm font-semibold truncate mt-1">{b.eventTitle}</p>
-                      <p className="text-xs text-[#64748B]">{b.clientName}</p>
+                      <p className="text-sm font-semibold text-slate-900 truncate mt-1">
+                        {b.eventTitle}
+                      </p>
+                      <p className="text-xs text-slate-500">{b.clientName}</p>
                     </div>
-                    <span className="font-mono-code text-xs font-semibold shrink-0">
+                    <span className="font-mono-code text-xs font-semibold text-slate-900 shrink-0 tabular-nums">
                       {formatPoisha(b.agreedTotalPoisha, b.currency)}
                     </span>
                   </button>
@@ -555,25 +678,25 @@ export function BookingsWorkspace({
 
           <div className="lg:col-span-7 space-y-6">
             {!selectedBooking ? (
-              <div className="atelier-card p-10 text-center text-sm text-[#64748B]">
-                Select a booking on the left to inspect its financial ledger, advance verification,
-                confirmation status, and independent deliverables.
+              <div className="atelier-card p-12 text-center text-sm text-slate-500">
+                Click any booking on the left to view payments, confirm the event, or track
+                deliverables.
               </div>
             ) : (
               <>
-                <div className="atelier-card p-6 space-y-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E2E8F0] pb-4">
+                <div className="atelier-card p-6 space-y-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono-code text-xs font-semibold text-[#64748B]">
+                        <span className="font-mono-code text-xs font-semibold text-slate-500">
                           {selectedBooking.reference}
                         </span>
                         <StatusBadge status={selectedBooking.status} />
                       </div>
-                      <h3 className="text-lg font-bold tracking-tight mt-1">
+                      <h3 className="text-lg font-bold tracking-tight text-slate-900 mt-1">
                         {selectedBooking.eventTitle}
                       </h3>
-                      <p className="text-xs text-[#64748B]">
+                      <p className="text-xs text-slate-500">
                         {selectedBooking.clientName} ({selectedBooking.clientPhone}) • Event Date:{' '}
                         {formatLocalDate(selectedBooking.eventDate)}
                       </p>
@@ -585,7 +708,7 @@ export function BookingsWorkspace({
                           type="button"
                           disabled={isPending}
                           onClick={handleConfirmBooking}
-                          className="rounded-xl bg-[#0F172A] px-4 py-2 text-xs font-semibold text-white"
+                          className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
                         >
                           Confirm Booking
                         </button>
@@ -595,7 +718,7 @@ export function BookingsWorkspace({
                           type="button"
                           disabled={isPending}
                           onClick={handleCompleteBooking}
-                          className="rounded-xl border border-[#CBD5E1] px-4 py-2 text-xs font-semibold"
+                          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         >
                           Mark Completed
                         </button>
@@ -605,27 +728,27 @@ export function BookingsWorkspace({
 
                   {ledger && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="rounded-xl bg-[#F8FAFC] p-3 border border-[#E2E8F0]">
-                        <p className="text-[10px] font-semibold uppercase text-[#64748B]">Agreed</p>
-                        <p className="font-mono-code text-sm font-semibold mt-1">
+                      <div className="rounded-xl bg-slate-50 p-3 border border-slate-200">
+                        <p className="text-[11px] font-semibold text-slate-500">Total Price</p>
+                        <p className="font-mono-code text-sm font-semibold text-slate-900 mt-1 tabular-nums">
                           {formatPoisha(ledger.summary.effectiveAgreedChargePoisha, ledger.summary.currency)}
                         </p>
                       </div>
                       <div className="rounded-xl bg-emerald-50/70 p-3 border border-emerald-200">
-                        <p className="text-[10px] font-semibold uppercase text-emerald-800">Verified Paid</p>
-                        <p className="font-mono-code text-sm font-semibold text-emerald-900 mt-1">
+                        <p className="text-[11px] font-semibold text-emerald-700">Paid (Verified)</p>
+                        <p className="font-mono-code text-sm font-semibold text-emerald-900 mt-1 tabular-nums">
                           {formatPoisha(ledger.summary.verifiedReceiptsPoisha, ledger.summary.currency)}
                         </p>
                       </div>
                       <div className="rounded-xl bg-amber-50/70 p-3 border border-amber-200">
-                        <p className="text-[10px] font-semibold uppercase text-amber-800">Pending</p>
-                        <p className="font-mono-code text-sm font-semibold text-amber-900 mt-1">
+                        <p className="text-[11px] font-semibold text-amber-700">Pending Approval</p>
+                        <p className="font-mono-code text-sm font-semibold text-amber-900 mt-1 tabular-nums">
                           {formatPoisha(ledger.summary.pendingReceiptsPoisha, ledger.summary.currency)}
                         </p>
                       </div>
-                      <div className="rounded-xl bg-[#F8FAFC] p-3 border border-[#E2E8F0]">
-                        <p className="text-[10px] font-semibold uppercase text-[#64748B]">Due</p>
-                        <p className="font-mono-code text-sm font-semibold mt-1">
+                      <div className="rounded-xl bg-slate-50 p-3 border border-slate-200">
+                        <p className="text-[11px] font-semibold text-slate-500">Remaining Due</p>
+                        <p className="font-mono-code text-sm font-semibold text-slate-900 mt-1 tabular-nums">
                           {formatPoisha(ledger.summary.outstandingDuePoisha, ledger.summary.currency)}
                         </p>
                       </div>
@@ -633,56 +756,60 @@ export function BookingsWorkspace({
                   )}
 
                   {/* Record Payment */}
-                  <form onSubmit={handleRecordPayment} className="grid sm:grid-cols-4 gap-2.5 pt-2">
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={payAmountTk}
-                      onChange={(e) => setPayAmountTk(e.target.value)}
-                      placeholder={`Amount (${currency})`}
-                      className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs font-mono-code"
-                    />
-                    <select
-                      value={payMethod}
-                      onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
-                      className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
-                    >
-                      <option value="BKASH">bKash</option>
-                      <option value="NAGAD">Nagad</option>
-                      <option value="BANK">Bank</option>
-                      <option value="CASH">Cash</option>
-                    </select>
-                    <input
-                      value={payRef}
-                      onChange={(e) => setPayRef(e.target.value)}
-                      placeholder="Tx Ref (e.g. TRX99)"
-                      className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isPending}
-                      className="rounded-xl bg-[#0F172A] px-3 py-2 text-xs font-semibold text-white"
-                    >
-                      Record Payment
-                    </button>
-                  </form>
+                  <div className="space-y-2 pt-1">
+                    <p className="text-xs font-semibold text-slate-600">Add a Payment</p>
+                    <form onSubmit={handleRecordPayment} className="grid sm:grid-cols-4 gap-2.5">
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={payAmountTk}
+                        onChange={(e) => setPayAmountTk(e.target.value)}
+                        placeholder={`Amount (${currency})`}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono-code"
+                      />
+                      <select
+                        value={payMethod}
+                        onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      >
+                        <option value="BKASH">bKash</option>
+                        <option value="NAGAD">Nagad</option>
+                        <option value="BANK">Bank</option>
+                        <option value="CASH">Cash</option>
+                      </select>
+                      <input
+                        value={payRef}
+                        onChange={(e) => setPayRef(e.target.value)}
+                        placeholder="Receipt / Tx Ref (optional)"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isPending}
+                        className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                      >
+                        Save Payment
+                      </button>
+                    </form>
+                  </div>
 
-                  {/* Ledger Entries */}
+                  {/* Payment History */}
                   {ledger && ledger.entries.length > 0 && (
-                    <div className="divide-y divide-[#E2E8F0] pt-2">
+                    <div className="divide-y divide-slate-100 pt-2">
                       {ledger.entries.map((entry) => (
                         <div key={entry.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                           <div>
-                            <span className="font-semibold">{entry.type}</span> • {entry.method}{' '}
+                            <span className="font-semibold text-slate-900">{entry.type}</span> •{' '}
+                            {entry.method}{' '}
                             {entry.transactionRef && (
-                              <span className="font-mono-code text-[#64748B]">
+                              <span className="font-mono-code text-slate-500">
                                 ({entry.transactionRef})
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-2.5">
-                            <span className="font-mono-code font-semibold">
+                            <span className="font-mono-code font-semibold tabular-nums">
                               {formatPoisha(entry.amountPoisha, entry.currency)}
                             </span>
                             <StatusBadge status={entry.verificationState} />
@@ -691,7 +818,7 @@ export function BookingsWorkspace({
                                 type="button"
                                 disabled={isPending}
                                 onClick={() => handleVerifyPayment(entry.id)}
-                                className="rounded-lg bg-emerald-700 px-2.5 py-1 text-[11px] font-semibold text-white"
+                                className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
                               >
                                 Verify
                               </button>
@@ -703,21 +830,23 @@ export function BookingsWorkspace({
                   )}
                 </div>
 
-                {/* Deliverables Track */}
+                {/* Deliverables */}
                 <div className="atelier-card p-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-base font-bold tracking-tight">Deliverables</h4>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-base font-bold tracking-tight text-slate-900">
+                      Deliverables
+                    </h4>
                     <form onSubmit={handleAddDeliverable} className="flex gap-2">
                       <input
                         value={delivLabel}
                         onChange={(e) => setDelivLabel(e.target.value)}
-                        placeholder="e.g. Gallery, Film, Event Report"
-                        className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-1.5 text-xs"
+                        placeholder="e.g. Photo Gallery, Highlight Film"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs"
                       />
                       <button
                         type="submit"
                         disabled={isPending}
-                        className="rounded-xl border border-[#CBD5E1] px-3 py-1.5 text-xs font-semibold hover:bg-[#F1F5F9]"
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                       >
                         + Add
                       </button>
@@ -725,18 +854,18 @@ export function BookingsWorkspace({
                   </div>
 
                   {!selectedBooking.deliverables || selectedBooking.deliverables.length === 0 ? (
-                    <p className="text-xs text-[#64748B]">
-                      No deliverables added yet. Each deliverable tracks its own status and delivery
-                      independently.
+                    <p className="text-xs text-slate-500">
+                      No deliverables added yet. Add items like Photo Gallery or Video to track
+                      delivery status.
                     </p>
                   ) : (
-                    <div className="divide-y divide-[#E2E8F0]">
+                    <div className="divide-y divide-slate-100">
                       {selectedBooking.deliverables.map((d) => (
                         <div key={d.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                           <div>
-                            <p className="font-semibold text-sm">{d.label}</p>
+                            <p className="font-semibold text-sm text-slate-900">{d.label}</p>
                             {d.deliveredAt && (
-                              <p className="text-[#64748B]">
+                              <p className="text-slate-500">
                                 Delivered {formatLocalDate(d.deliveredAt)}
                               </p>
                             )}
@@ -748,9 +877,9 @@ export function BookingsWorkspace({
                                 type="button"
                                 disabled={isPending}
                                 onClick={() => handleDeliverItem(d)}
-                                className="rounded-lg bg-[#0F172A] px-2.5 py-1 text-[11px] font-semibold text-white"
+                                className="rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-800"
                               >
-                                Deliver
+                                Mark Delivered
                               </button>
                             )}
                           </div>

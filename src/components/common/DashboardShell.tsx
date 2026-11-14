@@ -29,13 +29,13 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
   const isStaffOnly = session.role === 'STAFF';
 
   const navItems = isStaffOnly
-    ? [{ href: '/staff', label: 'My Assignments', icon: UsersIcon }]
+    ? [{ href: '/staff', label: 'My Tasks', icon: UsersIcon }]
     : [
-        { href: '/admin', label: 'Overview', icon: SparklesIcon },
-        { href: '/admin/bookings', label: 'Bookings & Ledger', icon: ReceiptIcon },
-        { href: '/admin/calendar', label: 'Schedule & Crew', icon: CalendarIcon },
-        { href: '/admin/catalog', label: 'Catalog & Branding', icon: PaletteIcon },
-        { href: '/staff', label: 'Crew View', icon: LayersIcon },
+        { href: '/admin', label: 'Home', icon: SparklesIcon },
+        { href: '/admin/bookings', label: 'Bookings & Payments', icon: ReceiptIcon },
+        { href: '/admin/calendar', label: 'Schedule', icon: CalendarIcon },
+        { href: '/admin/catalog', label: 'Packages & Settings', icon: PaletteIcon },
+        { href: '/staff', label: 'Staff Tasks', icon: LayersIcon },
       ];
 
   const handleLogout = () => {

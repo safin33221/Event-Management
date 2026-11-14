@@ -41,6 +41,9 @@ export function CalendarWorkspace({
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // UI panel toggle ('none' | 'schedule' | 'resources')
+  const [activePanel, setActivePanel] = useState<'none' | 'schedule' | 'resources'>('none');
+
   // Add resource state
   const [resName, setResName] = useState('');
   const [resType, setResType] = useState<ResourceType>('CREW');
@@ -106,7 +109,8 @@ export function CalendarWorkspace({
       setSessionTitle('');
       setLocation('');
       setSelectedResourceIds([]);
-      setFeedback({ type: 'ok', text: 'Session scheduled with atomic resource reservation' });
+      setActivePanel('none');
+      setFeedback({ type: 'ok', text: 'Event session scheduled and crew reserved.' });
       refreshCalendar();
     });
   };
@@ -134,39 +138,42 @@ export function CalendarWorkspace({
     return acc;
   }, {});
 
+  const inputClass =
+    'w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/15 transition-all';
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      {/* Header + Action Buttons */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#64748B]">
-            Studio Calendar • {timezone}
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A] mt-1">
-            Shoot & Event Schedule
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            Schedule
           </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            View upcoming shoots &amp; events or reserve crew and equipment • {timezone}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="rounded-xl border border-[#CBD5E1] bg-white px-3 py-2 text-xs"
-          />
-          <span className="text-xs text-[#64748B]">to</span>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="rounded-xl border border-[#CBD5E1] bg-white px-3 py-2 text-xs"
-          />
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            disabled={isPending}
-            onClick={() => refreshCalendar(from, to)}
-            className="rounded-xl bg-[#0F172A] px-4 py-2 text-xs font-semibold text-white"
+            onClick={() => setActivePanel(activePanel === 'resources' ? 'none' : 'resources')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors',
+              activePanel === 'resources'
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+            )}
           >
-            Filter
+            <span>Crew &amp; Gear ({resources.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActivePanel(activePanel === 'schedule' ? 'none' : 'schedule')}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            <span>{activePanel === 'schedule' ? 'Close Form' : 'Schedule Event'}</span>
           </button>
         </div>
       </div>
@@ -174,186 +181,290 @@ export function CalendarWorkspace({
       {feedback && (
         <div
           className={cn(
-            'rounded-xl border px-4 py-3 text-sm',
+            'rounded-xl border px-4 py-3 text-sm flex items-center justify-between',
             feedback.type === 'ok'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
               : 'border-rose-200 bg-rose-50 text-rose-900',
           )}
         >
-          {feedback.text}
+          <span>{feedback.text}</span>
+          <button type="button" onClick={() => setFeedback(null)} className="text-xs underline">
+            Dismiss
+          </button>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-12">
-        {/* Left: Schedule Session & Resources */}
-        <div className="lg:col-span-5 space-y-6">
-          <form onSubmit={handleCreateSession} className="atelier-card p-5 space-y-3">
-            <h2 className="text-lg font-bold tracking-tight">Schedule Session</h2>
-            <p className="text-xs text-[#64748B]">
-              Half-open slots <span className="font-mono-code">[start, end)</span> allow adjacent
-              bookings while blocking overlaps atomically.
-            </p>
-            <select
-              required
-              value={bookingId}
-              onChange={(e) => setBookingId(e.target.value)}
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
+      {/* Collapsible: Schedule Event Form */}
+      {activePanel === 'schedule' && (
+        <form onSubmit={handleCreateSession} className="atelier-card p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">
+                Schedule an Event Session
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pick a booking, date, and time. Double-bookings for the same crew or gear are blocked automatically.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActivePanel('none')}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-900"
             >
-              <option value="">Select a booking...</option>
-              {bookings.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.reference} — {b.eventTitle}
-                </option>
-              ))}
-            </select>
-            <input
-              required
-              value={sessionTitle}
-              onChange={(e) => setSessionTitle(e.target.value)}
-              placeholder="Session title (e.g. Holud Coverage / Keynote)"
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-semibold uppercase text-[#64748B] mb-1">
-                  Start
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={startLocal}
-                  onChange={(e) => setStartLocal(e.target.value)}
-                  className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-2.5 py-2 text-xs"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold uppercase text-[#64748B] mb-1">
-                  End
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={endLocal}
-                  onChange={(e) => setEndLocal(e.target.value)}
-                  className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-2.5 py-2 text-xs"
-                />
+              Cancel
+            </button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Booking *</label>
+              <select
+                required
+                value={bookingId}
+                onChange={(e) => setBookingId(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Select a booking...</option>
+                {bookings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.reference} — {b.eventTitle}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Session Name *
+              </label>
+              <input
+                required
+                value={sessionTitle}
+                onChange={(e) => setSessionTitle(e.target.value)}
+                placeholder="e.g. Main Ceremony / Keynote"
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Start Date &amp; Time *
+              </label>
+              <input
+                type="datetime-local"
+                required
+                value={startLocal}
+                onChange={(e) => setStartLocal(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                End Date &amp; Time *
+              </label>
+              <input
+                type="datetime-local"
+                required
+                value={endLocal}
+                onChange={(e) => setEndLocal(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Venue / Location (optional)
+              </label>
+              <input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="e.g. Dhaka Regency Hall"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          {resources.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-slate-600 mb-2">
+                Assign Crew &amp; Equipment (optional)
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {resources.map((r) => {
+                  const active = selectedResourceIds.includes(r.id);
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => toggleResource(r.id)}
+                      className={cn(
+                        'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                        active
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300',
+                      )}
+                    >
+                      {r.name} ({r.type})
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Venue / Location (optional)"
-              className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-            />
+          )}
 
-            {resources.length > 0 && (
-              <div>
-                <p className="text-[11px] font-semibold uppercase text-[#64748B] mb-1.5">
-                  Reserve Crew & Resources
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {resources.map((r) => {
-                    const active = selectedResourceIds.includes(r.id);
-                    return (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onClick={() => toggleResource(r.id)}
-                        className={cn(
-                          'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                          active
-                            ? 'bg-[#0F172A] text-white border-[#0F172A]'
-                            : 'bg-[#F8FAFC] text-[#475569] border-[#CBD5E1]',
-                        )}
-                      >
-                        {r.name} ({r.type})
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
+          <div className="flex justify-end pt-2">
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0F172A] px-4 py-2.5 text-xs font-semibold text-white"
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
             >
               <CalendarIcon className="w-4 h-4" />
-              <span>Reserve Slot</span>
+              <span>Save to Schedule</span>
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Collapsible: Crew & Gear Pool */}
+      {activePanel === 'resources' && (
+        <div className="atelier-card p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">
+                Crew &amp; Equipment Pool
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Add photographers, editors, cameras, or rooms so you can assign them to events.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActivePanel('none')}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-900"
+            >
+              Close
+            </button>
+          </div>
+
+          <form onSubmit={handleAddResource} className="flex flex-wrap gap-2">
+            <input
+              required
+              value={resName}
+              onChange={(e) => setResName(e.target.value)}
+              placeholder="Name (e.g. Lead Photographer / Sony FX3)"
+              className="flex-1 min-w-[200px] rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:bg-white"
+            />
+            <select
+              value={resType}
+              onChange={(e) => setResType(e.target.value as ResourceType)}
+              className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs"
+            >
+              <option value="CREW">Crew</option>
+              <option value="EQUIPMENT">Equipment</option>
+              <option value="ROOM">Room</option>
+              <option value="OTHER">Other</option>
+            </select>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span>Add</span>
             </button>
           </form>
 
-          <form onSubmit={handleAddResource} className="atelier-card p-5 space-y-3">
-            <h3 className="text-base font-bold tracking-tight">Crew & Equipment Pool</h3>
-            <div className="flex gap-2">
-              <input
-                required
-                value={resName}
-                onChange={(e) => setResName(e.target.value)}
-                placeholder="Resource name"
-                className="flex-1 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
-              />
-              <select
-                value={resType}
-                onChange={(e) => setResType(e.target.value as ResourceType)}
-                className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-2.5 py-2 text-xs"
-              >
-                <option value="CREW">Crew</option>
-                <option value="EQUIPMENT">Equipment</option>
-                <option value="ROOM">Room</option>
-                <option value="OTHER">Other</option>
-              </select>
-              <button
-                type="submit"
-                disabled={isPending}
-                className="rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold hover:bg-[#F1F5F9]"
-              >
-                <PlusIcon className="w-4 h-4" />
-              </button>
+          {resources.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {resources.map((r) => (
+                <span
+                  key={r.id}
+                  className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-medium text-slate-700"
+                >
+                  {r.name} <span className="text-slate-400">• {r.type}</span>
+                </span>
+              ))}
             </div>
-          </form>
+          )}
+        </div>
+      )}
+
+      {/* Main Schedule Timeline */}
+      <div className="atelier-card p-6 space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <h2 className="text-base font-bold tracking-tight text-slate-900">
+            Scheduled Sessions ({sessions.length})
+          </h2>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700"
+            />
+            <span className="text-xs text-slate-400">to</span>
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700"
+            />
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => refreshCalendar(from, to)}
+              className="rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+            >
+              Apply
+            </button>
+          </div>
         </div>
 
-        {/* Right: Local-Date Grouped Timeline */}
-        <div className="lg:col-span-7 atelier-card p-6 space-y-5">
-          <h2 className="text-lg font-bold tracking-tight">Scheduled Sessions</h2>
-          {Object.keys(grouped).length === 0 ? (
-            <p className="text-sm text-[#64748B] py-10 text-center">
-              No sessions scheduled between {from} and {to} ({timezone}).
+        {Object.keys(grouped).length === 0 ? (
+          <div className="py-12 text-center space-y-2">
+            <CalendarIcon className="w-8 h-8 mx-auto text-slate-300" />
+            <p className="text-sm font-medium text-slate-700">No sessions in this date range</p>
+            <p className="text-xs text-slate-500">
+              Click &ldquo;Schedule Event&rdquo; above to add a shoot or event session.
             </p>
-          ) : (
-            <div className="space-y-6">
-              {Object.entries(grouped)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([localDate, items]) => (
-                  <div key={localDate} className="space-y-2.5">
-                    <div className="flex items-center gap-2 border-b border-[#E2E8F0] pb-1.5">
-                      <span className="font-mono-code text-xs font-semibold text-[#4F46E5]">
-                        {localDate}
-                      </span>
-                      <span className="text-[11px] text-[#64748B]">
-                        ({items.length} session{items.length === 1 ? '' : 's'})
-                      </span>
-                    </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(grouped)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([localDate, items]) => (
+                <div key={localDate} className="space-y-2.5">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
+                    <span className="font-mono-code text-xs font-semibold text-indigo-600">
+                      {localDate}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      ({items.length} session{items.length === 1 ? '' : 's'})
+                    </span>
+                  </div>
 
+                  <div className="grid gap-3 md:grid-cols-2">
                     {items.map((s) => (
                       <div
                         key={s.id}
-                        className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 flex flex-wrap items-center justify-between gap-3"
+                        className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 flex items-start justify-between gap-3"
                       >
-                        <div>
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-semibold text-sm">{s.title}</p>
+                            <p className="font-semibold text-sm text-slate-900 truncate">
+                              {s.title}
+                            </p>
                             <StatusBadge status={s.status} />
                           </div>
-                          <p className="text-xs text-[#64748B] mt-1">
+                          <p className="text-xs text-slate-500 mt-1">
                             {formatDateTimeInTz(s.startAt, timezone)} →{' '}
                             {formatDateTimeInTz(s.endAt, timezone)}
                             {s.location ? ` • ${s.location}` : ''}
                           </p>
                           {s.booking && (
-                            <p className="text-[11px] text-[#475569] mt-1">
+                            <p className="text-xs text-slate-600 mt-1">
                               {s.booking.reference} • {s.booking.eventTitle} ({s.booking.clientName})
                             </p>
                           )}
@@ -362,7 +473,7 @@ export function CalendarWorkspace({
                               {s.reservations.map((r) => (
                                 <span
                                   key={r.id}
-                                  className="rounded-full bg-white border border-[#CBD5E1] px-2.5 py-0.5 text-[10px] font-medium"
+                                  className="rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-[11px] font-medium text-slate-700"
                                 >
                                   {r.resource?.name || r.resourceId}
                                 </span>
@@ -376,18 +487,18 @@ export function CalendarWorkspace({
                             type="button"
                             disabled={isPending}
                             onClick={() => handleCompleteSession(s.id)}
-                            className="rounded-xl border border-[#CBD5E1] bg-white px-3 py-1.5 text-xs font-semibold hover:bg-[#0F172A] hover:text-white transition-colors"
+                            className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-colors"
                           >
-                            Complete
+                            Mark Done
                           </button>
                         )}
                       </div>
                     ))}
                   </div>
-                ))}
-            </div>
-          )}
-        </div>
+                </div>
+              ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -41,6 +41,9 @@ export function CatalogWorkspace({
   const [settings, setSettings] = useState<StudioSettings | null>(initialSettings);
   const [packages, setPackages] = useState<StudioPackage[]>(initialPackages);
   const [members, setMembers] = useState(initialMembers);
+  const [activeTab, setActiveTab] = useState<'packages' | 'team' | 'showcase' | 'settings'>('packages');
+  const [showAddPkg, setShowAddPkg] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -188,65 +191,340 @@ export function CatalogWorkspace({
   };
 
   const currency = settings?.currency || 'BDT';
+  const inputClass =
+    'w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/15 transition-all';
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#64748B]">
-          White-Label Studio & Offerings
-        </p>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#0F172A] mt-1">
-          Catalog, Team & Branding
-        </h1>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            Packages &amp; Settings
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Manage your service packages, team members, showcase photos, and studio branding.
+          </p>
+        </div>
+
+        <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-white p-1 gap-1">
+          {[
+            { id: 'packages', label: `Packages (${packages.length})` },
+            { id: 'team', label: `Team (${members.length})` },
+            { id: 'showcase', label: 'Showcase' },
+            { id: 'settings', label: 'Branding & Rules' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setActiveTab(t.id as typeof activeTab)}
+              className={cn(
+                'rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors',
+                activeTab === t.id
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {feedback && (
         <div
           className={cn(
-            'rounded-xl border px-4 py-3 text-sm',
+            'rounded-xl border px-4 py-3 text-sm flex items-center justify-between',
             feedback.type === 'ok'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
               : 'border-rose-200 bg-rose-50 text-rose-900',
           )}
         >
-          {feedback.text}
+          <span>{feedback.text}</span>
+          <button type="button" onClick={() => setFeedback(null)} className="text-xs underline">
+            Dismiss
+          </button>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-12">
-        {/* Branding & Policy */}
-        <form onSubmit={handleSaveBranding} className="lg:col-span-6 atelier-card p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
-            <h2 className="text-lg font-bold tracking-tight">White-Label Branding</h2>
-            <PaletteIcon className="w-5 h-5 text-[#64748B]" />
+      {/* TAB 1: PACKAGES */}
+      {activeTab === 'packages' && (
+        <div className="atelier-card p-6 space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">
+                Service Packages
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Published packages appear on your public website for clients to select.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAddPkg((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span>{showAddPkg ? 'Close' : 'Add Package'}</span>
+            </button>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-3">
+          {showAddPkg && (
+            <form
+              onSubmit={(e) => {
+                handleCreatePackage(e);
+                setShowAddPkg(false);
+              }}
+              className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 grid sm:grid-cols-2 gap-3"
+            >
+              <input
+                required
+                value={pkgName}
+                onChange={(e) => setPkgName(e.target.value)}
+                placeholder="Package name (e.g. Gold Wedding)"
+                className={inputClass}
+              />
+              <input
+                type="number"
+                min="0"
+                required
+                value={pkgPriceTk}
+                onChange={(e) => setPkgPriceTk(e.target.value)}
+                placeholder={`Base price (${currency})`}
+                className={`${inputClass} font-mono-code`}
+              />
+              <select
+                value={pkgEventTypeId}
+                onChange={(e) => setPkgEventTypeId(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Any event type</option>
+                {eventTypes.map((et) => (
+                  <option key={et.id} value={et.id}>
+                    {et.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={pkgDesc}
+                onChange={(e) => setPkgDesc(e.target.value)}
+                placeholder="Short description"
+                className={inputClass}
+              />
+              <div className="sm:col-span-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  <span>Save &amp; Publish Package</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {packages.length === 0 ? (
+            <p className="text-sm text-slate-500 py-8 text-center">
+              No packages yet. Click &ldquo;Add Package&rdquo; to create your first offering.
+            </p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {packages.map((pkg) => (
+                <div key={pkg.id} className="py-3.5 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-sm text-slate-900">{pkg.name}</p>
+                    <p className="font-mono-code text-xs text-slate-500 mt-0.5 tabular-nums">
+                      {formatPoisha(pkg.basePricePoisha, currency)}
+                      {pkg.description ? ` • ${pkg.description}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePublish(pkg)}
+                    className={cn(
+                      'rounded-full px-3 py-1 text-[11px] font-semibold border transition-colors',
+                      pkg.isPublished
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200',
+                    )}
+                  >
+                    {pkg.isPublished ? 'Published' : 'Draft'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: TEAM */}
+      {activeTab === 'team' && (
+        <div className="atelier-card p-6 space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">Studio Team</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Add coordinators, accountants, or crew members with their login role.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAddMember((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span>{showAddMember ? 'Close' : 'Add Member'}</span>
+            </button>
+          </div>
+
+          {showAddMember && (
+            <form
+              onSubmit={(e) => {
+                handleAddMember(e);
+                setShowAddMember(false);
+              }}
+              className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 grid sm:grid-cols-2 gap-3"
+            >
+              <input
+                required
+                value={memName}
+                onChange={(e) => setMemName(e.target.value)}
+                placeholder="Full name"
+                className={inputClass}
+              />
+              <input
+                required
+                type="email"
+                value={memEmail}
+                onChange={(e) => setMemEmail(e.target.value)}
+                placeholder="Email address"
+                className={inputClass}
+              />
+              <input
+                type="password"
+                value={memPassword}
+                onChange={(e) => setMemPassword(e.target.value)}
+                placeholder="Initial password (min 6 chars)"
+                className={inputClass}
+              />
+              <select
+                value={memRole}
+                onChange={(e) => setMemRole(e.target.value as UserRole)}
+                className={inputClass}
+              >
+                <option value="COORDINATOR">Coordinator</option>
+                <option value="ACCOUNTANT">Accountant</option>
+                <option value="STAFF">Staff / Crew</option>
+                <option value="OWNER">Owner</option>
+              </select>
+              <div className="sm:col-span-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  Save Team Member
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="divide-y divide-slate-100">
+            {members.map((m) => (
+              <div key={m.id} className="py-3 flex items-center justify-between text-xs">
+                <div>
+                  <p className="font-semibold text-sm text-slate-900">{m.name}</p>
+                  <p className="text-slate-500">{m.email}</p>
+                </div>
+                <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-0.5 font-mono-code text-[11px] font-semibold text-slate-700">
+                  {m.role}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: SHOWCASE */}
+      {activeTab === 'showcase' && (
+        <form onSubmit={handleAddPortfolio} className="atelier-card p-6 space-y-4 max-w-2xl">
+          <div className="border-b border-slate-100 pb-3">
+            <h2 className="text-base font-bold tracking-tight text-slate-900">
+              Publish Showcase Photo
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Add an approved photo or story to your public homepage showcase.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Title *</label>
+            <input
+              required
+              value={portTitle}
+              onChange={(e) => setPortTitle(e.target.value)}
+              placeholder="e.g. Autumn Wedding Reception at Dhaka"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Image URL *</label>
+            <input
+              required
+              value={portMediaUrl}
+              onChange={(e) => setPortMediaUrl(e.target.value)}
+              placeholder="https://images.example.com/story.jpg"
+              className={inputClass}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isPending}
+            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+          >
+            Publish to Storefront
+          </button>
+        </form>
+      )}
+
+      {/* TAB 4: BRANDING & SETTINGS */}
+      {activeTab === 'settings' && (
+        <form onSubmit={handleSaveBranding} className="atelier-card p-6 space-y-5 max-w-2xl">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">
+                Branding &amp; Booking Rules
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Customize how your studio appears on the public storefront.
+              </p>
+            </div>
+            <PaletteIcon className="w-5 h-5 text-slate-400" />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <label className="block text-[11px] font-semibold uppercase text-[#64748B] mb-1">
-                Studio Display Name
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Studio Name
               </label>
               <input
                 value={brandName}
                 onChange={(e) => setBrandName(e.target.value)}
-                className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
+                className={inputClass}
               />
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-[11px] font-semibold uppercase text-[#64748B] mb-1">
-                Logo URL
-              </label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Logo URL</label>
               <input
                 value={logoUrl}
                 onChange={(e) => setLogoUrl(e.target.value)}
                 placeholder="https://cdn.example.com/logo.png"
-                className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase text-[#64748B] mb-1">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Primary Color
               </label>
               <div className="flex items-center gap-2">
@@ -254,18 +532,18 @@ export function CatalogWorkspace({
                   type="color"
                   value={primaryColor}
                   onChange={(e) => setPrimaryColor(e.target.value)}
-                  className="h-9 w-10 rounded border border-[#CBD5E1]"
+                  className="h-9 w-10 rounded-lg border border-slate-200 cursor-pointer"
                 />
                 <input
                   value={primaryColor}
                   onChange={(e) => setPrimaryColor(e.target.value)}
-                  className="flex-1 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs font-mono-code"
+                  className={`${inputClass} font-mono-code text-xs`}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase text-[#64748B] mb-1">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Accent Color
               </label>
               <div className="flex items-center gap-2">
@@ -273,30 +551,28 @@ export function CatalogWorkspace({
                   type="color"
                   value={accentColor}
                   onChange={(e) => setAccentColor(e.target.value)}
-                  className="h-9 w-10 rounded border border-[#CBD5E1]"
+                  className="h-9 w-10 rounded-lg border border-slate-200 cursor-pointer"
                 />
                 <input
                   value={accentColor}
                   onChange={(e) => setAccentColor(e.target.value)}
-                  className="flex-1 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs font-mono-code"
+                  className={`${inputClass} font-mono-code text-xs`}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase text-[#64748B] mb-1">
-                Timezone
-              </label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Timezone</label>
               <input
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
-                className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs font-mono-code"
+                className={`${inputClass} font-mono-code text-xs`}
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase text-[#64748B] mb-1">
-                Advance Policy
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Required Advance Deposit
               </label>
               <div className="flex gap-2">
                 <select
@@ -304,7 +580,7 @@ export function CatalogWorkspace({
                   onChange={(e) =>
                     setAdvancePolicyType(e.target.value as 'NONE' | 'PERCENTAGE' | 'FIXED')
                   }
-                  className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-2.5 py-2 text-xs"
+                  className="rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-2 text-xs"
                 >
                   <option value="PERCENTAGE">%</option>
                   <option value="FIXED">Fixed</option>
@@ -315,7 +591,7 @@ export function CatalogWorkspace({
                   min="0"
                   value={advancePolicyValue}
                   onChange={(e) => setAdvancePolicyValue(e.target.value)}
-                  className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs font-mono-code"
+                  className={`${inputClass} font-mono-code text-xs`}
                 />
               </div>
             </div>
@@ -324,175 +600,12 @@ export function CatalogWorkspace({
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-xl bg-[#0F172A] px-5 py-2.5 text-xs font-semibold text-white"
+            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
           >
-            Save Studio Branding
+            Save Settings
           </button>
         </form>
-
-        {/* Packages */}
-        <div className="lg:col-span-6 atelier-card p-6 space-y-4">
-          <h2 className="text-lg font-bold tracking-tight border-b border-[#E2E8F0] pb-3">
-            Packages
-          </h2>
-
-          <form onSubmit={handleCreatePackage} className="grid sm:grid-cols-2 gap-2.5">
-            <input
-              required
-              value={pkgName}
-              onChange={(e) => setPkgName(e.target.value)}
-              placeholder="Package name"
-              className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
-            />
-            <input
-              type="number"
-              min="0"
-              required
-              value={pkgPriceTk}
-              onChange={(e) => setPkgPriceTk(e.target.value)}
-              placeholder={`Base price (${currency})`}
-              className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs font-mono-code"
-            />
-            <select
-              value={pkgEventTypeId}
-              onChange={(e) => setPkgEventTypeId(e.target.value)}
-              className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
-            >
-              <option value="">Any event type</option>
-              {eventTypes.map((et) => (
-                <option key={et.id} value={et.id}>
-                  {et.name}
-                </option>
-              ))}
-            </select>
-            <input
-              value={pkgDesc}
-              onChange={(e) => setPkgDesc(e.target.value)}
-              placeholder="Short description"
-              className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
-            />
-            <button
-              type="submit"
-              disabled={isPending}
-              className="sm:col-span-2 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0F172A] px-4 py-2 text-xs font-semibold text-white"
-            >
-              <PlusIcon className="w-3.5 h-3.5" />
-              <span>Add & Publish Package</span>
-            </button>
-          </form>
-
-          <div className="divide-y divide-[#E2E8F0] pt-2">
-            {packages.map((pkg) => (
-              <div key={pkg.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
-                <div>
-                  <p className="font-semibold text-sm">{pkg.name}</p>
-                  <p className="font-mono-code text-[#64748B]">
-                    {formatPoisha(pkg.basePricePoisha, currency)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleTogglePublish(pkg)}
-                  className={cn(
-                    'rounded-full px-3 py-1 text-[11px] font-semibold border',
-                    pkg.isPublished
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      : 'bg-stone-100 text-stone-600 border-stone-200',
-                  )}
-                >
-                  {pkg.isPublished ? 'Published' : 'Draft'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Portfolio Publisher */}
-        <form onSubmit={handleAddPortfolio} className="lg:col-span-6 atelier-card p-6 space-y-3">
-          <h2 className="text-lg font-bold tracking-tight">Publish Showcase Asset</h2>
-          <input
-            required
-            value={portTitle}
-            onChange={(e) => setPortTitle(e.target.value)}
-            placeholder="Showcase title"
-            className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-          />
-          <input
-            required
-            value={portMediaUrl}
-            onChange={(e) => setPortMediaUrl(e.target.value)}
-            placeholder="https://images.example.com/story.jpg"
-            className="w-full rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={isPending}
-            className="rounded-xl border border-[#CBD5E1] px-4 py-2 text-xs font-semibold hover:bg-[#F1F5F9]"
-          >
-            Approve & Publish to Storefront
-          </button>
-        </form>
-
-        {/* Team Members */}
-        <div className="lg:col-span-6 atelier-card p-6 space-y-4">
-          <h2 className="text-lg font-bold tracking-tight">Studio Team</h2>
-          <form onSubmit={handleAddMember} className="grid sm:grid-cols-2 gap-2.5">
-            <input
-              required
-              value={memName}
-              onChange={(e) => setMemName(e.target.value)}
-              placeholder="Name"
-              className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
-            />
-            <input
-              required
-              type="email"
-              value={memEmail}
-              onChange={(e) => setMemEmail(e.target.value)}
-              placeholder="Email"
-              className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
-            />
-            <input
-              type="password"
-              value={memPassword}
-              onChange={(e) => setMemPassword(e.target.value)}
-              placeholder="Initial password (min 6 chars)"
-              className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
-            />
-            <select
-              value={memRole}
-              onChange={(e) => setMemRole(e.target.value as UserRole)}
-              className="rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-2 text-xs"
-            >
-              <option value="COORDINATOR">Coordinator</option>
-              <option value="ACCOUNTANT">Accountant</option>
-              <option value="STAFF">Staff / Crew</option>
-              <option value="OWNER">Owner</option>
-            </select>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="sm:col-span-2 rounded-xl bg-[#0F172A] px-4 py-2 text-xs font-semibold text-white"
-            >
-              Add Team Member
-            </button>
-          </form>
-
-          <div className="divide-y divide-[#E2E8F0]">
-            {members.map((m) => (
-              <div key={m.id} className="py-2 flex items-center justify-between text-xs">
-                <div>
-                  <p className="font-semibold">{m.name}</p>
-                  <p className="text-[#64748B]">{m.email}</p>
-                </div>
-                <span className="rounded-full bg-[#F1F5F9] px-2.5 py-0.5 font-mono-code text-[10px] font-semibold">
-                  {m.role}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
