@@ -3,13 +3,20 @@
 import { revalidatePath } from 'next/cache';
 import { serverFetch } from '@/lib/serverFetch';
 import {
+  DeliverableLabelTemplate,
   EventType,
   PaginatedResponse,
   PortfolioItem,
   ServiceItem,
   StudioPackage,
+  TaskTemplate,
 } from '@/types/event-management';
 import { ActionResult, parseApiResponse } from '../shared/apiResult';
+
+export async function getPublicEventTypes(): Promise<ActionResult<EventType[]>> {
+  const res = await serverFetch.get('/public/event-types');
+  return parseApiResponse<EventType[]>(res);
+}
 
 export async function getPublicPackages(): Promise<
   ActionResult<PaginatedResponse<StudioPackage>>
@@ -118,6 +125,73 @@ export async function createPortfolioItem(payload: {
     body: JSON.stringify(payload),
   });
   const result = await parseApiResponse<PortfolioItem>(res);
+  if (result.ok) revalidatePath('/admin/catalog');
+  return result;
+}
+
+export async function listDeliverableLabels(): Promise<
+  ActionResult<DeliverableLabelTemplate[]>
+> {
+  const res = await serverFetch.get('/catalog/deliverable-labels');
+  return parseApiResponse<DeliverableLabelTemplate[]>(res);
+}
+
+export async function createDeliverableLabel(payload: {
+  eventTypeId?: string;
+  label: string;
+  defaultDueDays?: number;
+}): Promise<ActionResult<DeliverableLabelTemplate>> {
+  const res = await serverFetch.post('/catalog/deliverable-labels', {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<DeliverableLabelTemplate>(res);
+  if (result.ok) revalidatePath('/admin/catalog');
+  return result;
+}
+
+export async function updateDeliverableLabel(
+  id: string,
+  payload: { label?: string; defaultDueDays?: number; isActive?: boolean },
+): Promise<ActionResult<DeliverableLabelTemplate>> {
+  const res = await serverFetch.patch(`/catalog/deliverable-labels/${encodeURIComponent(id)}`, {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<DeliverableLabelTemplate>(res);
+  if (result.ok) revalidatePath('/admin/catalog');
+  return result;
+}
+
+export async function listTaskTemplates(): Promise<ActionResult<TaskTemplate[]>> {
+  const res = await serverFetch.get('/catalog/task-templates');
+  return parseApiResponse<TaskTemplate[]>(res);
+}
+
+export async function createTaskTemplate(payload: {
+  eventTypeId?: string;
+  title: string;
+  roleLabel: string;
+  defaultOffsetDays?: number;
+}): Promise<ActionResult<TaskTemplate>> {
+  const res = await serverFetch.post('/catalog/task-templates', {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<TaskTemplate>(res);
+  if (result.ok) revalidatePath('/admin/catalog');
+  return result;
+}
+
+export async function updateTaskTemplate(
+  id: string,
+  payload: { title?: string; roleLabel?: string; defaultOffsetDays?: number; isActive?: boolean },
+): Promise<ActionResult<TaskTemplate>> {
+  const res = await serverFetch.patch(`/catalog/task-templates/${encodeURIComponent(id)}`, {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<TaskTemplate>(res);
   if (result.ok) revalidatePath('/admin/catalog');
   return result;
 }

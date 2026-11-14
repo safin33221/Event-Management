@@ -1,6 +1,10 @@
 import { getPublicBranding } from '@/service/agency/agency.service';
-import { getPublicPackages, getPublicPortfolio } from '@/service/catalog/catalog.service';
-import { StudioPackage, PortfolioItem, PublicBranding } from '@/types/event-management';
+import {
+  getPublicEventTypes,
+  getPublicPackages,
+  getPublicPortfolio,
+} from '@/service/catalog/catalog.service';
+import { EventType, StudioPackage, PortfolioItem, PublicBranding } from '@/types/event-management';
 
 export const NEUTRAL_PREVIEW_BRANDING: PublicBranding = {
   displayName: 'Softilo Event Management',
@@ -20,12 +24,14 @@ export const NEUTRAL_PREVIEW_BRANDING: PublicBranding = {
 
 export async function loadPublicStorefront(): Promise<{
   branding: PublicBranding;
+  eventTypes: EventType[];
   packages: StudioPackage[];
   portfolio: PortfolioItem[];
   isBackendConnected: boolean;
 }> {
-  const [brandRes, pkgRes, portRes] = await Promise.all([
+  const [brandRes, etRes, pkgRes, portRes] = await Promise.all([
     getPublicBranding(),
+    getPublicEventTypes(),
     getPublicPackages(),
     getPublicPortfolio(),
   ]);
@@ -33,6 +39,7 @@ export async function loadPublicStorefront(): Promise<{
   if (!brandRes.ok || !brandRes.data) {
     return {
       branding: NEUTRAL_PREVIEW_BRANDING,
+      eventTypes: [],
       packages: [],
       portfolio: [],
       isBackendConnected: false,
@@ -41,6 +48,7 @@ export async function loadPublicStorefront(): Promise<{
 
   return {
     branding: brandRes.data,
+    eventTypes: etRes.ok && etRes.data ? etRes.data : [],
     packages: pkgRes.ok && pkgRes.data ? pkgRes.data.data : [],
     portfolio: portRes.ok && portRes.data ? portRes.data.data : [],
     isBackendConnected: true,

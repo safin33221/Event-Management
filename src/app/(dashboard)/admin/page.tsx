@@ -4,7 +4,7 @@ import { getMe } from '@/service/auth';
 import { getAgencySettings } from '@/service/agency/agency.service';
 import { listInquiries } from '@/service/inquiries/inquiries.service';
 import { listQuotes } from '@/service/quotes/quotes.service';
-import { listBookings } from '@/service/bookings/bookings.service';
+import { listBookings, getAutomationAlerts } from '@/service/bookings/bookings.service';
 import { getCalendar } from '@/service/schedule/schedule.service';
 import { AdminOverview } from '@/components/module/admin/AdminOverview';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
@@ -22,12 +22,13 @@ async function AdminOverviewContent() {
   const from = addDaysIso(0);
   const to = addDaysIso(14);
 
-  const [settingsRes, inqRes, quotesRes, bookingsRes, calRes] = await Promise.all([
+  const [settingsRes, inqRes, quotesRes, bookingsRes, calRes, alertsRes] = await Promise.all([
     getAgencySettings(),
     listInquiries(),
     listQuotes(),
     listBookings(),
     getCalendar(from, to),
+    getAutomationAlerts(),
   ]);
 
   return (
@@ -37,6 +38,7 @@ async function AdminOverviewContent() {
       quotes={quotesRes.ok && quotesRes.data ? quotesRes.data.data : []}
       bookings={bookingsRes.ok && bookingsRes.data ? bookingsRes.data.data : []}
       upcomingSessions={calRes.ok && calRes.data ? calRes.data.sessions : []}
+      alerts={alertsRes.ok && alertsRes.data ? alertsRes.data : null}
     />
   );
 }

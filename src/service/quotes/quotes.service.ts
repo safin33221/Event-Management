@@ -66,6 +66,19 @@ export async function createQuoteVersion(
   return result;
 }
 
+export async function sendQuote(quoteId: string): Promise<ActionResult<Quote>> {
+  const res = await serverFetch.post(`/quotes/${encodeURIComponent(quoteId)}/send`, {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  const result = await parseApiResponse<Quote>(res);
+  if (result.ok) {
+    revalidatePath('/admin/bookings');
+    revalidatePath('/admin');
+  }
+  return result;
+}
+
 export async function acceptQuote(
   quoteId: string,
   payload: {

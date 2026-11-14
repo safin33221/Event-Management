@@ -48,12 +48,22 @@ export async function recordPayment(
 
 export async function verifyPayment(
   paymentId: string,
-): Promise<ActionResult<{ entry: PaymentEntry; ledger: BookingLedgerSummary }>> {
+): Promise<
+  ActionResult<{
+    entry: PaymentEntry;
+    ledger: BookingLedgerSummary;
+    bookingStatus?: string | null;
+  }>
+> {
   const res = await serverFetch.post(`/payments/${encodeURIComponent(paymentId)}/verify`, {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   });
-  const result = await parseApiResponse<{ entry: PaymentEntry; ledger: BookingLedgerSummary }>(res);
+  const result = await parseApiResponse<{
+    entry: PaymentEntry;
+    ledger: BookingLedgerSummary;
+    bookingStatus?: string | null;
+  }>(res);
   if (result.ok) {
     revalidatePath('/admin/bookings');
     revalidatePath('/admin');

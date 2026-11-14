@@ -2,7 +2,12 @@ import React, { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getMe } from '@/service/auth';
 import { getAgencySettings, listAgencyMembers } from '@/service/agency/agency.service';
-import { listEventTypes, listPackages } from '@/service/catalog/catalog.service';
+import {
+  listDeliverableLabels,
+  listEventTypes,
+  listPackages,
+  listTaskTemplates,
+} from '@/service/catalog/catalog.service';
 import { CatalogWorkspace } from '@/components/module/admin/CatalogWorkspace';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
 
@@ -11,19 +16,23 @@ async function AdminCatalogContent() {
   if (!session) redirect('/login');
   if (session.role === 'STAFF') redirect('/staff');
 
-  const [settingsRes, pkgRes, etRes, memRes] = await Promise.all([
+  const [settingsRes, pkgRes, etRes, memRes, delLabelsRes, taskTplRes] = await Promise.all([
     getAgencySettings(),
     listPackages(),
     listEventTypes(),
     listAgencyMembers(),
+    listDeliverableLabels(),
+    listTaskTemplates(),
   ]);
 
   return (
     <CatalogWorkspace
       initialSettings={settingsRes.ok && settingsRes.data ? settingsRes.data : null}
       initialPackages={pkgRes.ok && pkgRes.data ? pkgRes.data.data : []}
-      eventTypes={etRes.ok && etRes.data ? etRes.data : []}
+      initialEventTypes={etRes.ok && etRes.data ? etRes.data : []}
       initialMembers={memRes.ok && memRes.data ? memRes.data : []}
+      initialDeliverableLabels={delLabelsRes.ok && delLabelsRes.data ? delLabelsRes.data : []}
+      initialTaskTemplates={taskTplRes.ok && taskTplRes.data ? taskTplRes.data : []}
     />
   );
 }

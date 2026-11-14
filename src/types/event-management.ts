@@ -91,6 +91,7 @@ export interface PackageItem {
 export interface StudioPackage {
   id: string;
   eventTypeId: string | null;
+  eventType?: { id: string; name: string; slug: string };
   name: string;
   slug: string;
   description: string | null;
@@ -98,6 +99,25 @@ export interface StudioPackage {
   isActive: boolean;
   isPublished: boolean;
   items?: PackageItem[];
+}
+
+export interface DeliverableLabelTemplate {
+  id: string;
+  eventTypeId: string | null;
+  eventType?: { id: string; name: string; slug: string } | null;
+  label: string;
+  defaultDueDays: number;
+  isActive: boolean;
+}
+
+export interface TaskTemplate {
+  id: string;
+  eventTypeId: string | null;
+  eventType?: { id: string; name: string; slug: string } | null;
+  title: string;
+  roleLabel: string;
+  defaultOffsetDays: number;
+  isActive: boolean;
 }
 
 export interface PortfolioItem {
@@ -185,6 +205,8 @@ export interface BookingLedgerSummary {
   completedRefundsPoisha: number;
   outstandingDuePoisha: number;
   customerCreditPoisha: number;
+  requiredAdvancePoisha: number;
+  isAdvanceMet: boolean;
 }
 
 export interface PaymentEntry {
@@ -247,6 +269,12 @@ export interface Assignment {
   notes: string | null;
   status: AssignmentStatus;
   createdAt: string;
+  assignee?: {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+  };
   booking?: {
     id: string;
     reference: string;
@@ -259,10 +287,10 @@ export interface Assignment {
   session?: {
     id: string;
     title: string;
-    startAt: string;
-    endAt: string;
-    location: string | null;
-    status: SessionStatus;
+    startAt?: string;
+    endAt?: string;
+    location?: string | null;
+    status?: SessionStatus;
   } | null;
 }
 
@@ -271,11 +299,26 @@ export interface Deliverable {
   bookingId: string;
   label: string;
   assigneeUserId: string | null;
+  assigneeName?: string | null;
   dueAt: string | null;
   reviewStatus: DeliverableStatus;
   deliveredAt: string | null;
   deliveryUrl: string | null;
   notes: string | null;
+}
+
+export interface ScheduleAuditEntry {
+  id: string;
+  bookingId: string;
+  sessionId: string | null;
+  action: string;
+  reason: string;
+  changedById: string;
+  previousStartAt: string | null;
+  previousEndAt: string | null;
+  newStartAt: string | null;
+  newEndAt: string | null;
+  createdAt: string;
 }
 
 export interface Booking {
@@ -284,6 +327,9 @@ export interface Booking {
   quoteId: string;
   acceptedQuoteVersionId: string;
   eventTypeId: string | null;
+  eventType?: { id: string; name: string; slug: string } | null;
+  quote?: { id: string; reference: string } | null;
+  acceptedQuoteVersion?: QuoteVersion;
   eventTitle: string;
   eventDate: string | null;
   clientName: string;
@@ -299,6 +345,141 @@ export interface Booking {
   sessions?: EventSession[];
   deliverables?: Deliverable[];
   assignments?: Assignment[];
+  scheduleAuditLogs?: ScheduleAuditEntry[];
+}
+
+export interface AutomationAlerts {
+  currency: string;
+  timezone: string;
+  pendingPayments: Array<{
+    id: string;
+    bookingId: string;
+    method: PaymentMethod;
+    amountPoisha: number;
+    currency: string;
+    transactionRef: string | null;
+    createdAt: string;
+    booking: {
+      id: string;
+      reference: string;
+      eventTitle: string;
+      clientName: string;
+      status: BookingStatus;
+    };
+  }>;
+  readyToConfirmBookings: Array<{
+    id: string;
+    reference: string;
+    eventTitle: string;
+    clientName: string;
+    eventDate: string | null;
+    agreedTotalPoisha: number;
+    verifiedReceiptsPoisha: number;
+    requiredAdvancePoisha: number;
+  }>;
+  awaitingAdvanceBookings: Array<{
+    id: string;
+    reference: string;
+    eventTitle: string;
+    clientName: string;
+    eventDate: string | null;
+    agreedTotalPoisha: number;
+    verifiedReceiptsPoisha: number;
+    requiredAdvancePoisha: number;
+  }>;
+  unscheduledConfirmedBookings: Array<{
+    id: string;
+    reference: string;
+    eventTitle: string;
+    clientName: string;
+    eventDate: string | null;
+  }>;
+  unassignedConfirmedBookings: Array<{
+    id: string;
+    reference: string;
+    eventTitle: string;
+    clientName: string;
+    eventDate: string | null;
+  }>;
+  urgentDeliverables: Array<{
+    id: string;
+    bookingId: string;
+    label: string;
+    dueAt: string | null;
+    reviewStatus: DeliverableStatus;
+    isOverdue: boolean;
+    booking: {
+      id: string;
+      reference: string;
+      eventTitle: string;
+      clientName: string;
+    };
+  }>;
+  counts: {
+    pendingPayments: number;
+    readyToConfirm: number;
+    awaitingAdvance: number;
+    unscheduledConfirmed: number;
+    unassignedConfirmed: number;
+    urgentDeliverables: number;
+  };
+}
+
+export interface BookingReceipt {
+  studio: PublicBranding;
+  booking: {
+    id: string;
+    reference: string;
+    status: BookingStatus;
+    eventTitle: string;
+    eventTypeName: string | null;
+    eventDate: string | null;
+    clientName: string;
+    clientPhone: string;
+    clientEmail: string | null;
+    currency: string;
+    agreedTotalPoisha: number;
+    confirmedAt: string | null;
+    createdAt: string;
+  };
+  quote: {
+    reference: string;
+    versionNumber: number;
+    acceptedAt: string | null;
+    acceptedBy: string | null;
+    acceptedChannel: AcceptanceChannel | null;
+    terms: string | null;
+    subtotalPoisha: number;
+    discountPoisha: number;
+    totalPoisha: number;
+    items: Array<{
+      id: string;
+      description: string;
+      quantity: number;
+      unitPricePoisha: number;
+      lineTotalPoisha: number;
+    }>;
+  };
+  ledger: BookingLedgerSummary;
+  payments: Array<{
+    id: string;
+    type: PaymentType;
+    method: PaymentMethod;
+    amountPoisha: number;
+    currency: string;
+    transactionRef: string | null;
+    verifiedAt: string | null;
+    reason: string | null;
+    createdAt: string;
+  }>;
+  adjustments: Array<{
+    id: string;
+    type: AdjustmentType;
+    amountPoisha: number;
+    reason: string;
+    createdAt: string;
+  }>;
+  generatedAt: string;
 }
 
 export interface PaginatedResponse<T> {

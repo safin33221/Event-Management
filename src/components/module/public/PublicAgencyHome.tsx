@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { PortfolioItem, PublicBranding, StudioPackage } from '@/types/event-management';
+import { EventType, PortfolioItem, PublicBranding, StudioPackage } from '@/types/event-management';
 import { formatPoisha } from '@/lib/utils';
 import {
   ArrowRightIcon,
@@ -14,6 +14,7 @@ import { InquiryForm } from './InquiryForm';
 
 interface PublicAgencyHomeProps {
   branding: PublicBranding;
+  eventTypes: EventType[];
   packages: StudioPackage[];
   portfolio: PortfolioItem[];
   isBackendConnected: boolean;
@@ -21,6 +22,7 @@ interface PublicAgencyHomeProps {
 
 export function PublicAgencyHome({
   branding,
+  eventTypes,
   packages,
   portfolio,
   isBackendConnected,
@@ -177,6 +179,11 @@ export function PublicAgencyHome({
                   }`}
                 >
                   <div>
+                    {pkg.eventType && (
+                      <span className="inline-block mb-2 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-700">
+                        {pkg.eventType.name}
+                      </span>
+                    )}
                     <div className="flex items-start justify-between gap-3">
                       <h3 className="text-lg font-bold tracking-tight text-slate-900">
                         {pkg.name}
@@ -295,6 +302,7 @@ export function PublicAgencyHome({
       <section id="inquire" className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
         <InquiryForm
           branding={branding}
+          eventTypes={eventTypes}
           packages={packages}
           selectedPackageId={selectedPackageId}
           onPackageChange={setSelectedPackageId}

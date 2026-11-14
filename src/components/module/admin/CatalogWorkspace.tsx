@@ -2,9 +2,11 @@
 
 import React, { useState, useTransition } from 'react';
 import {
+  DeliverableLabelTemplate,
   EventType,
   StudioPackage,
   StudioSettings,
+  TaskTemplate,
   UserRole,
 } from '@/types/event-management';
 import {
@@ -12,9 +14,14 @@ import {
   updateAgencyBranding,
 } from '@/service/agency/agency.service';
 import {
+  createDeliverableLabel,
+  createEventType,
   createPackage,
   createPortfolioItem,
+  createTaskTemplate,
+  updateDeliverableLabel,
   updatePackage,
+  updateTaskTemplate,
 } from '@/service/catalog/catalog.service';
 import { cn, formatPoisha } from '@/lib/utils';
 import { PaletteIcon, PlusIcon } from '@/components/shared/Icons';
@@ -22,7 +29,7 @@ import { PaletteIcon, PlusIcon } from '@/components/shared/Icons';
 interface CatalogWorkspaceProps {
   initialSettings: StudioSettings | null;
   initialPackages: StudioPackage[];
-  eventTypes: EventType[];
+  initialEventTypes: EventType[];
   initialMembers: Array<{
     id: string;
     email: string;
@@ -30,18 +37,28 @@ interface CatalogWorkspaceProps {
     role: UserRole;
     isActive: boolean;
   }>;
+  initialDeliverableLabels?: DeliverableLabelTemplate[];
+  initialTaskTemplates?: TaskTemplate[];
 }
 
 export function CatalogWorkspace({
   initialSettings,
   initialPackages,
-  eventTypes,
+  initialEventTypes,
   initialMembers,
+  initialDeliverableLabels = [],
+  initialTaskTemplates = [],
 }: CatalogWorkspaceProps) {
   const [settings, setSettings] = useState<StudioSettings | null>(initialSettings);
   const [packages, setPackages] = useState<StudioPackage[]>(initialPackages);
+  const [eventTypes, setEventTypes] = useState<EventType[]>(initialEventTypes);
   const [members, setMembers] = useState(initialMembers);
-  const [activeTab, setActiveTab] = useState<'packages' | 'team' | 'showcase' | 'settings'>('packages');
+  const [deliverableLabels, setDeliverableLabels] =
+    useState<DeliverableLabelTemplate[]>(initialDeliverableLabels);
+  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>(initialTaskTemplates);
+  const [activeTab, setActiveTab] = useState<
+    'packages' | 'automation' | 'team' | 'showcase' | 'settings'
+  >('packages');
   const [showAddPkg, setShowAddPkg] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -80,6 +97,17 @@ export function CatalogWorkspace({
   const [memEmail, setMemEmail] = useState('');
   const [memPassword, setMemPassword] = useState('');
   const [memRole, setMemRole] = useState<UserRole>('STAFF');
+
+  // Automation rules state (Event Types, Deliverable Templates, Workflow Tasks)
+  const [etName, setEtName] = useState('');
+  const [etDesc, setEtDesc] = useState('');
+  const [delTplLabel, setDelTplLabel] = useState('');
+  const [delTplEventTypeId, setDelTplEventTypeId] = useState(initialEventTypes[0]?.id || '');
+  const [delTplDueDays, setDelTplDueDays] = useState('14');
+  const [taskTplTitle, setTaskTplTitle] = useState('');
+  const [taskTplRole, setTaskTplRole] = useState('Coordinator');
+  const [taskTplEventTypeId, setTaskTplEventTypeId] = useState(initialEventTypes[0]?.id || '');
+  const [taskTplOffsetDays, setTaskTplOffsetDays] = useState('-2');
 
   const notify = (type: 'ok' | 'err', text: string) => setFeedback({ type, text });
 
@@ -190,6 +218,94 @@ export function CatalogWorkspace({
     });
   };
 
+  const handleCreateEventType = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!etName.trim()) return;
+    const slug = etName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    startTransition(async () => {
+      const res = await createEventType({
+        name: etName.trim(),
+        slug,
+        description: etDesc.trim() || undefined,
+      });
+      if (!res.ok || !res.data) {
+        notify('err', res.message || 'Failed to add event type');
+        return;
+      }
+      setEventTypes([...eventTypes, res.data]);
+      setEtName('');
+      setEtDesc('');
+      notify('ok', `Event type "${res.data.name}" added`);
+    });
+  };
+
+  const handleCreateDeliverableLabel = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!delTplLabel.trim()) return;
+    startTransition(async () => {
+      const res = await createDeliverableLabel({
+        eventTypeId: delTplEventTypeId || undefined,
+        label: delTplLabel.trim(),
+        defaultDueDays: Number(delTplDueDays) || 14,
+      });
+      if (!res.ok || !res.data) {
+        notify('err', res.message || 'Failed to create deliverable rule');
+        return;
+      }
+      setDeliverableLabels([...deliverableLabels, res.data]);
+      setDelTplLabel('');
+      notify('ok', `Auto-deliverable "${res.data.label}" added`);
+    });
+  };
+
+  const handleDisableDeliverableLabel = (id: string) => {
+    startTransition(async () => {
+      const res = await updateDeliverableLabel(id, { isActive: false });
+      if (!res.ok) {
+        notify('err', res.message || 'Failed to remove rule');
+        return;
+      }
+      setDeliverableLabels(deliverableLabels.filter((d) => d.id !== id));
+      notify('ok', 'Deliverable template removed');
+    });
+  };
+
+  const handleCreateTaskTemplate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskTplTitle.trim() || !taskTplRole.trim()) return;
+    startTransition(async () => {
+      const res = await createTaskTemplate({
+        eventTypeId: taskTplEventTypeId || undefined,
+        title: taskTplTitle.trim(),
+        roleLabel: taskTplRole.trim(),
+        defaultOffsetDays: Number(taskTplOffsetDays) || 0,
+      });
+      if (!res.ok || !res.data) {
+        notify('err', res.message || 'Failed to create task template');
+        return;
+      }
+      setTaskTemplates([...taskTemplates, res.data]);
+      setTaskTplTitle('');
+      notify('ok', `Auto-task "${res.data.title}" added`);
+    });
+  };
+
+  const handleDisableTaskTemplate = (id: string) => {
+    startTransition(async () => {
+      const res = await updateTaskTemplate(id, { isActive: false });
+      if (!res.ok) {
+        notify('err', res.message || 'Failed to remove task template');
+        return;
+      }
+      setTaskTemplates(taskTemplates.filter((t) => t.id !== id));
+      notify('ok', 'Task template removed');
+    });
+  };
+
   const currency = settings?.currency || 'BDT';
   const inputClass =
     'w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/15 transition-all';
@@ -209,6 +325,7 @@ export function CatalogWorkspace({
         <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-white p-1 gap-1">
           {[
             { id: 'packages', label: `Packages (${packages.length})` },
+            { id: 'automation', label: 'Automation Rules' },
             { id: 'team', label: `Team (${members.length})` },
             { id: 'showcase', label: 'Showcase' },
             { id: 'settings', label: 'Branding & Rules' },
@@ -332,7 +449,14 @@ export function CatalogWorkspace({
               {packages.map((pkg) => (
                 <div key={pkg.id} className="py-3.5 flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-sm text-slate-900">{pkg.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm text-slate-900">{pkg.name}</p>
+                      {pkg.eventType && (
+                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                          {pkg.eventType.name}
+                        </span>
+                      )}
+                    </div>
                     <p className="font-mono-code text-xs text-slate-500 mt-0.5 tabular-nums">
                       {formatPoisha(pkg.basePricePoisha, currency)}
                       {pkg.description ? ` • ${pkg.description}` : ''}
@@ -354,6 +478,220 @@ export function CatalogWorkspace({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 1B: AUTOMATION RULES (EVENT TYPES, DELIVERABLE TEMPLATES, TASK TEMPLATES) */}
+      {activeTab === 'automation' && (
+        <div className="space-y-6">
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-xs text-indigo-950">
+            <span className="font-semibold">Booking Confirmation Automation:</span> Whenever a
+            booking is confirmed, matching Deliverables (with target due dates) and Workflow Crew
+            Tasks are automatically created from these templates. Corporate events confirm cleanly
+            without wedding albums or shoot templates.
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Deliverable Templates */}
+            <div className="atelier-card p-6 space-y-4">
+              <div className="border-b border-slate-100 pb-3">
+                <h2 className="text-base font-bold tracking-tight text-slate-900">
+                  Auto-Deliverable Rules ({deliverableLabels.length})
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Due dates calculate automatically from Event Date + Due Days.
+                </p>
+              </div>
+              <form onSubmit={handleCreateDeliverableLabel} className="grid sm:grid-cols-4 gap-2">
+                <input
+                  required
+                  value={delTplLabel}
+                  onChange={(e) => setDelTplLabel(e.target.value)}
+                  placeholder="Label (e.g. Holud Gallery)"
+                  className={`${inputClass} sm:col-span-2`}
+                />
+                <select
+                  value={delTplEventTypeId}
+                  onChange={(e) => setDelTplEventTypeId(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">All / Generic</option>
+                  {eventTypes.map((et) => (
+                    <option key={et.id} value={et.id}>
+                      {et.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={delTplDueDays}
+                  onChange={(e) => setDelTplDueDays(e.target.value)}
+                  placeholder="Due days"
+                  className={`${inputClass} font-mono-code`}
+                />
+                <div className="sm:col-span-4 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                  >
+                    + Add Deliverable Rule
+                  </button>
+                </div>
+              </form>
+              <div className="divide-y divide-slate-100">
+                {deliverableLabels.map((lbl) => (
+                  <div key={lbl.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-900">{lbl.label}</p>
+                      <p className="text-slate-500">
+                        {lbl.eventType?.name || 'Generic'} • Due +{lbl.defaultDueDays} days after event
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleDisableDeliverableLabel(lbl.id)}
+                      className="rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Workflow Task Templates */}
+            <div className="atelier-card p-6 space-y-4">
+              <div className="border-b border-slate-100 pb-3">
+                <h2 className="text-base font-bold tracking-tight text-slate-900">
+                  Auto-Task Workflow Templates ({taskTemplates.length})
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Negative offset runs before the event (e.g. -3 days); 0 is shoot day; positive is post-production.
+                </p>
+              </div>
+              <form onSubmit={handleCreateTaskTemplate} className="grid sm:grid-cols-4 gap-2">
+                <input
+                  required
+                  value={taskTplTitle}
+                  onChange={(e) => setTaskTplTitle(e.target.value)}
+                  placeholder="Task title (e.g. Gear check)"
+                  className={`${inputClass} sm:col-span-2`}
+                />
+                <input
+                  required
+                  value={taskTplRole}
+                  onChange={(e) => setTaskTplRole(e.target.value)}
+                  placeholder="Role (Coordinator/Editor)"
+                  className={inputClass}
+                />
+                <input
+                  type="number"
+                  required
+                  value={taskTplOffsetDays}
+                  onChange={(e) => setTaskTplOffsetDays(e.target.value)}
+                  placeholder="Offset days"
+                  className={`${inputClass} font-mono-code`}
+                />
+                <select
+                  value={taskTplEventTypeId}
+                  onChange={(e) => setTaskTplEventTypeId(e.target.value)}
+                  className={`${inputClass} sm:col-span-2`}
+                >
+                  <option value="">All / Generic</option>
+                  {eventTypes.map((et) => (
+                    <option key={et.id} value={et.id}>
+                      {et.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="sm:col-span-2 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                  >
+                    + Add Task Rule
+                  </button>
+                </div>
+              </form>
+              <div className="divide-y divide-slate-100">
+                {taskTemplates.map((tpl) => (
+                  <div key={tpl.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-900">
+                        {tpl.title}{' '}
+                        <span className="font-normal text-slate-500">({tpl.roleLabel})</span>
+                      </p>
+                      <p className="text-slate-500">
+                        {tpl.eventType?.name || 'Generic'} • Offset{' '}
+                        {tpl.defaultOffsetDays >= 0
+                          ? `+${tpl.defaultOffsetDays}`
+                          : tpl.defaultOffsetDays}{' '}
+                        days
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleDisableTaskTemplate(tpl.id)}
+                      className="rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Event Types */}
+          <div className="atelier-card p-6 space-y-4">
+            <div className="border-b border-slate-100 pb-3">
+              <h2 className="text-base font-bold tracking-tight text-slate-900">
+                Event Types ({eventTypes.length})
+              </h2>
+              <p className="text-xs text-slate-500">
+                Categories shown on public storefront &amp; matched against deliverable/task templates.
+              </p>
+            </div>
+            <form onSubmit={handleCreateEventType} className="flex flex-wrap gap-2.5">
+              <input
+                required
+                value={etName}
+                onChange={(e) => setEtName(e.target.value)}
+                placeholder="Event type name (e.g. Akd / Engagement)"
+                className={`${inputClass} flex-1 min-w-[200px]`}
+              />
+              <input
+                value={etDesc}
+                onChange={(e) => setEtDesc(e.target.value)}
+                placeholder="Short description (optional)"
+                className={`${inputClass} flex-1 min-w-[200px]`}
+              />
+              <button
+                type="submit"
+                disabled={isPending}
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+              >
+                + Add Event Type
+              </button>
+            </form>
+            <div className="flex flex-wrap gap-2">
+              {eventTypes.map((et) => (
+                <div
+                  key={et.id}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs"
+                >
+                  <p className="font-semibold text-slate-900">{et.name}</p>
+                  <p className="font-mono-code text-[10px] text-slate-500">{et.slug}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

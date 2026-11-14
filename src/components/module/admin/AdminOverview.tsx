@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import {
+  AutomationAlerts,
   Booking,
   EventSession,
   Inquiry,
@@ -23,6 +24,7 @@ interface AdminOverviewProps {
   quotes: Quote[];
   bookings: Booking[];
   upcomingSessions: EventSession[];
+  alerts?: AutomationAlerts | null;
 }
 
 export function AdminOverview({
@@ -31,6 +33,7 @@ export function AdminOverview({
   quotes,
   bookings,
   upcomingSessions,
+  alerts,
 }: AdminOverviewProps) {
   const currency = settings?.currency || 'BDT';
   const timezone = settings?.timezone || 'Asia/Dhaka';
@@ -181,6 +184,157 @@ export function AdminOverview({
           <p className="text-xs text-slate-500 mt-1">In the next 14 days</p>
         </div>
       </div>
+
+      {/* Studio Automation & Action Queue */}
+      {alerts && (
+        <div className="atelier-card p-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">
+                Action Queue &amp; Workflow Alerts
+              </h2>
+              <p className="text-xs text-slate-500">
+                Live checks for bKash/Nagad/Bank verifications, ready confirmations, missing crew, and deadlines.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[11px] font-mono-code">
+              <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-amber-800">
+                {alerts.counts.pendingPayments} pending verify
+              </span>
+              <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-emerald-800">
+                {alerts.counts.readyToConfirm} ready confirm
+              </span>
+              <span className="rounded-full bg-sky-50 border border-sky-200 px-2.5 py-0.5 text-sky-800">
+                {alerts.counts.unscheduledConfirmed} need shoot
+              </span>
+              <span className="rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-rose-800">
+                {alerts.counts.urgentDeliverables} due/overdue files
+              </span>
+            </div>
+          </div>
+
+          {alerts.counts.pendingPayments === 0 &&
+          alerts.counts.readyToConfirm === 0 &&
+          alerts.counts.unscheduledConfirmed === 0 &&
+          alerts.counts.urgentDeliverables === 0 ? (
+            <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+              All caught up — no pending payment approvals, unscheduled confirmed bookings, or overdue deliverables.
+            </p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {alerts.pendingPayments.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                    Payments Awaiting Verification ({alerts.pendingPayments.length})
+                  </p>
+                  {alerts.pendingPayments.slice(0, 4).map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/admin/bookings?tab=bookings&bookingId=${p.bookingId}`}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 border border-amber-100 hover:border-amber-300 transition-colors text-xs"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900 truncate">
+                          {p.booking.reference} • {p.booking.clientName}
+                        </p>
+                        <p className="text-slate-500 font-mono-code">
+                          {p.method} {p.transactionRef ? `(${p.transactionRef})` : ''}
+                        </p>
+                      </div>
+                      <span className="font-mono-code font-bold text-amber-800 shrink-0 tabular-nums">
+                        {formatPoisha(p.amountPoisha, p.currency)}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {alerts.readyToConfirmBookings.length > 0 && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                    Advance Met — Ready to Confirm ({alerts.readyToConfirmBookings.length})
+                  </p>
+                  {alerts.readyToConfirmBookings.slice(0, 4).map((b) => (
+                    <Link
+                      key={b.id}
+                      href={`/admin/bookings?tab=bookings&bookingId=${b.id}`}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 border border-emerald-100 hover:border-emerald-300 transition-colors text-xs"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900 truncate">
+                          {b.reference} • {b.eventTitle}
+                        </p>
+                        <p className="text-slate-500">
+                          {b.clientName} • {formatLocalDate(b.eventDate)}
+                        </p>
+                      </div>
+                      <span className="rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white shrink-0">
+                        Confirm →
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {alerts.unscheduledConfirmedBookings.length > 0 && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-sky-800">
+                    Confirmed Missing Shoot Slot ({alerts.unscheduledConfirmedBookings.length})
+                  </p>
+                  {alerts.unscheduledConfirmedBookings.slice(0, 4).map((b) => (
+                    <Link
+                      key={b.id}
+                      href={`/admin/bookings?tab=bookings&bookingId=${b.id}`}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 border border-sky-100 hover:border-sky-300 transition-colors text-xs"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900 truncate">
+                          {b.reference} • {b.eventTitle}
+                        </p>
+                        <p className="text-slate-500">
+                          {b.clientName} • {formatLocalDate(b.eventDate)}
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-semibold text-sky-700 shrink-0">
+                        Add Slot →
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {alerts.urgentDeliverables.length > 0 && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-rose-800">
+                    Due Soon &amp; Overdue Deliverables ({alerts.urgentDeliverables.length})
+                  </p>
+                  {alerts.urgentDeliverables.slice(0, 4).map((d) => (
+                    <Link
+                      key={d.id}
+                      href={`/admin/bookings?tab=bookings&bookingId=${d.bookingId}`}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 border border-rose-100 hover:border-rose-300 transition-colors text-xs"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900 truncate">
+                          {d.label} — {d.booking.reference}
+                        </p>
+                        <p className="text-slate-500 truncate">{d.booking.eventTitle}</p>
+                      </div>
+                      <span
+                        className={`font-mono-code text-[11px] font-semibold shrink-0 ${
+                          d.isOverdue ? 'text-rose-700' : 'text-amber-700'
+                        }`}
+                      >
+                        {d.isOverdue ? 'OVERDUE' : formatLocalDate(d.dueAt)}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Two-Column Operational Feed */}
       <div className="grid gap-6 lg:grid-cols-12">

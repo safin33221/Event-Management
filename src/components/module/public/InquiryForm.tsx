@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { PublicBranding, StudioPackage } from '@/types/event-management';
+import { EventType, PublicBranding, StudioPackage } from '@/types/event-management';
 import { submitPublicInquiry } from '@/service/inquiries/inquiries.service';
 import { formatPoisha } from '@/lib/utils';
 import { ArrowRightIcon, CalendarIcon, CheckCircleIcon } from '@/components/shared/Icons';
 
 interface InquiryFormProps {
   branding: PublicBranding;
+  eventTypes: EventType[];
   packages: StudioPackage[];
   selectedPackageId?: string;
   onPackageChange?: (id: string) => void;
@@ -15,16 +16,22 @@ interface InquiryFormProps {
 
 export function InquiryForm({
   branding,
+  eventTypes,
   packages,
   selectedPackageId,
   onPackageChange,
 }: InquiryFormProps) {
   const [isPending, startTransition] = useTransition();
   const [localPackageId, setLocalPackageId] = useState(selectedPackageId || '');
+  const [eventTypeId, setEventTypeId] = useState('');
   const packageId = selectedPackageId !== undefined ? selectedPackageId : localPackageId;
   const setPackageId = (val: string) => {
     setLocalPackageId(val);
     onPackageChange?.(val);
+    const matchedPkg = packages.find((p) => p.id === val);
+    if (matchedPkg?.eventTypeId) {
+      setEventTypeId(matchedPkg.eventTypeId);
+    }
   };
   const [eventTitle, setEventTitle] = useState('');
   const [requestedDate, setRequestedDate] = useState('');
@@ -48,7 +55,9 @@ export function InquiryForm({
     setError(null);
 
     startTransition(async () => {
+      const resolvedEventTypeId = eventTypeId || selectedPkg?.eventTypeId || undefined;
       const res = await submitPublicInquiry({
+        eventTypeId: resolvedEventTypeId,
         packageId: packageId || undefined,
         eventTitle,
         requestedDate: requestedDate || undefined,
@@ -189,6 +198,24 @@ export function InquiryForm({
 
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+            Event Category
+          </label>
+          <select
+            value={eventTypeId || selectedPkg?.eventTypeId || ''}
+            onChange={(e) => setEventTypeId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">Select event type</option>
+            {eventTypes.map((et) => (
+              <option key={et.id} value={et.id}>
+                {et.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
             Preferred Date
           </label>
           <input
@@ -199,7 +226,7 @@ export function InquiryForm({
           />
         </div>
 
-        <div>
+        <div className="sm:col-span-2">
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
             Collection / Package
           </label>

@@ -49,12 +49,28 @@ export function CalendarWorkspace({
   const [resType, setResType] = useState<ResourceType>('CREW');
 
   // Schedule session state
-  const [bookingId, setBookingId] = useState(bookings[0]?.id || '');
-  const [sessionTitle, setSessionTitle] = useState('');
-  const [startLocal, setStartLocal] = useState('');
-  const [endLocal, setEndLocal] = useState('');
+  const defaultBooking = bookings[0];
+  const defaultDatePart = defaultBooking?.eventDate ? defaultBooking.eventDate.slice(0, 10) : '';
+  const [bookingId, setBookingId] = useState(defaultBooking?.id || '');
+  const [sessionTitle, setSessionTitle] = useState(
+    defaultBooking ? `${defaultBooking.eventTitle} — Shoot` : '',
+  );
+  const [startLocal, setStartLocal] = useState(defaultDatePart ? `${defaultDatePart}T17:00` : '');
+  const [endLocal, setEndLocal] = useState(defaultDatePart ? `${defaultDatePart}T23:00` : '');
   const [location, setLocation] = useState('');
   const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>([]);
+
+  const handleSelectBooking = (nextId: string) => {
+    setBookingId(nextId);
+    const chosen = bookings.find((b) => b.id === nextId);
+    if (!chosen) return;
+    setSessionTitle(`${chosen.eventTitle} — Shoot`);
+    if (chosen.eventDate) {
+      const d = chosen.eventDate.slice(0, 10);
+      setStartLocal(`${d}T17:00`);
+      setEndLocal(`${d}T23:00`);
+    }
+  };
 
   const refreshCalendar = (nextFrom = from, nextTo = to) => {
     startTransition(async () => {
@@ -221,7 +237,7 @@ export function CalendarWorkspace({
               <select
                 required
                 value={bookingId}
-                onChange={(e) => setBookingId(e.target.value)}
+                onChange={(e) => handleSelectBooking(e.target.value)}
                 className={inputClass}
               >
                 <option value="">Select a booking...</option>

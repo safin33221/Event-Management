@@ -2,8 +2,26 @@
 
 import { revalidatePath } from 'next/cache';
 import { serverFetch } from '@/lib/serverFetch';
-import { Booking, BookingStatus, PaginatedResponse } from '@/types/event-management';
+import {
+  Assignment,
+  AutomationAlerts,
+  Booking,
+  BookingReceipt,
+  BookingStatus,
+  Deliverable,
+  PaginatedResponse,
+} from '@/types/event-management';
 import { ActionResult, parseApiResponse } from '../shared/apiResult';
+
+export async function getAutomationAlerts(): Promise<ActionResult<AutomationAlerts>> {
+  const res = await serverFetch.get('/bookings/automation-alerts');
+  return parseApiResponse<AutomationAlerts>(res);
+}
+
+export async function getBookingReceipt(id: string): Promise<ActionResult<BookingReceipt>> {
+  const res = await serverFetch.get(`/bookings/${encodeURIComponent(id)}/receipt`);
+  return parseApiResponse<BookingReceipt>(res);
+}
 
 export async function listBookings(params?: {
   status?: BookingStatus;
@@ -35,7 +53,13 @@ export async function confirmBooking(
   id: string,
   expectedVersion?: number,
   sessions?: ConfirmBookingSessionInput[],
-): Promise<ActionResult<{ booking: Booking }>> {
+): Promise<
+  ActionResult<{
+    booking: Booking;
+    deliverables?: Deliverable[];
+    assignments?: Assignment[];
+  }>
+> {
   const body: { expectedVersion?: number; sessions?: ConfirmBookingSessionInput[] } = {};
   if (expectedVersion !== undefined) body.expectedVersion = expectedVersion;
   if (sessions && sessions.length > 0) body.sessions = sessions;
@@ -44,11 +68,16 @@ export async function confirmBooking(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const result = await parseApiResponse<{ booking: Booking }>(res);
+  const result = await parseApiResponse<{
+    booking: Booking;
+    deliverables?: Deliverable[];
+    assignments?: Assignment[];
+  }>(res);
   if (result.ok) {
     revalidatePath('/admin/bookings');
     revalidatePath('/admin/calendar');
     revalidatePath('/admin');
+    revalidatePath('/staff');
   }
   return result;
 }
