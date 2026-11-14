@@ -32,7 +32,7 @@ export function StaffWorkspace({
         <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
           Team Portal
         </p>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
+        <h1 className="text-2xl sm:text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mt-1">
           My Tasks
         </h1>
       </div>
@@ -96,7 +96,7 @@ export function StaffWorkspace({
                     type="button"
                     disabled={isPending}
                     onClick={() => handleStatusChange(a.id, 'ACCEPTED')}
-                    className="rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                    className="rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors disabled:opacity-60"
                   >
                     Accept Assignment
                   </button>
@@ -106,7 +106,7 @@ export function StaffWorkspace({
                     type="button"
                     disabled={isPending}
                     onClick={() => handleStatusChange(a.id, 'COMPLETED')}
-                    className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                    className="rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
                   >
                     Mark Complete
                   </button>

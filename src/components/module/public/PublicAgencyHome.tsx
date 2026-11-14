@@ -96,7 +96,7 @@ export function PublicAgencyHome({
               <div className="atelier-card p-6 sm:p-7 space-y-5 bg-white">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
                       How It Works
                     </p>
                     <p className="text-lg font-bold tracking-tight text-slate-900 mt-0.5">
@@ -128,14 +128,14 @@ export function PublicAgencyHome({
                   ].map((item) => (
                     <li key={item.step} className="flex items-start gap-3.5">
                       <span
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-mono-code font-bold text-white mt-0.5"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-mono-code font-bold text-white mt-0.5"
                         style={{ backgroundColor: accent }}
                       >
                         {item.step}
                       </span>
                       <div>
                         <p className="font-semibold text-slate-900">{item.title}</p>
-                        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{item.desc}</p>
+                        <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">{item.desc}</p>
                       </div>
                     </li>
                   ))}
@@ -153,7 +153,7 @@ export function PublicAgencyHome({
             <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
               Our Offerings
             </p>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
+            <h2 className="text-2xl sm:text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mt-1">
               Event Packages
             </h2>
           </div>
@@ -180,7 +180,7 @@ export function PublicAgencyHome({
                 >
                   <div>
                     {pkg.eventType && (
-                      <span className="inline-block mb-2 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-700">
+                      <span className="inline-block mb-2 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-indigo-700">
                         {pkg.eventType.name}
                       </span>
                     )}
@@ -220,7 +220,7 @@ export function PublicAgencyHome({
                   <button
                     type="button"
                     onClick={() => handleSelectPackage(pkg.id)}
-                    className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all ${
+                    className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all ${
                       isSelected
                         ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
                         : 'border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-900 hover:text-white hover:border-slate-900'
@@ -253,7 +253,7 @@ export function PublicAgencyHome({
               <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
                 Our Work
               </p>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
+              <h2 className="text-2xl sm:text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mt-1">
                 Past Events
               </h2>
             </div>
@@ -282,11 +282,11 @@ export function PublicAgencyHome({
                     />
                   </div>
                   <div className="p-5">
-                    <h3 className="text-base font-bold tracking-tight text-slate-900">
+                    <h3 className="text-lg font-bold tracking-tight text-slate-900">
                       {item.title}
                     </h3>
                     {item.description && (
-                      <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">
+                      <p className="mt-1.5 text-sm text-slate-600 leading-relaxed">
                         {item.description}
                       </p>
                     )}

@@ -115,7 +115,7 @@ export function InquiryForm({
           <button
             type="button"
             onClick={() => handleCopyRef(confirmation.reference)}
-            className="ml-1 rounded-md bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-600 border border-slate-200 hover:bg-indigo-50 transition-colors"
+            className="ml-1 rounded-md bg-white px-2 py-0.5 text-sm font-semibold text-indigo-600 border border-slate-200 hover:bg-indigo-50 transition-colors"
           >
             {copied ? 'Copied' : 'Copy'}
           </button>
@@ -128,7 +128,7 @@ export function InquiryForm({
           <button
             type="button"
             onClick={() => setConfirmation(null)}
-            className="mt-2 text-xs font-semibold text-indigo-600 hover:text-indigo-700 underline underline-offset-4"
+            className="mt-2 text-sm font-semibold text-indigo-600 hover:text-indigo-700 underline underline-offset-4"
           >
             Submit another inquiry
           </button>
@@ -157,7 +157,7 @@ export function InquiryForm({
       </div>
 
       {selectedPkg && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-2.5 text-xs">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-2.5 text-sm">
           <div className="flex items-center gap-2 text-indigo-950">
             <span className="font-semibold">Selected Package:</span>
             <span>{selectedPkg.name}</span>

@@ -842,7 +842,7 @@ export function BookingsWorkspace({
       {!isDetailPage && (
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl sm:text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
               Bookings &amp; Payments
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">
@@ -861,7 +861,7 @@ export function BookingsWorkspace({
                 type="button"
                 onClick={() => setTab(item.key)}
                 className={cn(
-                  'rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors',
+                  'rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors',
                   tab === item.key
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
@@ -889,7 +889,7 @@ export function BookingsWorkspace({
             <button
               type="button"
               onClick={() => setShowInquiryForm((v) => !v)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
             >
               <PlusIcon className="w-3.5 h-3.5" />
               <span>{showInquiryForm ? 'Close Form' : 'New Request'}</span>
@@ -900,7 +900,7 @@ export function BookingsWorkspace({
             <button
               type="button"
               onClick={() => setShowQuoteForm((v) => !v)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
             >
               <PlusIcon className="w-3.5 h-3.5" />
               <span>{showQuoteForm ? 'Close Form' : 'New Quote'}</span>
@@ -937,7 +937,7 @@ export function BookingsWorkspace({
               className="atelier-card p-6 space-y-4"
             >
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h2 className="text-base font-bold tracking-tight text-slate-900">
+                <h2 className="text-lg font-bold tracking-tight text-slate-900">
                   Log Phone / Walk-In Inquiry
                 </h2>
                 <button
@@ -1018,7 +1018,7 @@ export function BookingsWorkspace({
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                 >
                   <PlusIcon className="w-3.5 h-3.5" />
                   <span>Save Inquiry</span>
@@ -1051,7 +1051,7 @@ export function BookingsWorkspace({
                     <button
                       type="button"
                       onClick={() => prefillQuoteFromInquiry(inq)}
-                      className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors"
+                      className="rounded-xl bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
                     >
                       Create Quote →
                     </button>
@@ -1070,7 +1070,7 @@ export function BookingsWorkspace({
             <form onSubmit={handleSaveQuote} className="atelier-card p-6 space-y-5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
-                  <h2 className="text-base font-bold tracking-tight text-slate-900">
+                  <h2 className="text-lg font-bold tracking-tight text-slate-900">
                     {editingQuoteId ? 'Revise Quote (New Version)' : 'Create Price Quote'}
                   </h2>
                   <p className="text-xs text-slate-500">
@@ -1161,7 +1161,7 @@ export function BookingsWorkspace({
                         { description: '', quantity: '1', unitPriceTk: '0' },
                       ])
                     }
-                    className="text-xs font-semibold text-indigo-600 hover:underline"
+                    className="text-sm font-semibold text-indigo-600 hover:underline"
                   >
                     + Add Line Item
                   </button>
@@ -1215,7 +1215,7 @@ export function BookingsWorkspace({
                       type="button"
                       disabled={quoteItems.length <= 1}
                       onClick={() => setQuoteItems(quoteItems.filter((_, i) => i !== idx))}
-                      className="rounded-xl border border-slate-200 px-2.5 py-2 text-xs text-rose-600 hover:bg-rose-50 disabled:opacity-30 sm:col-span-1"
+                      className="rounded-xl border border-slate-200 px-2.5 py-2 text-sm text-rose-600 hover:bg-rose-50 disabled:opacity-30 sm:col-span-1"
                     >
                       ×
                     </button>
@@ -1225,7 +1225,7 @@ export function BookingsWorkspace({
 
               <div className="grid sm:grid-cols-3 gap-3 items-end pt-1">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">
                     Discount ({currency})
                   </label>
                   <input
@@ -1237,7 +1237,7 @@ export function BookingsWorkspace({
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">
                     Terms &amp; Payment Schedule
                   </label>
                   <input
@@ -1274,7 +1274,7 @@ export function BookingsWorkspace({
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                 >
                   <span>{editingQuoteId ? 'Save Revised Version' : 'Save Quote'}</span>
                 </button>
@@ -1300,7 +1300,7 @@ export function BookingsWorkspace({
                           </span>
                           <StatusBadge status={item.status} />
                           {latest && (
-                            <span className="text-[11px] font-mono-code text-slate-400">
+                            <span className="text-xs font-mono-code text-slate-400">
                               v{latest.versionNumber}
                             </span>
                           )}
@@ -1323,7 +1323,7 @@ export function BookingsWorkspace({
                               type="button"
                               disabled={isPending}
                               onClick={() => startReviseQuote(item)}
-                              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                             >
                               Revise
                             </button>
@@ -1345,7 +1345,7 @@ export function BookingsWorkspace({
                                   [item.id]: e.target.value as AcceptanceChannel,
                                 })
                               }
-                              className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px]"
+                              className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs"
                             >
                               <option value="PHONE">Phone</option>
                               <option value="WHATSAPP">WhatsApp</option>
@@ -1357,7 +1357,7 @@ export function BookingsWorkspace({
                               type="button"
                               disabled={isPending}
                               onClick={() => handleAcceptQuote(item)}
-                              className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                              className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
                             >
                               Accept &amp; Book
                             </button>
@@ -1377,7 +1377,7 @@ export function BookingsWorkspace({
       {tab === 'bookings' && !selectedBooking && (
         <div className="atelier-card p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h2 className="text-base font-bold tracking-tight text-slate-900">
+            <h2 className="text-lg font-bold tracking-tight text-slate-900">
               All Bookings ({filteredBookings.length})
             </h2>
             <p className="text-xs text-slate-500">Click any booking to open details &amp; payments</p>
@@ -1401,7 +1401,7 @@ export function BookingsWorkspace({
                       </span>
                       <StatusBadge status={b.status} />
                       {b.eventType && (
-                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
                           {b.eventType.name}
                         </span>
                       )}
@@ -1415,12 +1415,12 @@ export function BookingsWorkspace({
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right">
-                      <p className="text-[10px] font-semibold uppercase text-slate-400">Total Price</p>
+                      <p className="text-xs font-semibold uppercase text-slate-400">Total Price</p>
                       <p className="font-mono-code text-sm font-semibold text-slate-900 tabular-nums">
                         {formatPoisha(b.agreedTotalPoisha, b.currency)}
                       </p>
                     </div>
-                    <span className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 group-hover:border-indigo-300 group-hover:text-indigo-600 transition-colors">
+                    <span className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 group-hover:border-indigo-300 group-hover:text-indigo-600 transition-colors">
                       View Details →
                     </span>
                   </div>
@@ -1437,7 +1437,7 @@ export function BookingsWorkspace({
             {isDetailPage ? (
               <Link
                 href="/admin/bookings"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
               >
                 <span>← Back to All Bookings</span>
               </Link>
@@ -1448,7 +1448,7 @@ export function BookingsWorkspace({
                   setSelectedBooking(null);
                   setLedger(null);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
               >
                 <span>← Back to All Bookings</span>
               </button>
@@ -1465,7 +1465,7 @@ export function BookingsWorkspace({
                         </span>
                         <StatusBadge status={selectedBooking.status} />
                         {selectedBooking.eventType && (
-                          <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                          <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
                             {selectedBooking.eventType.name}
                           </span>
                         )}
@@ -1484,7 +1484,7 @@ export function BookingsWorkspace({
                       <button
                         type="button"
                         onClick={() => setReceiptBookingId(selectedBooking.id)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                       >
                         <ReceiptIcon className="w-3.5 h-3.5 text-indigo-600" />
                         <span>Receipt View</span>
@@ -1492,7 +1492,7 @@ export function BookingsWorkspace({
                       <a
                         href={`/api/bookings/${encodeURIComponent(selectedBooking.id)}/invoice.pdf`}
                         download
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
                       >
                         <span>PDF Invoice</span>
                       </a>
@@ -1505,7 +1505,7 @@ export function BookingsWorkspace({
                               disabled={isPending}
                               onClick={() => setScheduleOnConfirm((v) => !v)}
                               className={cn(
-                                'rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors',
+                                'rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors',
                                 scheduleOnConfirm
                                   ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
                                   : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
@@ -1518,7 +1518,7 @@ export function BookingsWorkspace({
                             type="button"
                             disabled={isPending}
                             onClick={handleConfirmBooking}
-                            className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                           >
                             {scheduleOnConfirm && (selectedBooking.sessions?.length ?? 0) === 0
                               ? 'Confirm & Schedule'
@@ -1531,7 +1531,7 @@ export function BookingsWorkspace({
                           type="button"
                           disabled={isPending}
                           onClick={handleCompleteBooking}
-                          className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                         >
                           Mark Completed
                         </button>
@@ -1541,7 +1541,7 @@ export function BookingsWorkspace({
                           <button
                             type="button"
                             onClick={() => setShowCancelBooking((v) => !v)}
-                            className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                            className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
                           >
                             Cancel
                           </button>
@@ -1564,7 +1564,7 @@ export function BookingsWorkspace({
                       <button
                         type="submit"
                         disabled={isPending}
-                        className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+                        className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-rose-700"
                       >
                         Confirm Cancel Booking
                       </button>
@@ -1574,7 +1574,7 @@ export function BookingsWorkspace({
                   {selectedBooking.status === 'PENDING_CONFIRMATION' && ledger && (
                     <div
                       className={cn(
-                        'rounded-xl border px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2',
+                        'rounded-xl border px-4 py-2.5 text-sm flex flex-wrap items-center justify-between gap-2',
                         ledger.summary.isAdvanceMet
                           ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900'
                           : 'border-amber-200 bg-amber-50/70 text-amber-900',
@@ -1602,7 +1602,7 @@ export function BookingsWorkspace({
                                 key={p}
                                 type="button"
                                 onClick={() => applyCeremonyPreset(p)}
-                                className="rounded-lg border border-indigo-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100"
+                                className="rounded-lg border border-indigo-200 bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
                               >
                                 + {p}
                               </button>
@@ -1614,34 +1614,34 @@ export function BookingsWorkspace({
                             value={schedTitle}
                             onChange={(e) => setSchedTitle(e.target.value)}
                             placeholder="Session title"
-                            className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs"
+                            className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm"
                           />
                           <input
                             value={schedLocation}
                             onChange={(e) => setSchedLocation(e.target.value)}
                             placeholder="Venue / Location (optional)"
-                            className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs"
+                            className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm"
                           />
                           <div>
-                            <label className="block text-[10px] font-semibold uppercase text-indigo-700 mb-1">
+                            <label className="block text-xs font-semibold uppercase text-indigo-700 mb-1">
                               Start ({timezone})
                             </label>
                             <input
                               type="datetime-local"
                               value={schedStart}
                               onChange={(e) => setSchedStart(e.target.value)}
-                              className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-mono-code"
+                              className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-mono-code"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-semibold uppercase text-indigo-700 mb-1">
+                            <label className="block text-xs font-semibold uppercase text-indigo-700 mb-1">
                               End ({timezone})
                             </label>
                             <input
                               type="datetime-local"
                               value={schedEnd}
                               onChange={(e) => setSchedEnd(e.target.value)}
-                              className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-mono-code"
+                              className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-mono-code"
                             />
                           </div>
                         </div>
@@ -1652,7 +1652,7 @@ export function BookingsWorkspace({
                               type="button"
                               onClick={() => toggleSchedResource(r.id)}
                               className={cn(
-                                'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                                'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
                                 schedResourceIds.includes(r.id)
                                   ? 'border-indigo-600 bg-indigo-600 text-white'
                                   : 'border-indigo-200 bg-white text-slate-700 hover:bg-indigo-100/50',
@@ -1668,25 +1668,25 @@ export function BookingsWorkspace({
                   {ledger && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="rounded-xl bg-slate-50 p-3 border border-slate-200">
-                        <p className="text-[11px] font-semibold text-slate-500">Total Price</p>
+                        <p className="text-xs font-semibold text-slate-500">Total Price</p>
                         <p className="font-mono-code text-sm font-semibold text-slate-900 mt-1 tabular-nums">
                           {formatPoisha(ledger.summary.effectiveAgreedChargePoisha, ledger.summary.currency)}
                         </p>
                       </div>
                       <div className="rounded-xl bg-emerald-50/70 p-3 border border-emerald-200">
-                        <p className="text-[11px] font-semibold text-emerald-700">Paid (Verified)</p>
+                        <p className="text-xs font-semibold text-emerald-700">Paid (Verified)</p>
                         <p className="font-mono-code text-sm font-semibold text-emerald-900 mt-1 tabular-nums">
                           {formatPoisha(ledger.summary.verifiedReceiptsPoisha, ledger.summary.currency)}
                         </p>
                       </div>
                       <div className="rounded-xl bg-amber-50/70 p-3 border border-amber-200">
-                        <p className="text-[11px] font-semibold text-amber-700">Pending Approval</p>
+                        <p className="text-xs font-semibold text-amber-700">Pending Approval</p>
                         <p className="font-mono-code text-sm font-semibold text-amber-900 mt-1 tabular-nums">
                           {formatPoisha(ledger.summary.pendingReceiptsPoisha, ledger.summary.currency)}
                         </p>
                       </div>
                       <div className="rounded-xl bg-slate-50 p-3 border border-slate-200">
-                        <p className="text-[11px] font-semibold text-slate-500">Remaining Due</p>
+                        <p className="text-xs font-semibold text-slate-500">Remaining Due</p>
                         <p className="font-mono-code text-sm font-semibold text-slate-900 mt-1 tabular-nums">
                           {formatPoisha(ledger.summary.outstandingDuePoisha, ledger.summary.currency)}
                         </p>
@@ -1696,7 +1696,7 @@ export function BookingsWorkspace({
 
                   {/* Record Payment */}
                   <div className="space-y-2 pt-1">
-                    <p className="text-xs font-semibold text-slate-600">Add a Payment</p>
+                    <p className="text-sm font-semibold text-slate-600">Add a Payment</p>
                     <form onSubmit={handleRecordPayment} className="grid sm:grid-cols-4 gap-2.5">
                       <input
                         type="number"
@@ -1705,12 +1705,12 @@ export function BookingsWorkspace({
                         value={payAmountTk}
                         onChange={(e) => setPayAmountTk(e.target.value)}
                         placeholder={`Amount (${currency})`}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono-code"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono-code"
                       />
                       <select
                         value={payMethod}
                         onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                       >
                         <option value="BKASH">bKash</option>
                         <option value="NAGAD">Nagad</option>
@@ -1721,12 +1721,12 @@ export function BookingsWorkspace({
                         value={payRef}
                         onChange={(e) => setPayRef(e.target.value)}
                         placeholder="Receipt / Tx Ref (optional)"
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                       />
                       <button
                         type="submit"
                         disabled={isPending}
-                        className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                        className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                       >
                         Save Payment
                       </button>
@@ -1758,7 +1758,7 @@ export function BookingsWorkspace({
                                   type="button"
                                   disabled={isPending}
                                   onClick={() => handleVerifyPayment(entry.id, false)}
-                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-sm font-semibold text-white hover:bg-emerald-700"
                                 >
                                   Verify
                                 </button>
@@ -1767,7 +1767,7 @@ export function BookingsWorkspace({
                                     type="button"
                                     disabled={isPending}
                                     onClick={() => handleVerifyPayment(entry.id, true)}
-                                    className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700"
+                                    className="rounded-lg bg-indigo-600 px-2.5 py-1 text-sm font-semibold text-white hover:bg-indigo-700"
                                   >
                                     Verify &amp; Confirm
                                   </button>
@@ -1785,11 +1785,11 @@ export function BookingsWorkspace({
                 <div className="atelier-card p-6 space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h4 className="text-base font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                      <h4 className="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
                         <CalendarIcon className="w-4 h-4 text-indigo-600" />
                         <span>Shoot &amp; Event Schedule ({selectedBooking.sessions?.length ?? 0})</span>
                       </h4>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-xs text-slate-500">
                         Manage shoot slots &amp; crew directly for {selectedBooking.reference} •{' '}
                         <Link href="/admin/calendar" className="underline underline-offset-2 hover:text-slate-800">
                           View Master Calendar ↗
@@ -1800,7 +1800,7 @@ export function BookingsWorkspace({
                       <button
                         type="button"
                         onClick={() => setShowScheduleForm((v) => !v)}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                       >
                         <PlusIcon className="w-3.5 h-3.5" />
                         <span>{showScheduleForm ? 'Close' : 'Schedule Session'}</span>
@@ -1811,7 +1811,7 @@ export function BookingsWorkspace({
                   {showScheduleForm && selectedBooking.status !== 'CANCELLED' && (
                     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-[11px] font-semibold text-slate-600">
+                        <span className="text-sm font-semibold text-slate-600">
                           Quick BD Ceremony Presets:
                         </span>
                         <div className="flex flex-wrap gap-1.5">
@@ -1820,7 +1820,7 @@ export function BookingsWorkspace({
                               key={p}
                               type="button"
                               onClick={() => applyCeremonyPreset(p)}
-                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
                             >
                               + {p}
                             </button>
@@ -1834,16 +1834,16 @@ export function BookingsWorkspace({
                             value={schedTitle}
                             onChange={(e) => setSchedTitle(e.target.value)}
                             placeholder="Session title (e.g. Holud, Reception)"
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                           />
                           <input
                             value={schedLocation}
                             onChange={(e) => setSchedLocation(e.target.value)}
                             placeholder="Venue / Location (optional)"
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                           />
                           <div>
-                            <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">
+                            <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">
                               Start ({timezone})
                             </label>
                             <input
@@ -1851,11 +1851,11 @@ export function BookingsWorkspace({
                               type="datetime-local"
                               value={schedStart}
                               onChange={(e) => setSchedStart(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono-code"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-mono-code"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-1">
+                            <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">
                               End ({timezone})
                             </label>
                             <input
@@ -1863,27 +1863,27 @@ export function BookingsWorkspace({
                               type="datetime-local"
                               value={schedEnd}
                               onChange={(e) => setSchedEnd(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono-code"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-mono-code"
                             />
                           </div>
                         </div>
 
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-semibold text-slate-600">
+                            <span className="text-sm font-semibold text-slate-600">
                               Reserve Crew / Gear
                             </span>
                             <button
                               type="button"
                               onClick={() => setShowQuickResource((v) => !v)}
-                              className="text-[11px] font-semibold text-indigo-600 hover:underline"
+                              className="text-sm font-semibold text-indigo-600 hover:underline"
                             >
                               {showQuickResource ? 'Cancel Quick Add' : '+ Quick Add Crew/Gear'}
                             </button>
                           </div>
                           <div className="flex flex-wrap gap-1.5">
                             {resources.length === 0 ? (
-                              <span className="text-[11px] text-slate-500">
+                              <span className="text-xs text-slate-500">
                                 No crew or equipment added yet.
                               </span>
                             ) : (
@@ -1893,7 +1893,7 @@ export function BookingsWorkspace({
                                   type="button"
                                   onClick={() => toggleSchedResource(r.id)}
                                   className={cn(
-                                    'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                                    'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
                                     schedResourceIds.includes(r.id)
                                       ? 'border-slate-900 bg-slate-900 text-white'
                                       : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
@@ -1909,7 +1909,7 @@ export function BookingsWorkspace({
                         <button
                           type="submit"
                           disabled={isPending}
-                          className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                          className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                         >
                           Save Shoot Session &amp; Reserve Crew
                         </button>
@@ -1939,7 +1939,7 @@ export function BookingsWorkspace({
                           <button
                             type="submit"
                             disabled={isPending}
-                            className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white"
+                            className="rounded-xl bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white"
                           >
                             Add Resource
                           </button>
@@ -1963,7 +1963,7 @@ export function BookingsWorkspace({
                                 <span className="font-semibold text-sm text-slate-900">{s.title}</span>
                                 <StatusBadge status={s.status} />
                               </div>
-                              <p className="text-xs text-slate-500 mt-0.5 font-mono-code">
+                              <p className="text-sm text-slate-500 mt-0.5 font-mono-code">
                                 {s.agencyLocalDate || formatLocalDate(s.startAt)} •{' '}
                                 {formatDateTimeInTz(s.startAt, timezone)} →{' '}
                                 {formatDateTimeInTz(s.endAt, timezone)}
@@ -1974,7 +1974,7 @@ export function BookingsWorkspace({
                                   {s.reservations.map((r) => (
                                     <span
                                       key={r.id}
-                                      className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-700"
+                                      className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700"
                                     >
                                       {r.resource?.name || r.resourceId}
                                       {r.resource?.type ? ` (${r.resource.type})` : ''}
@@ -1990,7 +1990,7 @@ export function BookingsWorkspace({
                                   type="button"
                                   disabled={isPending}
                                   onClick={() => openReschedule(s)}
-                                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                                 >
                                   Reschedule
                                 </button>
@@ -1998,7 +1998,7 @@ export function BookingsWorkspace({
                                   type="button"
                                   disabled={isPending}
                                   onClick={() => handleCompleteSession(s.id)}
-                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-sm font-semibold text-white hover:bg-emerald-700"
                                 >
                                   Done
                                 </button>
@@ -2009,7 +2009,7 @@ export function BookingsWorkspace({
                                     setCancellingSessionId(s.id);
                                     setReschedSessionId(null);
                                   }}
-                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100"
+                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
                                 >
                                   Cancel
                                 </button>
@@ -2052,7 +2052,7 @@ export function BookingsWorkspace({
                                     type="button"
                                     onClick={() => toggleReschedResource(r.id)}
                                     className={cn(
-                                      'rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                                      'rounded-full border px-2 py-0.5 text-xs font-medium',
                                       reschedResourceIds.includes(r.id)
                                         ? 'border-slate-900 bg-slate-900 text-white'
                                         : 'border-amber-200 bg-white text-slate-700',
@@ -2066,14 +2066,14 @@ export function BookingsWorkspace({
                                 <button
                                   type="submit"
                                   disabled={isPending}
-                                  className="rounded-lg bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white"
+                                  className="rounded-lg bg-slate-900 px-3 py-1 text-sm font-semibold text-white"
                                 >
                                   Save New Slot
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setReschedSessionId(null)}
-                                  className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600"
+                                  className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-600"
                                 >
                                   Dismiss
                                 </button>
@@ -2096,14 +2096,14 @@ export function BookingsWorkspace({
                               <button
                                 type="submit"
                                 disabled={isPending}
-                                className="rounded-lg bg-rose-600 px-3 py-1.5 text-[11px] font-semibold text-white"
+                                className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white"
                               >
                                 Confirm Cancel
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setCancellingSessionId(null)}
-                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600"
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600"
                               >
                                 Keep Slot
                               </button>
@@ -2118,7 +2118,7 @@ export function BookingsWorkspace({
             {/* Crew & Workflow Assignments */}
             <div className="atelier-card p-6 space-y-4">
               <div className="border-b border-slate-100 pb-3">
-                <h4 className="text-base font-bold tracking-tight text-slate-900">
+                <h4 className="text-lg font-bold tracking-tight text-slate-900">
                   Crew &amp; Workflow Tasks ({selectedBooking.assignments?.length ?? 0})
                 </h4>
                 <p className="text-xs text-slate-500">
@@ -2165,7 +2165,7 @@ export function BookingsWorkspace({
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 sm:col-span-2"
+                    className="rounded-xl bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800 sm:col-span-2"
                   >
                     Assign
                   </button>
@@ -2198,7 +2198,7 @@ export function BookingsWorkspace({
                             type="button"
                             disabled={isPending}
                             onClick={() => handleUpdateAssignmentStatus(a, 'COMPLETED')}
-                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100"
+                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
                           >
                             Done
                           </button>
@@ -2212,7 +2212,7 @@ export function BookingsWorkspace({
 
             <div className="atelier-card p-6 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-base font-bold tracking-tight text-slate-900">
+                <h4 className="text-lg font-bold tracking-tight text-slate-900">
                   Files &amp; Items to Deliver ({selectedBooking.deliverables?.length ?? 0})
                 </h4>
                     <form onSubmit={handleAddDeliverable} className="flex flex-wrap gap-2">
@@ -2231,7 +2231,7 @@ export function BookingsWorkspace({
                       <button
                         type="submit"
                         disabled={isPending}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                       >
                         + Add
                       </button>
@@ -2256,7 +2256,7 @@ export function BookingsWorkspace({
                                 <div className="flex items-center gap-2">
                                   <p className="font-semibold text-sm text-slate-900">{d.label}</p>
                                   {isOverdue && (
-                                    <span className="rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                                    <span className="rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-xs font-semibold text-rose-700">
                                       Overdue
                                     </span>
                                   )}
@@ -2289,7 +2289,7 @@ export function BookingsWorkspace({
                                       setDeliveringId(deliveringId === d.id ? null : d.id);
                                       setDeliveryUrlInput(d.deliveryUrl || '');
                                     }}
-                                    className="rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-800"
+                                    className="rounded-lg bg-slate-900 px-2.5 py-1 text-sm font-semibold text-white hover:bg-slate-800"
                                   >
                                     {deliveringId === d.id ? 'Close' : 'Deliver'}
                                   </button>
@@ -2309,7 +2309,7 @@ export function BookingsWorkspace({
                                   type="button"
                                   disabled={isPending}
                                   onClick={() => handleDeliverItem(d, deliveryUrlInput)}
-                                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
                                 >
                                   Confirm Delivered
                                 </button>

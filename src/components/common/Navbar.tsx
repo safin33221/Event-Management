@@ -31,10 +31,10 @@ export function Navbar({ branding }: NavbarProps) {
             </span>
           )}
           <div className="leading-tight">
-            <span className="text-base font-bold tracking-tight text-slate-900 block">
+            <span className="text-lg font-bold tracking-tight text-slate-900 block">
               {displayName}
             </span>
-            <span className="text-[11px] font-medium text-slate-500 block">
+            <span className="text-xs font-medium text-slate-500 block">
               Event Management
             </span>
           </div>
@@ -64,14 +64,14 @@ export function Navbar({ branding }: NavbarProps) {
         <div className="flex items-center gap-2.5">
           <a
             href="#inquire"
-            className="inline-flex items-center rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
+            className="inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
             style={{ backgroundColor: accent }}
           >
             Book Now
           </a>
           <Link
             href="/login"
-            className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-colors"
+            className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-colors"
           >
             Team Login
           </Link>

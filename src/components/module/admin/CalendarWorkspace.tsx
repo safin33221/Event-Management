@@ -162,7 +162,7 @@ export function CalendarWorkspace({
       {/* Header + Action Buttons */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl sm:text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
             Schedule
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -175,7 +175,7 @@ export function CalendarWorkspace({
             type="button"
             onClick={() => setActivePanel(activePanel === 'resources' ? 'none' : 'resources')}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors',
+              'inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors',
               activePanel === 'resources'
                 ? 'border-slate-900 bg-slate-900 text-white'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
@@ -186,7 +186,7 @@ export function CalendarWorkspace({
           <button
             type="button"
             onClick={() => setActivePanel(activePanel === 'schedule' ? 'none' : 'schedule')}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
           >
             <PlusIcon className="w-3.5 h-3.5" />
             <span>{activePanel === 'schedule' ? 'Close Form' : 'Schedule Event'}</span>
@@ -215,10 +215,10 @@ export function CalendarWorkspace({
         <form onSubmit={handleCreateSession} className="atelier-card p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-base font-bold tracking-tight text-slate-900">
+              <h2 className="text-lg font-bold tracking-tight text-slate-900">
                 Schedule an Event Session
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-sm text-slate-500 mt-0.5">
                 Pick a booking, date, and time. Double-bookings for the same crew or gear are blocked automatically.
               </p>
             </div>
@@ -233,7 +233,7 @@ export function CalendarWorkspace({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Booking *</label>
+              <label className="block text-sm font-semibold text-slate-600 mb-1">Booking *</label>
               <select
                 required
                 value={bookingId}
@@ -250,7 +250,7 @@ export function CalendarWorkspace({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-sm font-semibold text-slate-600 mb-1">
                 Session Name *
               </label>
               <input
@@ -263,7 +263,7 @@ export function CalendarWorkspace({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-sm font-semibold text-slate-600 mb-1">
                 Start Date &amp; Time *
               </label>
               <input
@@ -276,7 +276,7 @@ export function CalendarWorkspace({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-sm font-semibold text-slate-600 mb-1">
                 End Date &amp; Time *
               </label>
               <input
@@ -289,7 +289,7 @@ export function CalendarWorkspace({
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-sm font-semibold text-slate-600 mb-1">
                 Venue / Location (optional)
               </label>
               <input
@@ -303,7 +303,7 @@ export function CalendarWorkspace({
 
           {resources.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-slate-600 mb-2">
+              <p className="text-sm font-semibold text-slate-600 mb-2">
                 Assign Crew &amp; Equipment (optional)
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -333,7 +333,7 @@ export function CalendarWorkspace({
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors"
             >
               <CalendarIcon className="w-4 h-4" />
               <span>Save to Schedule</span>
@@ -347,10 +347,10 @@ export function CalendarWorkspace({
         <div className="atelier-card p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-base font-bold tracking-tight text-slate-900">
+              <h2 className="text-lg font-bold tracking-tight text-slate-900">
                 Crew &amp; Equipment Pool
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-sm text-slate-500 mt-0.5">
                 Add photographers, editors, cameras, or rooms so you can assign them to events.
               </p>
             </div>
@@ -369,12 +369,12 @@ export function CalendarWorkspace({
               value={resName}
               onChange={(e) => setResName(e.target.value)}
               placeholder="Name (e.g. Lead Photographer / Sony FX3)"
-              className="flex-1 min-w-[200px] rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:bg-white"
+              className="flex-1 min-w-[200px] rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:bg-white"
             />
             <select
               value={resType}
               onChange={(e) => setResType(e.target.value as ResourceType)}
-              className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs"
+              className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm"
             >
               <option value="CREW">Crew</option>
               <option value="EQUIPMENT">Equipment</option>
@@ -384,7 +384,7 @@ export function CalendarWorkspace({
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
             >
               <PlusIcon className="w-3.5 h-3.5" />
               <span>Add</span>
@@ -409,7 +409,7 @@ export function CalendarWorkspace({
       {/* Main Schedule Timeline */}
       <div className="atelier-card p-6 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <h2 className="text-base font-bold tracking-tight text-slate-900">
+          <h2 className="text-lg font-bold tracking-tight text-slate-900">
             Scheduled Sessions ({sessions.length})
           </h2>
 
@@ -431,7 +431,7 @@ export function CalendarWorkspace({
               type="button"
               disabled={isPending}
               onClick={() => refreshCalendar(from, to)}
-              className="rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+              className="rounded-xl bg-slate-900 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-slate-800"
             >
               Apply
             </button>
@@ -453,7 +453,7 @@ export function CalendarWorkspace({
               .map(([localDate, items]) => (
                 <div key={localDate} className="space-y-2.5">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
-                    <span className="font-mono-code text-xs font-semibold text-indigo-600">
+                    <span className="font-mono-code text-sm font-semibold text-indigo-600">
                       {localDate}
                     </span>
                     <span className="text-xs text-slate-400">
@@ -474,7 +474,7 @@ export function CalendarWorkspace({
                             </p>
                             <StatusBadge status={s.status} />
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">
+                          <p className="text-sm text-slate-500 mt-1">
                             {formatDateTimeInTz(s.startAt, timezone)} →{' '}
                             {formatDateTimeInTz(s.endAt, timezone)}
                             {s.location ? ` • ${s.location}` : ''}
@@ -489,7 +489,7 @@ export function CalendarWorkspace({
                               {s.reservations.map((r) => (
                                 <span
                                   key={r.id}
-                                  className="rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-[11px] font-medium text-slate-700"
+                                  className="rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-700"
                                 >
                                   {r.resource?.name || r.resourceId}
                                 </span>
@@ -503,7 +503,7 @@ export function CalendarWorkspace({
                             type="button"
                             disabled={isPending}
                             onClick={() => handleCompleteSession(s.id)}
-                            className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-colors"
+                            className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-colors"
                           >
                             Mark Done
                           </button>

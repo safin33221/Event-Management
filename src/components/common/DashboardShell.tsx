@@ -31,12 +31,12 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
   const navItems = isStaffOnly
     ? [{ href: '/staff', label: 'My Tasks', icon: UsersIcon }]
     : [
-        { href: '/admin', label: 'Home', icon: SparklesIcon },
-        { href: '/admin/bookings', label: 'Bookings & Payments', icon: ReceiptIcon },
-        { href: '/admin/calendar', label: 'Schedule', icon: CalendarIcon },
-        { href: '/admin/catalog', label: 'Packages & Settings', icon: PaletteIcon },
-        { href: '/staff', label: 'Staff Tasks', icon: LayersIcon },
-      ];
+      { href: '/admin', label: 'Home', icon: SparklesIcon },
+      { href: '/admin/bookings', label: 'Bookings & Payments', icon: ReceiptIcon },
+      { href: '/admin/calendar', label: 'Schedule', icon: CalendarIcon },
+      { href: '/admin/catalog', label: 'Packages & Settings', icon: PaletteIcon },
+      { href: '/staff', label: 'Staff Tasks', icon: LayersIcon },
+    ];
 
   const handleLogout = () => {
     startTransition(async () => {
@@ -63,10 +63,10 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
               <SparklesIcon className="w-4 h-4" />
             </span>
             <div className="min-w-0">
-              <p className="text-base font-bold tracking-tight text-slate-900 truncate">
+              <p className="text-lg font-bold tracking-tight text-slate-900 truncate">
                 {session.studioName}
               </p>
-              <p className="text-[11px] font-mono-code uppercase tracking-wider text-indigo-600 font-medium">
+              <p className="text-xs font-mono-code uppercase tracking-wider text-indigo-600 font-medium">
                 {session.role}
               </p>
             </div>
@@ -85,7 +85,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all',
+                  'flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[15px] font-medium transition-all',
                   active
                     ? 'bg-slate-900 text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
@@ -101,19 +101,19 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
         <div className="p-4 border-t border-slate-200 space-y-3">
           <Link
             href="/"
-            className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+            className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors"
           >
             View Public Website ↗
           </Link>
 
           <div className="flex items-center justify-between gap-2 pt-1">
             <div className="flex items-center gap-2.5 min-w-0">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700 border border-indigo-100">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700 border border-indigo-100">
                 {initials}
               </span>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-900 truncate">{session.name}</p>
-                <p className="text-[11px] text-slate-500 truncate">{session.email}</p>
+                <p className="text-sm font-semibold text-slate-900 truncate">{session.name}</p>
+                <p className="text-xs text-slate-500 truncate">{session.email}</p>
               </div>
             </div>
             <button
