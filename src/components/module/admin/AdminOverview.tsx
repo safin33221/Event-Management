@@ -1,4 +1,6 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   AutomationAlerts,
@@ -8,11 +10,12 @@ import {
   Quote,
   StudioSettings,
 } from '@/types/event-management';
-import { formatDateTimeInTz, formatLocalDate, formatPoisha } from '@/lib/utils';
+import { cn, formatDateTimeInTz, formatLocalDate, formatPoisha } from '@/lib/utils';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import {
   ArrowRightIcon,
   CalendarIcon,
+  CheckCircleIcon,
   ReceiptIcon,
   SparklesIcon,
   UsersIcon,
@@ -26,6 +29,8 @@ interface AdminOverviewProps {
   upcomingSessions: EventSession[];
   alerts?: AutomationAlerts | null;
 }
+
+type AlertTab = 'payments' | 'confirm' | 'unscheduled' | 'deliverables';
 
 export function AdminOverview({
   settings,
@@ -43,292 +48,363 @@ export function AdminOverview({
     (q) => q.status === 'DRAFT' || q.status === 'SENT',
   ).length;
   const confirmedCount = bookings.filter((b) => b.status === 'CONFIRMED').length;
+  const pendingConfirmCount = bookings.filter(
+    (b) => b.status === 'PENDING_CONFIRMATION',
+  ).length;
   const totalAgreedPoisha = bookings
     .filter((b) => b.status !== 'CANCELLED')
     .reduce((acc, b) => acc + b.agreedTotalPoisha, 0);
 
+  const defaultAlertTab: AlertTab =
+    (alerts?.counts.pendingPayments ?? 0) > 0
+      ? 'payments'
+      : (alerts?.counts.readyToConfirm ?? 0) > 0
+        ? 'confirm'
+        : (alerts?.counts.unscheduledConfirmed ?? 0) > 0
+          ? 'unscheduled'
+          : 'deliverables';
+
+  const [alertTab, setAlertTab] = useState<AlertTab>(defaultAlertTab);
+
+  const totalAlerts =
+    (alerts?.counts.pendingPayments ?? 0) +
+    (alerts?.counts.readyToConfirm ?? 0) +
+    (alerts?.counts.unscheduledConfirmed ?? 0) +
+    (alerts?.counts.urgentDeliverables ?? 0);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Clean Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
-            {settings?.displayName || 'Studio Home'}
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            {settings?.displayName || 'Studio Dashboard'}
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Everything happening in your studio at a glance • {timezone}
+            Daily overview of your inquiries, quotes, bookings, and upcoming shoots ({timezone})
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Link
             href="/admin/calendar"
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <CalendarIcon className="w-3.5 h-3.5 text-slate-500" />
-            <span>View Schedule</span>
+            <CalendarIcon className="w-4 h-4 text-indigo-600" />
+            <span>Shoot Calendar</span>
           </Link>
           <Link
             href="/admin/bookings"
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-700 transition-colors"
           >
-            <span>Manage Bookings</span>
-            <ArrowRightIcon className="w-3.5 h-3.5" />
+            <span>All Bookings</span>
+            <ArrowRightIcon className="w-4 h-4" />
           </Link>
         </div>
       </div>
 
-      {/* Simple 3-Step Guide Strip */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/* 4 Primary KPI Cards (Each navigates to its dedicated workspace) */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link
-          href="/admin/bookings?tab=inquiries"
-          className="atelier-card p-4 flex items-center gap-3.5 hover:border-indigo-300 transition-colors group"
+          href="/admin/inquiries"
+          className="atelier-card p-5 hover:border-indigo-300 transition-all group"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-xs font-bold text-indigo-600">
-            1
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
-              Requests ({newInquiriesCount} new)
-            </p>
-            <p className="text-xs text-slate-500 truncate">Write down client event requests</p>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              1. Inquiries
+            </span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+              <SparklesIcon className="w-4 h-4" />
+            </span>
           </div>
+          <p className="text-3xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
+            {newInquiriesCount}
+            <span className="text-sm font-medium text-slate-400 ml-1.5">new</span>
+          </p>
+          <p className="text-xs font-medium text-indigo-600 mt-2 flex items-center gap-1">
+            <span>{inquiries.length} total requests • Open Inquiries</span>
+            <ArrowRightIcon className="w-3 h-3" />
+          </p>
         </Link>
 
         <Link
-          href="/admin/bookings?tab=quotes"
-          className="atelier-card p-4 flex items-center gap-3.5 hover:border-indigo-300 transition-colors group"
+          href="/admin/quotes"
+          className="atelier-card p-5 hover:border-amber-300 transition-all group"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-xs font-bold text-amber-600">
-            2
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
-              Price Quotes ({openQuotesCount} open)
-            </p>
-            <p className="text-xs text-slate-500 truncate">Send price &amp; confirm booking</p>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              2. Price Quotes
+            </span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+              <ReceiptIcon className="w-4 h-4" />
+            </span>
           </div>
+          <p className="text-3xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
+            {openQuotesCount}
+            <span className="text-sm font-medium text-slate-400 ml-1.5">open</span>
+          </p>
+          <p className="text-xs font-medium text-amber-700 mt-2 flex items-center gap-1">
+            <span>{quotes.length} total proposals • Manage Quotes</span>
+            <ArrowRightIcon className="w-3 h-3" />
+          </p>
         </Link>
 
         <Link
           href="/admin/bookings"
-          className="atelier-card p-4 flex items-center gap-3.5 hover:border-indigo-300 transition-colors group"
+          className="atelier-card p-5 hover:border-emerald-300 transition-all group"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-xs font-bold text-emerald-600">
-            3
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
-              Bookings ({confirmedCount} confirmed)
-            </p>
-            <p className="text-xs text-slate-500 truncate">Track payments &amp; files</p>
-          </div>
-        </Link>
-      </div>
-
-      {/* KPI Strip */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="atelier-card p-5">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold text-slate-500">New Requests</span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-              <SparklesIcon className="w-4 h-4" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              3. Bookings
             </span>
-          </div>
-          <p className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mt-2.5 tabular-nums">
-            {newInquiriesCount}
-          </p>
-          <p className="text-sm text-slate-500 mt-1">{inquiries.length} total requests</p>
-        </div>
-
-        <div className="atelier-card p-5">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold text-slate-500">Open Quotes</span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-              <ReceiptIcon className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mt-2.5 tabular-nums">
-            {openQuotesCount}
-          </p>
-          <p className="text-sm text-slate-500 mt-1">{quotes.length} total quotes</p>
-        </div>
-
-        <div className="atelier-card p-5">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold text-slate-500">Confirmed Bookings</span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
               <UsersIcon className="w-4 h-4" />
             </span>
           </div>
-          <p className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mt-2.5 tabular-nums">
+          <p className="text-3xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
             {confirmedCount}
-          </p>
-          <p className="text-sm text-slate-500 mt-1">
-            Total value:{' '}
-            <span className="font-mono-code font-medium text-slate-700 tabular-nums">
-              {formatPoisha(totalAgreedPoisha, currency)}
+            <span className="text-sm font-medium text-slate-400 ml-1.5">
+              confirmed {pendingConfirmCount > 0 ? `(+${pendingConfirmCount} pending)` : ''}
             </span>
           </p>
-        </div>
+          <p className="text-xs font-mono-code font-semibold text-emerald-700 mt-2 tabular-nums">
+            Pipeline: {formatPoisha(totalAgreedPoisha, currency)} →
+          </p>
+        </Link>
 
-        <div className="atelier-card p-5">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold text-slate-500">Upcoming Events</span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
+        <Link
+          href="/admin/calendar"
+          className="atelier-card p-5 hover:border-sky-300 transition-all group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              4. Upcoming Shoots
+            </span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 group-hover:bg-sky-600 group-hover:text-white transition-colors">
               <CalendarIcon className="w-4 h-4" />
             </span>
           </div>
-          <p className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mt-2.5 tabular-nums">
+          <p className="text-3xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
             {upcomingSessions.length}
+            <span className="text-sm font-medium text-slate-400 ml-1.5">next 14d</span>
           </p>
-          <p className="text-sm text-slate-500 mt-1">In the next 14 days</p>
-        </div>
+          <p className="text-xs font-medium text-sky-700 mt-2 flex items-center gap-1">
+            <span>View Calendar &amp; Crew</span>
+            <ArrowRightIcon className="w-3 h-3" />
+          </p>
+        </Link>
       </div>
 
-      {/* Studio Automation & Action Queue */}
+      {/* Focused Tabbed Action Center (Replaces the 4-box clutter) */}
       {alerts && (
-        <div className="atelier-card p-6 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <div>
-              <h2 className="text-lg font-bold tracking-tight text-slate-900">
-                Action Queue &amp; Workflow Alerts
-              </h2>
-              <p className="text-xs text-slate-500">
-                Live checks for bKash/Nagad/Bank verifications, ready confirmations, missing crew, and deadlines.
-              </p>
+        <div className="atelier-card p-5 sm:p-6 space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                <CheckCircleIcon className="w-4 h-4" />
+              </span>
+              <div>
+                <h2 className="text-base font-bold tracking-tight text-slate-900">
+                  Needs Your Attention ({totalAlerts})
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Click any category below to act on pending payments, confirmations, or shoots.
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2 text-xs font-mono-code">
-              <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-amber-800">
-                {alerts.counts.pendingPayments} pending verify
-              </span>
-              <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-emerald-800">
-                {alerts.counts.readyToConfirm} ready confirm
-              </span>
-              <span className="rounded-full bg-sky-50 border border-sky-200 px-2.5 py-0.5 text-sky-800">
-                {alerts.counts.unscheduledConfirmed} need shoot
-              </span>
-              <span className="rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-rose-800">
-                {alerts.counts.urgentDeliverables} due/overdue files
-              </span>
+
+            <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
+              {[
+                {
+                  id: 'payments' as const,
+                  label: 'Verify Payments',
+                  count: alerts.counts.pendingPayments,
+                  badgeClass: 'bg-amber-100 text-amber-800',
+                },
+                {
+                  id: 'confirm' as const,
+                  label: 'Ready to Confirm',
+                  count: alerts.counts.readyToConfirm,
+                  badgeClass: 'bg-emerald-100 text-emerald-800',
+                },
+                {
+                  id: 'unscheduled' as const,
+                  label: 'Needs Shoot Slot',
+                  count: alerts.counts.unscheduledConfirmed,
+                  badgeClass: 'bg-sky-100 text-sky-800',
+                },
+                {
+                  id: 'deliverables' as const,
+                  label: 'Urgent Files',
+                  count: alerts.counts.urgentDeliverables,
+                  badgeClass: 'bg-rose-100 text-rose-800',
+                },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setAlertTab(t.id)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+                    alertTab === t.id
+                      ? 'bg-white text-slate-900 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900',
+                  )}
+                >
+                  <span>{t.label}</span>
+                  <span
+                    className={cn(
+                      'rounded-full px-1.5 py-0.5 text-[10px] font-mono-code font-bold',
+                      t.count > 0 ? t.badgeClass : 'bg-slate-200 text-slate-600',
+                    )}
+                  >
+                    {t.count}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {alerts.counts.pendingPayments === 0 &&
-          alerts.counts.readyToConfirm === 0 &&
-          alerts.counts.unscheduledConfirmed === 0 &&
-          alerts.counts.urgentDeliverables === 0 ? (
-            <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-              All caught up — no pending payment approvals, unscheduled confirmed bookings, or overdue deliverables.
-            </p>
+          {totalAlerts === 0 ? (
+            <div className="rounded-xl bg-emerald-50/70 border border-emerald-200 px-4 py-3 text-xs font-medium text-emerald-800">
+              All caught up! No pending payment approvals, unscheduled confirmed bookings, or overdue deliverables.
+            </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {alerts.pendingPayments.length > 0 && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
-                    Payments Awaiting Verification ({alerts.pendingPayments.length})
-                  </p>
-                  {alerts.pendingPayments.slice(0, 4).map((p) => (
-                    <Link
-                      key={p.id}
-                      href={`/admin/bookings?tab=bookings&bookingId=${p.bookingId}`}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 border border-amber-100 hover:border-amber-300 transition-colors text-xs"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 truncate">
-                          {p.booking.reference} • {p.booking.clientName}
-                        </p>
-                        <p className="text-slate-500 font-mono-code">
-                          {p.method} {p.transactionRef ? `(${p.transactionRef})` : ''}
-                        </p>
-                      </div>
-                      <span className="font-mono-code font-bold text-amber-800 shrink-0 tabular-nums">
-                        {formatPoisha(p.amountPoisha, p.currency)}
-                      </span>
-                    </Link>
-                  ))}
+            <div>
+              {alertTab === 'payments' && (
+                <div className="space-y-2">
+                  {alerts.pendingPayments.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-4 text-center">
+                      No payments waiting for verification right now.
+                    </p>
+                  ) : (
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      {alerts.pendingPayments.slice(0, 6).map((p) => (
+                        <Link
+                          key={p.id}
+                          href={`/admin/bookings/${p.bookingId}?section=payments`}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-amber-200/80 bg-amber-50/40 px-4 py-3 hover:border-amber-400 hover:bg-amber-50 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {p.booking.reference} • {p.booking.clientName}
+                            </p>
+                            <p className="text-[11px] text-slate-500 font-mono-code mt-0.5">
+                              {p.method} {p.transactionRef ? `(${p.transactionRef})` : ''}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-mono-code text-xs font-bold text-amber-900 tabular-nums">
+                              {formatPoisha(p.amountPoisha, p.currency)}
+                            </p>
+                            <span className="text-[11px] font-semibold text-amber-700">
+                              Verify →
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {alerts.readyToConfirmBookings.length > 0 && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-                    Advance Met — Ready to Confirm ({alerts.readyToConfirmBookings.length})
-                  </p>
-                  {alerts.readyToConfirmBookings.slice(0, 4).map((b) => (
-                    <Link
-                      key={b.id}
-                      href={`/admin/bookings?tab=bookings&bookingId=${b.id}`}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 border border-emerald-100 hover:border-emerald-300 transition-colors text-xs"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 truncate">
-                          {b.reference} • {b.eventTitle}
-                        </p>
-                        <p className="text-slate-500">
-                          {b.clientName} • {formatLocalDate(b.eventDate)}
-                        </p>
-                      </div>
-                      <span className="rounded-md bg-emerald-600 px-2 py-1 text-sm font-semibold text-white shrink-0">
-                        Confirm →
-                      </span>
-                    </Link>
-                  ))}
+              {alertTab === 'confirm' && (
+                <div className="space-y-2">
+                  {alerts.readyToConfirmBookings.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-4 text-center">
+                      No bookings waiting for confirmation right now.
+                    </p>
+                  ) : (
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      {alerts.readyToConfirmBookings.slice(0, 6).map((b) => (
+                        <Link
+                          key={b.id}
+                          href={`/admin/bookings/${b.id}`}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/40 px-4 py-3 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {b.reference} • {b.eventTitle}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {b.clientName} • {formatLocalDate(b.eventDate)}
+                            </p>
+                          </div>
+                          <span className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shrink-0">
+                            Confirm →
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {alerts.unscheduledConfirmedBookings.length > 0 && (
-                <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4 space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-sky-800">
-                    Confirmed Missing Shoot Slot ({alerts.unscheduledConfirmedBookings.length})
-                  </p>
-                  {alerts.unscheduledConfirmedBookings.slice(0, 4).map((b) => (
-                    <Link
-                      key={b.id}
-                      href={`/admin/bookings?tab=bookings&bookingId=${b.id}`}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 border border-sky-100 hover:border-sky-300 transition-colors text-xs"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 truncate">
-                          {b.reference} • {b.eventTitle}
-                        </p>
-                        <p className="text-slate-500">
-                          {b.clientName} • {formatLocalDate(b.eventDate)}
-                        </p>
-                      </div>
-                      <span className="text-xs font-semibold text-sky-700 shrink-0">
-                        Add Slot →
-                      </span>
-                    </Link>
-                  ))}
+              {alertTab === 'unscheduled' && (
+                <div className="space-y-2">
+                  {alerts.unscheduledConfirmedBookings.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-4 text-center">
+                      Every confirmed booking has at least one scheduled shoot session.
+                    </p>
+                  ) : (
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      {alerts.unscheduledConfirmedBookings.slice(0, 6).map((b) => (
+                        <Link
+                          key={b.id}
+                          href={`/admin/bookings/${b.id}?section=schedule`}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-sky-200/80 bg-sky-50/40 px-4 py-3 hover:border-sky-400 hover:bg-sky-50 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {b.reference} • {b.eventTitle}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {b.clientName} • {formatLocalDate(b.eventDate)}
+                            </p>
+                          </div>
+                          <span className="text-xs font-semibold text-sky-700 shrink-0">
+                            Add Shoot Slot →
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {alerts.urgentDeliverables.length > 0 && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-rose-800">
-                    Due Soon &amp; Overdue Deliverables ({alerts.urgentDeliverables.length})
-                  </p>
-                  {alerts.urgentDeliverables.slice(0, 4).map((d) => (
-                    <Link
-                      key={d.id}
-                      href={`/admin/bookings?tab=bookings&bookingId=${d.bookingId}`}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 border border-rose-100 hover:border-rose-300 transition-colors text-xs"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 truncate">
-                          {d.label} — {d.booking.reference}
-                        </p>
-                        <p className="text-slate-500 truncate">{d.booking.eventTitle}</p>
-                      </div>
-                      <span
-                        className={`font-mono-code text-xs font-semibold shrink-0 ${
-                          d.isOverdue ? 'text-rose-700' : 'text-amber-700'
-                        }`}
-                      >
-                        {d.isOverdue ? 'OVERDUE' : formatLocalDate(d.dueAt)}
-                      </span>
-                    </Link>
-                  ))}
+              {alertTab === 'deliverables' && (
+                <div className="space-y-2">
+                  {alerts.urgentDeliverables.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-4 text-center">
+                      No urgent or overdue deliverables right now.
+                    </p>
+                  ) : (
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      {alerts.urgentDeliverables.slice(0, 6).map((d) => (
+                        <Link
+                          key={d.id}
+                          href={`/admin/bookings/${d.bookingId}?section=deliverables`}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-rose-200/80 bg-rose-50/40 px-4 py-3 hover:border-rose-400 hover:bg-rose-50 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {d.label} — {d.booking.reference}
+                            </p>
+                            <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                              {d.booking.eventTitle}
+                            </p>
+                          </div>
+                          <span
+                            className={cn(
+                              'font-mono-code text-xs font-bold shrink-0',
+                              d.isOverdue ? 'text-rose-700' : 'text-amber-700',
+                            )}
+                          >
+                            {d.isOverdue ? 'OVERDUE' : formatLocalDate(d.dueAt)}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -336,26 +412,33 @@ export function AdminOverview({
         </div>
       )}
 
-      {/* Two-Column Operational Feed */}
+      {/* Two-Column Clean Activity Grid */}
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-7 atelier-card p-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-            <h2 className="text-lg font-bold tracking-tight text-slate-900">Recent Bookings</h2>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-3">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">Recent Bookings</h2>
+              <p className="text-xs text-slate-500">Click a booking to open its workspace</p>
+            </div>
             <Link
               href="/admin/bookings"
-              className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
             >
-              See all →
+              View all ({bookings.length}) →
             </Link>
           </div>
           {bookings.length === 0 ? (
             <p className="text-sm text-slate-500 py-8 text-center">
-              No bookings yet. Accept a quote in Bookings &amp; Payments to create one.
+              No bookings yet. Accept a quote in Price Quotes to create one.
             </p>
           ) : (
             <div className="divide-y divide-slate-100">
               {bookings.slice(0, 5).map((b) => (
-                <div key={b.id} className="py-3.5 flex items-center justify-between gap-4">
+                <Link
+                  key={b.id}
+                  href={`/admin/bookings/${b.id}`}
+                  className="py-3 px-2 -mx-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-between gap-4 group"
+                >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-mono-code text-xs font-semibold text-slate-500">
@@ -363,7 +446,7 @@ export function AdminOverview({
                       </span>
                       <StatusBadge status={b.status} />
                     </div>
-                    <p className="text-sm font-semibold text-slate-900 truncate mt-1">
+                    <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate mt-1">
                       {b.eventTitle}
                     </p>
                     <p className="text-xs text-slate-500">
@@ -374,21 +457,27 @@ export function AdminOverview({
                     <p className="font-mono-code text-sm font-semibold text-slate-900 tabular-nums">
                       {formatPoisha(b.agreedTotalPoisha, b.currency)}
                     </p>
+                    <span className="text-xs font-medium text-indigo-600">Open →</span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
         </div>
 
         <div className="lg:col-span-5 atelier-card p-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-            <h2 className="text-lg font-bold tracking-tight text-slate-900">Upcoming Schedule</h2>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-3">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">
+                Upcoming Schedule
+              </h2>
+              <p className="text-xs text-slate-500">Next 14 days in {timezone}</p>
+            </div>
             <Link
               href="/admin/calendar"
-              className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
             >
-              Full schedule →
+              Open calendar →
             </Link>
           </div>
           {upcomingSessions.length === 0 ? (
@@ -396,11 +485,12 @@ export function AdminOverview({
               No sessions scheduled in the next 14 days.
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {upcomingSessions.slice(0, 5).map((s) => (
-                <div
+                <Link
                   key={s.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1"
+                  href={s.bookingId ? `/admin/bookings/${s.bookingId}?section=schedule` : '/admin/calendar'}
+                  className="block rounded-xl border border-slate-200/80 bg-slate-50/60 hover:border-indigo-300 hover:bg-white p-3.5 space-y-1 transition-all"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-mono-code font-semibold text-indigo-600">
@@ -408,16 +498,16 @@ export function AdminOverview({
                     </span>
                     <StatusBadge status={s.status} />
                   </div>
-                  <p className="text-sm font-semibold text-slate-900">{s.title}</p>
+                  <p className="text-sm font-semibold text-slate-900 truncate">{s.title}</p>
                   <p className="text-xs text-slate-500">
                     {formatDateTimeInTz(s.startAt, timezone)} → {formatDateTimeInTz(s.endAt, timezone)}
                   </p>
                   {s.booking && (
-                    <p className="text-xs text-slate-600">
+                    <p className="text-xs text-slate-600 truncate">
                       {s.booking.reference} — {s.booking.eventTitle}
                     </p>
                   )}
-                </div>
+                </Link>
               ))}
             </div>
           )}

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   AcceptanceChannel,
   Assignment,
@@ -53,7 +54,7 @@ import {
 } from '@/service/schedule/schedule.service';
 import { cn, formatDateTimeInTz, formatLocalDate, formatPoisha } from '@/lib/utils';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { CalendarIcon, PlusIcon, ReceiptIcon } from '@/components/shared/Icons';
+import { CalendarIcon, PlusIcon, ReceiptIcon, SearchIcon } from '@/components/shared/Icons';
 import { BookingReceiptModal } from './BookingReceiptModal';
 
 interface StudioMemberOption {
@@ -72,7 +73,11 @@ interface QuoteItemDraft {
   unitPriceTk: string;
 }
 
+export type BookingsWorkspaceMode = 'inquiries' | 'quotes' | 'bookings' | 'detail';
+export type BookingDetailSection = 'payments' | 'schedule' | 'deliverables' | 'tasks';
+
 interface BookingsWorkspaceProps {
+  mode?: BookingsWorkspaceMode;
   initialInquiries: Inquiry[];
   initialQuotes: Quote[];
   initialBookings: Booking[];
@@ -90,6 +95,9 @@ interface BookingsWorkspaceProps {
     entries: PaymentEntry[];
   } | null;
   isDetailPage?: boolean;
+  initialDetailSection?: BookingDetailSection;
+  initialInquiryIdForQuote?: string;
+  initialOpenCreateModal?: boolean;
 }
 
 function getDefaultSlotFromEventDate(eventDate?: string | null): { start: string; end: string } {
@@ -109,6 +117,7 @@ function toLocalDateTimeInput(iso?: string | null): string {
 }
 
 export function BookingsWorkspace({
+  mode,
   initialInquiries,
   initialQuotes,
   initialBookings,
@@ -123,11 +132,28 @@ export function BookingsWorkspace({
   initialSelectedBooking = null,
   initialLedger = null,
   isDetailPage = false,
+  initialDetailSection = 'payments',
+  initialInquiryIdForQuote,
+  initialOpenCreateModal = false,
 }: BookingsWorkspaceProps) {
-  const [tab, setTab] = useState<'inquiries' | 'quotes' | 'bookings'>(initialTab);
+  const router = useRouter();
+
+  const resolvedMode: BookingsWorkspaceMode =
+    mode ?? (isDetailPage ? 'detail' : initialTab);
+
+  const [detailSection, setDetailSection] =
+    useState<BookingDetailSection>(initialDetailSection);
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [showInquiryForm, setShowInquiryForm] = useState(false);
-  const [showQuoteForm, setShowQuoteForm] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
+  const [showInquiryForm, setShowInquiryForm] = useState(
+    resolvedMode === 'inquiries' && initialOpenCreateModal,
+  );
+  const [showQuoteForm, setShowQuoteForm] = useState(
+    resolvedMode === 'quotes' && (initialOpenCreateModal || Boolean(initialInquiryIdForQuote)),
+  );
+
   const [inquiries, setInquiries] = useState<Inquiry[]>(initialInquiries);
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
@@ -141,7 +167,7 @@ export function BookingsWorkspace({
   const [isPending, startTransition] = useTransition();
   const [renderNowMs] = useState(() => Date.now());
 
-  // Phone Inquiry Modal / Inline Form state
+  // Phone Inquiry Modal state
   const [inqTitle, setInqTitle] = useState('');
   const [inqEventTypeId, setInqEventTypeId] = useState('');
   const [inqPackageId, setInqPackageId] = useState('');
@@ -150,18 +176,55 @@ export function BookingsWorkspace({
   const [inqPhone, setInqPhone] = useState('');
   const [inqNotes, setInqNotes] = useState('');
 
+  const prefilledInquiry = initialInquiryIdForQuote
+    ? initialInquiries.find((i) => i.id === initialInquiryIdForQuote)
+    : undefined;
+  const prefilledInquiryPkg = prefilledInquiry?.packageId
+    ? packages.find((p) => p.id === prefilledInquiry.packageId)
+    : undefined;
+  const initialSlot = getDefaultSlotFromEventDate(initialSelectedBooking?.eventDate);
+
   // Quote Builder & Revision state
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
-  const [quoteInquiryId, setQuoteInquiryId] = useState('');
-  const [quoteEventTypeId, setQuoteEventTypeId] = useState('');
-  const [quotePackageId, setQuotePackageId] = useState('');
-  const [quoteEventTitle, setQuoteEventTitle] = useState('');
-  const [quoteClientName, setQuoteClientName] = useState('');
-  const [quoteClientPhone, setQuoteClientPhone] = useState('');
-  const [quoteDate, setQuoteDate] = useState('');
-  const [quoteItems, setQuoteItems] = useState<QuoteItemDraft[]>([
-    { description: '', quantity: '1', unitPriceTk: '50000' },
-  ]);
+  const [quoteInquiryId, setQuoteInquiryId] = useState(prefilledInquiry?.id || '');
+  const [quoteEventTypeId, setQuoteEventTypeId] = useState(
+    prefilledInquiry?.eventTypeId || prefilledInquiryPkg?.eventTypeId || '',
+  );
+  const [quotePackageId, setQuotePackageId] = useState(prefilledInquiry?.packageId || '');
+  const [quoteEventTitle, setQuoteEventTitle] = useState(prefilledInquiry?.eventTitle || '');
+  const [quoteClientName, setQuoteClientName] = useState(prefilledInquiry?.clientName || '');
+  const [quoteClientPhone, setQuoteClientPhone] = useState(prefilledInquiry?.clientPhone || '');
+  const [quoteDate, setQuoteDate] = useState(
+    prefilledInquiry?.requestedDate ? prefilledInquiry.requestedDate.slice(0, 10) : '',
+  );
+  const [quoteItems, setQuoteItems] = useState<QuoteItemDraft[]>(() => {
+    if (prefilledInquiryPkg) {
+      if (prefilledInquiryPkg.items && prefilledInquiryPkg.items.length > 0) {
+        return prefilledInquiryPkg.items.map((item) => ({
+          packageId: prefilledInquiryPkg.id,
+          serviceItemId: item.serviceItemId || undefined,
+          description: item.description,
+          quantity: String(item.quantity),
+          unitPriceTk: String(Math.round(item.unitPricePoisha / 100)),
+        }));
+      }
+      return [
+        {
+          packageId: prefilledInquiryPkg.id,
+          description: prefilledInquiryPkg.name,
+          quantity: '1',
+          unitPriceTk: String(Math.round(prefilledInquiryPkg.basePricePoisha / 100)),
+        },
+      ];
+    }
+    return [
+      {
+        description: prefilledInquiry?.eventTitle || '',
+        quantity: '1',
+        unitPriceTk: '50000',
+      },
+    ];
+  });
   const [quoteDiscountTk, setQuoteDiscountTk] = useState('0');
   const [quoteTerms, setQuoteTerms] = useState(
     'Advance locks the event date & crew. Remaining balance due before final gallery/album delivery.',
@@ -182,9 +245,9 @@ export function BookingsWorkspace({
   // Integrated Schedule & Crew state
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [scheduleOnConfirm, setScheduleOnConfirm] = useState(false);
-  const [schedTitle, setSchedTitle] = useState('');
-  const [schedStart, setSchedStart] = useState('');
-  const [schedEnd, setSchedEnd] = useState('');
+  const [schedTitle, setSchedTitle] = useState(initialSelectedBooking?.eventTitle || '');
+  const [schedStart, setSchedStart] = useState(initialSlot.start);
+  const [schedEnd, setSchedEnd] = useState(initialSlot.end);
   const [schedLocation, setSchedLocation] = useState('');
   const [schedResourceIds, setSchedResourceIds] = useState<string[]>([]);
 
@@ -193,7 +256,7 @@ export function BookingsWorkspace({
   const [newResName, setNewResName] = useState('');
   const [newResType, setNewResType] = useState<ResourceType>('CREW');
 
-  // Inline session reschedule / cancel state
+  // Session reschedule / cancel state
   const [reschedSessionId, setReschedSessionId] = useState<string | null>(null);
   const [reschedStart, setReschedStart] = useState('');
   const [reschedEnd, setReschedEnd] = useState('');
@@ -249,41 +312,6 @@ export function BookingsWorkspace({
     });
   };
 
-  useEffect(() => {
-    if (initialSelectedBookingId) {
-      openBookingDetail(initialSelectedBookingId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSelectedBookingId]);
-
-  const handleCreateInquiry = (e: React.FormEvent) => {
-    e.preventDefault();
-    startTransition(async () => {
-      const matchedPkg = packages.find((p) => p.id === inqPackageId);
-      const res = await createPhoneInquiry({
-        eventTypeId: inqEventTypeId || matchedPkg?.eventTypeId || undefined,
-        packageId: inqPackageId || undefined,
-        eventTitle: inqTitle,
-        requestedDate: inqDate || undefined,
-        clientName: inqClient,
-        clientPhone: inqPhone,
-        notes: inqNotes.trim() || undefined,
-      });
-      if (!res.ok || !res.data) {
-        notify('err', res.message || 'Failed to create inquiry');
-        return;
-      }
-      setInquiries([res.data, ...inquiries]);
-      setInqTitle('');
-      setInqEventTypeId('');
-      setInqPackageId('');
-      setInqClient('');
-      setInqPhone('');
-      setInqNotes('');
-      notify('ok', `Created inquiry ${res.data.reference}`);
-    });
-  };
-
   const applyPackagePresetToQuote = (pkgId: string, fallbackTitle?: string) => {
     setQuotePackageId(pkgId);
     const pkg = packages.find((p) => p.id === pkgId);
@@ -313,23 +341,40 @@ export function BookingsWorkspace({
     }
   };
 
-  const prefillQuoteFromInquiry = (inq: Inquiry) => {
-    setEditingQuoteId(null);
-    setQuoteInquiryId(inq.id);
-    setQuoteEventTitle(inq.eventTitle);
-    setQuoteClientName(inq.clientName);
-    setQuoteClientPhone(inq.clientPhone);
-    setQuoteDate(inq.requestedDate ? inq.requestedDate.slice(0, 10) : '');
-    setQuoteEventTypeId(inq.eventTypeId || '');
-    setQuoteDiscountTk('0');
-    if (inq.packageId) {
-      applyPackagePresetToQuote(inq.packageId, inq.eventTitle);
-    } else {
-      setQuotePackageId('');
-      setQuoteItems([{ description: inq.eventTitle, quantity: '1', unitPriceTk: '50000' }]);
+  useEffect(() => {
+    if (initialSelectedBookingId && !initialSelectedBooking) {
+      openBookingDetail(initialSelectedBookingId);
     }
-    setTab('quotes');
-    setShowQuoteForm(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSelectedBookingId]);
+
+  const handleCreateInquiry = (e: React.FormEvent) => {
+    e.preventDefault();
+    startTransition(async () => {
+      const matchedPkg = packages.find((p) => p.id === inqPackageId);
+      const res = await createPhoneInquiry({
+        eventTypeId: inqEventTypeId || matchedPkg?.eventTypeId || undefined,
+        packageId: inqPackageId || undefined,
+        eventTitle: inqTitle,
+        requestedDate: inqDate || undefined,
+        clientName: inqClient,
+        clientPhone: inqPhone,
+        notes: inqNotes.trim() || undefined,
+      });
+      if (!res.ok || !res.data) {
+        notify('err', res.message || 'Failed to create inquiry');
+        return;
+      }
+      setInquiries([res.data, ...inquiries]);
+      setInqTitle('');
+      setInqEventTypeId('');
+      setInqPackageId('');
+      setInqClient('');
+      setInqPhone('');
+      setInqNotes('');
+      setShowInquiryForm(false);
+      notify('ok', `Logged inquiry ${res.data.reference}`);
+    });
   };
 
   const startReviseQuote = (q: Quote) => {
@@ -464,10 +509,7 @@ export function BookingsWorkspace({
         return;
       }
       setQuotes(quotes.map((item) => (item.id === q.id ? { ...item, status: 'ACCEPTED' } : item)));
-      setBookings([res.data.booking, ...bookings]);
-      setTab('bookings');
-      openBookingDetail(res.data.booking.id);
-      notify('ok', `Accepted quote ${q.reference} → Booking ${res.data.booking.reference}`);
+      router.push(`/admin/bookings/${res.data.booking.id}`);
     });
   };
 
@@ -494,7 +536,7 @@ export function BookingsWorkspace({
       );
       setPayRef('');
       setPayIdemKey('');
-      openBookingDetail(selectedBooking.id);
+      openBookingDetail(selectedBooking.id, false);
     });
   };
 
@@ -515,7 +557,7 @@ export function BookingsWorkspace({
         if (confRes.ok && confRes.data) {
           const delCount = confRes.data.deliverables?.length ?? 0;
           const taskCount = confRes.data.assignments?.length ?? 0;
-          openBookingDetail(selectedBooking.id);
+          openBookingDetail(selectedBooking.id, false);
           notify(
             'ok',
             `Payment verified & booking confirmed! Auto-created ${delCount} deliverables and ${taskCount} crew tasks.`,
@@ -529,7 +571,7 @@ export function BookingsWorkspace({
           ? 'Payment verified! Advance threshold is now met — ready to confirm.'
           : 'Payment verified and applied to booking balance',
       );
-      openBookingDetail(selectedBooking.id);
+      openBookingDetail(selectedBooking.id, false);
     });
   };
 
@@ -692,7 +734,8 @@ export function BookingsWorkspace({
         notify('err', res.message || 'Crew/resource conflict or invalid time slot');
         return;
       }
-      openBookingDetail(selectedBooking.id);
+      setShowScheduleForm(false);
+      openBookingDetail(selectedBooking.id, false);
       notify('ok', 'Shoot session scheduled and crew reserved');
     });
   };
@@ -738,7 +781,7 @@ export function BookingsWorkspace({
         return;
       }
       openBookingDetail(selectedBooking.id, false);
-      notify('ok', 'Shoot session marked completed (balance & deliverables preserved)');
+      notify('ok', 'Shoot session marked completed');
     });
   };
 
@@ -769,7 +812,7 @@ export function BookingsWorkspace({
         notify('err', res.message || 'Failed to mark booking completed');
         return;
       }
-      openBookingDetail(selectedBooking.id);
+      openBookingDetail(selectedBooking.id, false);
       notify('ok', 'Booking marked as completed.');
     });
   };
@@ -813,24 +856,27 @@ export function BookingsWorkspace({
   const q = searchQuery.trim().toLowerCase();
   const filteredInquiries = inquiries.filter(
     (i) =>
-      !q ||
-      i.eventTitle.toLowerCase().includes(q) ||
-      i.clientName.toLowerCase().includes(q) ||
-      i.reference.toLowerCase().includes(q),
+      (statusFilter === 'ALL' || i.status === statusFilter) &&
+      (!q ||
+        i.eventTitle.toLowerCase().includes(q) ||
+        i.clientName.toLowerCase().includes(q) ||
+        i.reference.toLowerCase().includes(q)),
   );
   const filteredQuotes = quotes.filter(
     (item) =>
-      !q ||
-      item.eventTitle.toLowerCase().includes(q) ||
-      item.clientName.toLowerCase().includes(q) ||
-      item.reference.toLowerCase().includes(q),
+      (statusFilter === 'ALL' || item.status === statusFilter) &&
+      (!q ||
+        item.eventTitle.toLowerCase().includes(q) ||
+        item.clientName.toLowerCase().includes(q) ||
+        item.reference.toLowerCase().includes(q)),
   );
   const filteredBookings = bookings.filter(
     (b) =>
-      !q ||
-      b.eventTitle.toLowerCase().includes(q) ||
-      b.clientName.toLowerCase().includes(q) ||
-      b.reference.toLowerCase().includes(q),
+      (statusFilter === 'ALL' || b.status === statusFilter) &&
+      (!q ||
+        b.eventTitle.toLowerCase().includes(q) ||
+        b.clientName.toLowerCase().includes(q) ||
+        b.reference.toLowerCase().includes(q)),
   );
 
   const inputClass =
@@ -838,77 +884,6 @@ export function BookingsWorkspace({
 
   return (
     <div className="space-y-6">
-      {/* Header & Step Tabs (hidden on dedicated booking detail route) */}
-      {!isDetailPage && (
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
-              Bookings &amp; Payments
-            </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              3 easy steps: 1. Client Request → 2. Price Quote → 3. Booking &amp; Payments
-            </p>
-          </div>
-
-          <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-white p-1 gap-1">
-            {[
-              { key: 'inquiries' as const, label: `1. Requests (${inquiries.length})` },
-              { key: 'quotes' as const, label: `2. Quotes (${quotes.length})` },
-              { key: 'bookings' as const, label: `3. Bookings (${bookings.length})` },
-            ].map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setTab(item.key)}
-                className={cn(
-                  'rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors',
-                  tab === item.key
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Search + Quick Add Bar (hidden when viewing a single booking detail) */}
-      {!(tab === 'bookings' && selectedBooking) && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by client name, event, or reference..."
-            className="w-full sm:max-w-sm rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
-          />
-
-          {tab === 'inquiries' && (
-            <button
-              type="button"
-              onClick={() => setShowInquiryForm((v) => !v)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-            >
-              <PlusIcon className="w-3.5 h-3.5" />
-              <span>{showInquiryForm ? 'Close Form' : 'New Request'}</span>
-            </button>
-          )}
-
-          {tab === 'quotes' && (
-            <button
-              type="button"
-              onClick={() => setShowQuoteForm((v) => !v)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-            >
-              <PlusIcon className="w-3.5 h-3.5" />
-              <span>{showQuoteForm ? 'Close Form' : 'New Quote'}</span>
-            </button>
-          )}
-        </div>
-      )}
-
       {feedback && (
         <div
           className={cn(
@@ -925,118 +900,77 @@ export function BookingsWorkspace({
         </div>
       )}
 
-      {/* TAB 1: INQUIRIES */}
-      {tab === 'inquiries' && (
+      {/* =====================================================================
+          MODE 1: DEDICATED INQUIRIES ROUTE (/admin/inquiries)
+      ===================================================================== */}
+      {resolvedMode === 'inquiries' && (
         <div className="space-y-5">
-          {showInquiryForm && (
-            <form
-              onSubmit={(e) => {
-                handleCreateInquiry(e);
-                setShowInquiryForm(false);
-              }}
-              className="atelier-card p-6 space-y-4"
-            >
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h2 className="text-lg font-bold tracking-tight text-slate-900">
-                  Log Phone / Walk-In Inquiry
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setShowInquiryForm(false)}
-                  className="text-xs font-semibold text-slate-500 hover:text-slate-900"
-                >
-                  Cancel
-                </button>
-              </div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <input
-                  required
-                  value={inqTitle}
-                  onChange={(e) => setInqTitle(e.target.value)}
-                  placeholder="Event title (e.g. Ayesha & Rafiq Wedding) *"
-                  className={inputClass}
-                />
-                <select
-                  value={inqEventTypeId}
-                  onChange={(e) => setInqEventTypeId(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">Event Type (optional)</option>
-                  {eventTypes.map((et) => (
-                    <option key={et.id} value={et.id}>
-                      {et.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={inqPackageId}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    setInqPackageId(nextId);
-                    const pkg = packages.find((p) => p.id === nextId);
-                    if (pkg?.eventTypeId && !inqEventTypeId) {
-                      setInqEventTypeId(pkg.eventTypeId);
-                    }
-                  }}
-                  className={inputClass}
-                >
-                  <option value="">Interested Package (optional)</option>
-                  {packages.map((pkg) => (
-                    <option key={pkg.id} value={pkg.id}>
-                      {pkg.name} ({formatPoisha(pkg.basePricePoisha, currency)})
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="date"
-                  value={inqDate}
-                  onChange={(e) => setInqDate(e.target.value)}
-                  className={inputClass}
-                />
-                <input
-                  required
-                  value={inqClient}
-                  onChange={(e) => setInqClient(e.target.value)}
-                  placeholder="Client name *"
-                  className={inputClass}
-                />
-                <input
-                  required
-                  value={inqPhone}
-                  onChange={(e) => setInqPhone(e.target.value)}
-                  placeholder="Client phone *"
-                  className={inputClass}
-                />
-                <input
-                  value={inqNotes}
-                  onChange={(e) => setInqNotes(e.target.value)}
-                  placeholder="Venue, ceremony count, or guest notes (optional)"
-                  className={`${inputClass} sm:col-span-2 lg:col-span-3`}
-                />
-              </div>
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-                >
-                  <PlusIcon className="w-3.5 h-3.5" />
-                  <span>Save Inquiry</span>
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="atelier-card p-6 space-y-3">
-            {filteredInquiries.length === 0 ? (
-              <p className="text-sm text-slate-500 py-8 text-center">
-                No inquiries found. Click &ldquo;New Phone Inquiry&rdquo; to log one.
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                1. Client Inquiries
+              </h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Log phone/walk-in requests or review public storefront inquiries before sending a quote.
               </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowInquiryForm(true)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition-colors"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span>Log Phone / Walk-In Inquiry</span>
+            </button>
+          </div>
+
+          {/* Search & Status Filters */}
+          <div className="atelier-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search client, event, or ref..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              {(['ALL', 'NEW', 'QUOTED', 'CONVERTED'] as const).map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setStatusFilter(st)}
+                  className={cn(
+                    'rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors',
+                    statusFilter === st
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-600 hover:bg-slate-100',
+                  )}
+                >
+                  {st === 'ALL' ? `All (${inquiries.length})` : st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="atelier-card p-6">
+            {filteredInquiries.length === 0 ? (
+              <div className="py-10 text-center space-y-2">
+                <p className="text-sm font-semibold text-slate-800">No matching inquiries</p>
+                <p className="text-xs text-slate-500">
+                  Click &ldquo;Log Phone / Walk-In Inquiry&rdquo; to add a new client request.
+                </p>
+              </div>
             ) : (
               <div className="divide-y divide-slate-100">
                 {filteredInquiries.map((inq) => (
-                  <div key={inq.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
-                    <div>
+                  <div
+                    key={inq.id}
+                    className="py-3.5 flex flex-wrap items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-mono-code text-xs font-semibold text-slate-500">
                           {inq.reference}
@@ -1045,275 +979,269 @@ export function BookingsWorkspace({
                       </div>
                       <p className="font-semibold text-sm text-slate-900 mt-1">{inq.eventTitle}</p>
                       <p className="text-xs text-slate-500">
-                        {inq.clientName} ({inq.clientPhone}) • Date: {formatLocalDate(inq.requestedDate)}
+                        {inq.clientName} ({inq.clientPhone}) • Requested Date:{' '}
+                        {formatLocalDate(inq.requestedDate)}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => prefillQuoteFromInquiry(inq)}
-                      className="rounded-xl bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
+                    <Link
+                      href={`/admin/quotes?inquiryId=${encodeURIComponent(inq.id)}`}
+                      className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors"
                     >
                       Create Quote →
-                    </button>
+                    </Link>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* Log Inquiry Modal */}
+          {showInquiryForm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
+              <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      Log Phone / Walk-In Inquiry
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Generates an agency-unique reference without locking the date yet.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowInquiryForm(false)}
+                    className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <form onSubmit={handleCreateInquiry} className="space-y-3">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Event Title *
+                      </label>
+                      <input
+                        required
+                        value={inqTitle}
+                        onChange={(e) => setInqTitle(e.target.value)}
+                        placeholder="e.g. Ayesha & Rafiq Wedding Reception"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Client Name *
+                      </label>
+                      <input
+                        required
+                        value={inqClient}
+                        onChange={(e) => setInqClient(e.target.value)}
+                        placeholder="Full name"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Client Phone *
+                      </label>
+                      <input
+                        required
+                        value={inqPhone}
+                        onChange={(e) => setInqPhone(e.target.value)}
+                        placeholder="+8801..."
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Requested Date
+                      </label>
+                      <input
+                        type="date"
+                        value={inqDate}
+                        onChange={(e) => setInqDate(e.target.value)}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Event Category
+                      </label>
+                      <select
+                        value={inqEventTypeId}
+                        onChange={(e) => setInqEventTypeId(e.target.value)}
+                        className={inputClass}
+                      >
+                        <option value="">Select category (optional)</option>
+                        {eventTypes.map((et) => (
+                          <option key={et.id} value={et.id}>
+                            {et.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Interested Package
+                      </label>
+                      <select
+                        value={inqPackageId}
+                        onChange={(e) => {
+                          const nextId = e.target.value;
+                          setInqPackageId(nextId);
+                          const pkg = packages.find((p) => p.id === nextId);
+                          if (pkg?.eventTypeId && !inqEventTypeId) {
+                            setInqEventTypeId(pkg.eventTypeId);
+                          }
+                        }}
+                        className={inputClass}
+                      >
+                        <option value="">Select package preset (optional)</option>
+                        {packages.map((pkg) => (
+                          <option key={pkg.id} value={pkg.id}>
+                            {pkg.name} ({formatPoisha(pkg.basePricePoisha, currency)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Venue &amp; Notes
+                      </label>
+                      <input
+                        value={inqNotes}
+                        onChange={(e) => setInqNotes(e.target.value)}
+                        placeholder="Venue, ceremony count, or guest notes (optional)"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowInquiryForm(false)}
+                      className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isPending}
+                      className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                    >
+                      Save Inquiry
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* TAB 2: QUOTES */}
-      {tab === 'quotes' && (
+      {/* =====================================================================
+          MODE 2: DEDICATED QUOTES ROUTE (/admin/quotes)
+      ===================================================================== */}
+      {resolvedMode === 'quotes' && (
         <div className="space-y-5">
-          {showQuoteForm && (
-            <form onSubmit={handleSaveQuote} className="atelier-card p-6 space-y-5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
-                  <h2 className="text-lg font-bold tracking-tight text-slate-900">
-                    {editingQuoteId ? 'Revise Quote (New Version)' : 'Create Price Quote'}
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    {editingQuoteId
-                      ? 'Saving creates an immutable new quote version while preserving prior versions.'
-                      : 'Load a studio package preset or customize itemized pricing below.'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowQuoteForm(false);
-                    setEditingQuoteId(null);
-                  }}
-                  className="text-xs font-semibold text-slate-500 hover:text-slate-900"
-                >
-                  Cancel
-                </button>
-              </div>
-
-              {!editingQuoteId && (
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  <input
-                    required
-                    value={quoteEventTitle}
-                    onChange={(e) => setQuoteEventTitle(e.target.value)}
-                    placeholder="Event title *"
-                    className={inputClass}
-                  />
-                  <select
-                    value={quoteEventTypeId}
-                    onChange={(e) => setQuoteEventTypeId(e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Event Type (determines auto-tasks/deliverables)</option>
-                    {eventTypes.map((et) => (
-                      <option key={et.id} value={et.id}>
-                        {et.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={quotePackageId}
-                    onChange={(e) => applyPackagePresetToQuote(e.target.value, quoteEventTitle)}
-                    className={inputClass}
-                  >
-                    <option value="">Load Package Preset...</option>
-                    {packages.map((pkg) => (
-                      <option key={pkg.id} value={pkg.id}>
-                        {pkg.name} ({formatPoisha(pkg.basePricePoisha, currency)})
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="date"
-                    value={quoteDate}
-                    onChange={(e) => setQuoteDate(e.target.value)}
-                    className={inputClass}
-                  />
-                  <input
-                    required
-                    value={quoteClientName}
-                    onChange={(e) => setQuoteClientName(e.target.value)}
-                    placeholder="Client name *"
-                    className={inputClass}
-                  />
-                  <input
-                    required
-                    value={quoteClientPhone}
-                    onChange={(e) => setQuoteClientPhone(e.target.value)}
-                    placeholder="Client phone *"
-                    className={inputClass}
-                  />
-                </div>
-              )}
-
-              {/* Line Items Builder */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-                    Line Items
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setQuoteItems([
-                        ...quoteItems,
-                        { description: '', quantity: '1', unitPriceTk: '0' },
-                      ])
-                    }
-                    className="text-sm font-semibold text-indigo-600 hover:underline"
-                  >
-                    + Add Line Item
-                  </button>
-                </div>
-                {quoteItems.map((row, idx) => (
-                  <div key={idx} className="grid sm:grid-cols-12 gap-2 items-center">
-                    <input
-                      required
-                      value={row.description}
-                      onChange={(e) =>
-                        setQuoteItems(
-                          quoteItems.map((item, i) =>
-                            i === idx ? { ...item, description: e.target.value } : item,
-                          ),
-                        )
-                      }
-                      placeholder="Service / deliverable description *"
-                      className={`${inputClass} sm:col-span-6`}
-                    />
-                    <input
-                      required
-                      type="number"
-                      min="1"
-                      value={row.quantity}
-                      onChange={(e) =>
-                        setQuoteItems(
-                          quoteItems.map((item, i) =>
-                            i === idx ? { ...item, quantity: e.target.value } : item,
-                          ),
-                        )
-                      }
-                      placeholder="Qty"
-                      className={`${inputClass} font-mono-code sm:col-span-2`}
-                    />
-                    <input
-                      required
-                      type="number"
-                      min="0"
-                      value={row.unitPriceTk}
-                      onChange={(e) =>
-                        setQuoteItems(
-                          quoteItems.map((item, i) =>
-                            i === idx ? { ...item, unitPriceTk: e.target.value } : item,
-                          ),
-                        )
-                      }
-                      placeholder={`Unit (${currency})`}
-                      className={`${inputClass} font-mono-code sm:col-span-3`}
-                    />
-                    <button
-                      type="button"
-                      disabled={quoteItems.length <= 1}
-                      onClick={() => setQuoteItems(quoteItems.filter((_, i) => i !== idx))}
-                      className="rounded-xl border border-slate-200 px-2.5 py-2 text-sm text-rose-600 hover:bg-rose-50 disabled:opacity-30 sm:col-span-1"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid sm:grid-cols-3 gap-3 items-end pt-1">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-600 mb-1">
-                    Discount ({currency})
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={quoteDiscountTk}
-                    onChange={(e) => setQuoteDiscountTk(e.target.value)}
-                    className={`${inputClass} font-mono-code`}
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-slate-600 mb-1">
-                    Terms &amp; Payment Schedule
-                  </label>
-                  <input
-                    value={quoteTerms}
-                    onChange={(e) => setQuoteTerms(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                {(() => {
-                  const subtotalPoisha = quoteItems.reduce(
-                    (sum, item) =>
-                      sum +
-                      Math.max(1, Math.round(Number(item.quantity) || 1)) *
-                        Math.round((Number(item.unitPriceTk) || 0) * 100),
-                    0,
-                  );
-                  const discountPoisha = Math.max(
-                    0,
-                    Math.round((Number(quoteDiscountTk) || 0) * 100),
-                  );
-                  const totalPoisha = Math.max(0, subtotalPoisha - discountPoisha);
-                  return (
-                    <div className="text-xs text-slate-600 font-mono-code">
-                      Subtotal: {formatPoisha(subtotalPoisha, currency)} • Total:{' '}
-                      <span className="font-bold text-slate-900">
-                        {formatPoisha(totalPoisha, currency)}
-                      </span>
-                    </div>
-                  );
-                })()}
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-                >
-                  <span>{editingQuoteId ? 'Save Revised Version' : 'Save Quote'}</span>
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="atelier-card p-6 space-y-3">
-            {filteredQuotes.length === 0 ? (
-              <p className="text-sm text-slate-500 py-8 text-center">
-                No quotes found. Click &ldquo;New Quote&rdquo; or create one from an inquiry.
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                2. Price Quotes
+              </h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Build itemized proposals, revise versions, and accept a quote to create a booking.
               </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingQuoteId(null);
+                setShowQuoteForm(true);
+              }}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition-colors"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span>Create Price Quote</span>
+            </button>
+          </div>
+
+          {/* Search & Status Filters */}
+          <div className="atelier-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search quote reference, client, or event..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              {(['ALL', 'DRAFT', 'SENT', 'ACCEPTED'] as const).map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setStatusFilter(st)}
+                  className={cn(
+                    'rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors',
+                    statusFilter === st
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-600 hover:bg-slate-100',
+                  )}
+                >
+                  {st === 'ALL' ? `All (${quotes.length})` : st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="atelier-card p-6">
+            {filteredQuotes.length === 0 ? (
+              <div className="py-10 text-center space-y-2">
+                <p className="text-sm font-semibold text-slate-800">No quotes found</p>
+                <p className="text-xs text-slate-500">
+                  Click &ldquo;Create Price Quote&rdquo; or convert a client inquiry.
+                </p>
+              </div>
             ) : (
               <div className="divide-y divide-slate-100">
                 {filteredQuotes.map((item) => {
                   const latest = item.versions?.[0] || item.currentVersion;
                   return (
-                    <div key={item.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
-                      <div>
+                    <div
+                      key={item.id}
+                      className="py-4 flex flex-wrap items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-mono-code text-xs font-semibold text-slate-500">
                             {item.reference}
                           </span>
                           <StatusBadge status={item.status} />
                           {latest && (
-                            <span className="text-xs font-mono-code text-slate-400">
+                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-mono-code text-slate-600">
                               v{latest.versionNumber}
                             </span>
                           )}
                         </div>
-                        <p className="font-semibold text-sm text-slate-900 mt-1">{item.eventTitle}</p>
+                        <p className="font-semibold text-sm text-slate-900 mt-1">
+                          {item.eventTitle}
+                        </p>
                         <p className="text-xs text-slate-500">
                           {item.clientName} ({item.clientPhone})
+                          {item.requestedDate
+                            ? ` • Requested: ${formatLocalDate(item.requestedDate)}`
+                            : ''}
                         </p>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
                         {latest && (
-                          <span className="font-mono-code text-sm font-semibold text-slate-900 tabular-nums mr-1">
+                          <span className="font-mono-code text-sm font-bold text-slate-900 tabular-nums mr-2">
                             {formatPoisha(latest.totalPoisha, item.currency)}
                           </span>
                         )}
@@ -1323,7 +1251,7 @@ export function BookingsWorkspace({
                               type="button"
                               disabled={isPending}
                               onClick={() => startReviseQuote(item)}
-                              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                             >
                               Revise
                             </button>
@@ -1345,7 +1273,7 @@ export function BookingsWorkspace({
                                   [item.id]: e.target.value as AcceptanceChannel,
                                 })
                               }
-                              className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs"
+                              className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium"
                             >
                               <option value="PHONE">Phone</option>
                               <option value="WHATSAPP">WhatsApp</option>
@@ -1357,9 +1285,9 @@ export function BookingsWorkspace({
                               type="button"
                               disabled={isPending}
                               onClick={() => handleAcceptQuote(item)}
-                              className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
+                              className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
                             >
-                              Accept &amp; Book
+                              Accept &amp; Book →
                             </button>
                           </>
                         )}
@@ -1370,757 +1298,1238 @@ export function BookingsWorkspace({
               </div>
             )}
           </div>
-        </div>
-      )}
 
-      {/* TAB 3: BOOKINGS */}
-      {tab === 'bookings' && !selectedBooking && (
-        <div className="atelier-card p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h2 className="text-lg font-bold tracking-tight text-slate-900">
-              All Bookings ({filteredBookings.length})
-            </h2>
-            <p className="text-xs text-slate-500">Click any booking to open details &amp; payments</p>
-          </div>
-          {filteredBookings.length === 0 ? (
-            <p className="text-sm text-slate-500 py-10 text-center">
-              No bookings yet. Accept a quote to create your first booking.
-            </p>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {filteredBookings.map((b) => (
-                <Link
-                  key={b.id}
-                  href={`/admin/bookings/${b.id}`}
-                  className="w-full text-left py-4 px-3 rounded-xl hover:bg-slate-50 transition-colors flex flex-wrap items-center justify-between gap-4 group"
-                >
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono-code text-xs font-semibold text-slate-500">
-                        {b.reference}
-                      </span>
-                      <StatusBadge status={b.status} />
-                      {b.eventType && (
-                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                          {b.eventType.name}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
-                      {b.eventTitle}
-                    </p>
+          {/* Quote Builder / Revision Modal */}
+          {showQuoteForm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs overflow-y-auto">
+              <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-5 my-8">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      {editingQuoteId ? 'Revise Quote (New Version)' : 'Create Price Quote'}
+                    </h2>
                     <p className="text-xs text-slate-500">
-                      {b.clientName} ({b.clientPhone}) • Event Date: {formatLocalDate(b.eventDate)}
+                      {editingQuoteId
+                        ? 'Creates an immutable new quote version while preserving prior versions.'
+                        : 'Select a package preset or customize itemized services below.'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-4 shrink-0">
-                    <div className="text-right">
-                      <p className="text-xs font-semibold uppercase text-slate-400">Total Price</p>
-                      <p className="font-mono-code text-sm font-semibold text-slate-900 tabular-nums">
-                        {formatPoisha(b.agreedTotalPoisha, b.currency)}
-                      </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowQuoteForm(false);
+                      setEditingQuoteId(null);
+                    }}
+                    className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveQuote} className="space-y-4">
+                  {!editingQuoteId && (
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Event Title *
+                        </label>
+                        <input
+                          required
+                          value={quoteEventTitle}
+                          onChange={(e) => setQuoteEventTitle(e.target.value)}
+                          placeholder="e.g. Ayesha & Rafiq Wedding"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Client Name *
+                        </label>
+                        <input
+                          required
+                          value={quoteClientName}
+                          onChange={(e) => setQuoteClientName(e.target.value)}
+                          placeholder="Client name"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Client Phone *
+                        </label>
+                        <input
+                          required
+                          value={quoteClientPhone}
+                          onChange={(e) => setQuoteClientPhone(e.target.value)}
+                          placeholder="+8801..."
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Event Category
+                        </label>
+                        <select
+                          value={quoteEventTypeId}
+                          onChange={(e) => setQuoteEventTypeId(e.target.value)}
+                          className={inputClass}
+                        >
+                          <option value="">Select category (for auto-tasks)</option>
+                          {eventTypes.map((et) => (
+                            <option key={et.id} value={et.id}>
+                              {et.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Requested Date
+                        </label>
+                        <input
+                          type="date"
+                          value={quoteDate}
+                          onChange={(e) => setQuoteDate(e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Load Package Preset
+                        </label>
+                        <select
+                          value={quotePackageId}
+                          onChange={(e) => applyPackagePresetToQuote(e.target.value, quoteEventTitle)}
+                          className={inputClass}
+                        >
+                          <option value="">Custom Itemized Quote...</option>
+                          {packages.map((pkg) => (
+                            <option key={pkg.id} value={pkg.id}>
+                              {pkg.name} ({formatPoisha(pkg.basePricePoisha, currency)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <span className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 group-hover:border-indigo-300 group-hover:text-indigo-600 transition-colors">
-                      View Details →
-                    </span>
+                  )}
+
+                  {/* Line Items Builder */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Line Items
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setQuoteItems([
+                            ...quoteItems,
+                            { description: '', quantity: '1', unitPriceTk: '0' },
+                          ])
+                        }
+                        className="text-xs font-semibold text-indigo-600 hover:underline"
+                      >
+                        + Add Line Item
+                      </button>
+                    </div>
+                    {quoteItems.map((row, idx) => (
+                      <div key={idx} className="grid sm:grid-cols-12 gap-2 items-center">
+                        <input
+                          required
+                          value={row.description}
+                          onChange={(e) =>
+                            setQuoteItems(
+                              quoteItems.map((item, i) =>
+                                i === idx ? { ...item, description: e.target.value } : item,
+                              ),
+                            )
+                          }
+                          placeholder="Service / deliverable description *"
+                          className={`${inputClass} sm:col-span-6`}
+                        />
+                        <input
+                          required
+                          type="number"
+                          min="1"
+                          value={row.quantity}
+                          onChange={(e) =>
+                            setQuoteItems(
+                              quoteItems.map((item, i) =>
+                                i === idx ? { ...item, quantity: e.target.value } : item,
+                              ),
+                            )
+                          }
+                          placeholder="Qty"
+                          className={`${inputClass} font-mono-code sm:col-span-2`}
+                        />
+                        <input
+                          required
+                          type="number"
+                          min="0"
+                          value={row.unitPriceTk}
+                          onChange={(e) =>
+                            setQuoteItems(
+                              quoteItems.map((item, i) =>
+                                i === idx ? { ...item, unitPriceTk: e.target.value } : item,
+                              ),
+                            )
+                          }
+                          placeholder={`Unit (${currency})`}
+                          className={`${inputClass} font-mono-code sm:col-span-3`}
+                        />
+                        <button
+                          type="button"
+                          disabled={quoteItems.length <= 1}
+                          onClick={() => setQuoteItems(quoteItems.filter((_, i) => i !== idx))}
+                          className="rounded-xl border border-slate-200 px-2.5 py-2 text-xs text-rose-600 hover:bg-rose-50 disabled:opacity-30 sm:col-span-1"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                </Link>
-              ))}
+
+                  <div className="grid sm:grid-cols-3 gap-3 items-end">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Discount ({currency})
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={quoteDiscountTk}
+                        onChange={(e) => setQuoteDiscountTk(e.target.value)}
+                        className={`${inputClass} font-mono-code`}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Terms &amp; Payment Schedule
+                      </label>
+                      <input
+                        value={quoteTerms}
+                        onChange={(e) => setQuoteTerms(e.target.value)}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                    {(() => {
+                      const subtotalPoisha = quoteItems.reduce(
+                        (sum, item) =>
+                          sum +
+                          Math.max(1, Math.round(Number(item.quantity) || 1)) *
+                            Math.round((Number(item.unitPriceTk) || 0) * 100),
+                        0,
+                      );
+                      const discountPoisha = Math.max(
+                        0,
+                        Math.round((Number(quoteDiscountTk) || 0) * 100),
+                      );
+                      const totalPoisha = Math.max(0, subtotalPoisha - discountPoisha);
+                      return (
+                        <div className="text-xs text-slate-600 font-mono-code">
+                          Subtotal: {formatPoisha(subtotalPoisha, currency)} • Total:{' '}
+                          <span className="font-bold text-slate-900">
+                            {formatPoisha(totalPoisha, currency)}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowQuoteForm(false);
+                          setEditingQuoteId(null);
+                        }}
+                        className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isPending}
+                        className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                      >
+                        {editingQuoteId ? 'Save Revised Version' : 'Save Quote'}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {tab === 'bookings' && selectedBooking && (
-        <div className="space-y-6">
-          <div>
-            {isDetailPage ? (
-              <Link
-                href="/admin/bookings"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-              >
-                <span>← Back to All Bookings</span>
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedBooking(null);
-                  setLedger(null);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-              >
-                <span>← Back to All Bookings</span>
-              </button>
-            )}
+      {/* =====================================================================
+          MODE 3: DEDICATED BOOKINGS LIST ROUTE (/admin/bookings)
+      ===================================================================== */}
+      {resolvedMode === 'bookings' && (
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                3. Bookings &amp; Ledger
+              </h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Select any booking to manage payments, shoot schedule, deliverables, and invoices.
+              </p>
+            </div>
+            <Link
+              href="/admin/quotes"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <span>Go to Price Quotes →</span>
+            </Link>
           </div>
-          <div className="space-y-6">
-              <>
-                <div className="atelier-card p-6 space-y-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
-                    <div>
+
+          {/* Search & Status Filters */}
+          <div className="atelier-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search booking ref, client, or event..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              {(
+                ['ALL', 'PENDING_CONFIRMATION', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] as const
+              ).map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setStatusFilter(st)}
+                  className={cn(
+                    'rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors',
+                    statusFilter === st
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-600 hover:bg-slate-100',
+                  )}
+                >
+                  {st === 'ALL'
+                    ? `All (${bookings.length})`
+                    : st === 'PENDING_CONFIRMATION'
+                      ? 'Pending Confirm'
+                      : st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="atelier-card p-6">
+            {filteredBookings.length === 0 ? (
+              <p className="text-sm text-slate-500 py-10 text-center">
+                No matching bookings. Accept a quote in Price Quotes to create one.
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {filteredBookings.map((b) => (
+                  <Link
+                    key={b.id}
+                    href={`/admin/bookings/${b.id}`}
+                    className="w-full text-left py-4 px-3 -mx-3 rounded-xl hover:bg-slate-50 transition-colors flex flex-wrap items-center justify-between gap-4 group"
+                  >
+                    <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono-code text-xs font-semibold text-slate-500">
-                          {selectedBooking.reference}
+                          {b.reference}
                         </span>
-                        <StatusBadge status={selectedBooking.status} />
-                        {selectedBooking.eventType && (
+                        <StatusBadge status={b.status} />
+                        {b.eventType && (
                           <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                            {selectedBooking.eventType.name}
+                            {b.eventType.name}
                           </span>
                         )}
                       </div>
-                      <h3 className="text-lg font-bold tracking-tight text-slate-900 mt-1">
-                        {selectedBooking.eventTitle}
-                      </h3>
+                      <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
+                        {b.eventTitle}
+                      </p>
                       <p className="text-xs text-slate-500">
-                        {selectedBooking.clientName} ({selectedBooking.clientPhone}) • Event Date:{' '}
-                        {formatLocalDate(selectedBooking.eventDate)}
-                        {selectedBooking.quote ? ` • Quote ${selectedBooking.quote.reference}` : ''}
+                        {b.clientName} ({b.clientPhone}) • Event Date:{' '}
+                        {formatLocalDate(b.eventDate)}
                       </p>
                     </div>
+                    <div className="flex items-center gap-4 shrink-0">
+                      <div className="text-right">
+                        <p className="text-[11px] font-semibold uppercase text-slate-400">
+                          Agreed Price
+                        </p>
+                        <p className="font-mono-code text-sm font-bold text-slate-900 tabular-nums">
+                          {formatPoisha(b.agreedTotalPoisha, b.currency)}
+                        </p>
+                      </div>
+                      <span className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 group-hover:border-indigo-300 group-hover:text-indigo-600 transition-colors">
+                        Open Workspace →
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-                    <div className="flex flex-wrap gap-2">
+      {/* =====================================================================
+          MODE 4: SINGLE BOOKING WORKSPACE (/admin/bookings/[id])
+          Clean Header + 4-Card Financial Strip + 4 Focused Tabs!
+      ===================================================================== */}
+      {resolvedMode === 'detail' && selectedBooking && (
+        <div className="space-y-5">
+          {/* Top Breadcrumb & Quick Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href="/admin/bookings"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <span>← All Bookings</span>
+            </Link>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setReceiptBookingId(selectedBooking.id)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <ReceiptIcon className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Receipt View</span>
+              </button>
+              <a
+                href={`/api/bookings/${encodeURIComponent(selectedBooking.id)}/invoice.pdf`}
+                download
+                className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+              >
+                <span>PDF Invoice</span>
+              </a>
+
+              {selectedBooking.status === 'PENDING_CONFIRMATION' && (
+                <>
+                  {(selectedBooking.sessions?.length ?? 0) === 0 && (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => setScheduleOnConfirm((v) => !v)}
+                      className={cn(
+                        'rounded-xl border px-3 py-2 text-xs font-semibold transition-colors',
+                        scheduleOnConfirm
+                          ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                      )}
+                    >
+                      {scheduleOnConfirm ? 'Hide Shoot Slot' : '+ Add Shoot on Confirm'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={handleConfirmBooking}
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                  >
+                    {scheduleOnConfirm && (selectedBooking.sessions?.length ?? 0) === 0
+                      ? 'Confirm & Schedule'
+                      : 'Confirm & Auto-Setup'}
+                  </button>
+                </>
+              )}
+              {selectedBooking.status === 'CONFIRMED' && (
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={handleCompleteBooking}
+                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Mark Completed
+                </button>
+              )}
+              {selectedBooking.status !== 'CANCELLED' &&
+                selectedBooking.status !== 'COMPLETED' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelBooking((v) => !v)}
+                    className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                  >
+                    Cancel Booking
+                  </button>
+                )}
+            </div>
+          </div>
+
+          {/* Booking Summary Card */}
+          <div className="atelier-card p-6 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono-code text-xs font-semibold text-slate-500">
+                    {selectedBooking.reference}
+                  </span>
+                  <StatusBadge status={selectedBooking.status} />
+                  {selectedBooking.eventType && (
+                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                      {selectedBooking.eventType.name}
+                    </span>
+                  )}
+                </div>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mt-1">
+                  {selectedBooking.eventTitle}
+                </h1>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Client: <strong className="text-slate-800">{selectedBooking.clientName}</strong> (
+                  {selectedBooking.clientPhone}) • Event Date:{' '}
+                  <strong className="text-slate-800">
+                    {formatLocalDate(selectedBooking.eventDate)}
+                  </strong>
+                  {selectedBooking.quote ? ` • Quote ${selectedBooking.quote.reference}` : ''}
+                </p>
+              </div>
+            </div>
+
+            {showCancelBooking && (
+              <form
+                onSubmit={handleCancelBooking}
+                className="rounded-xl border border-rose-200 bg-rose-50/70 p-3 flex flex-wrap gap-2 items-center"
+              >
+                <input
+                  required
+                  value={bookingCancelReason}
+                  onChange={(e) => setBookingCancelReason(e.target.value)}
+                  placeholder="Cancellation reason (releases all reserved crew & gear)"
+                  className="flex-1 min-w-[220px] rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs"
+                />
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+                >
+                  Confirm Cancel Booking
+                </button>
+              </form>
+            )}
+
+            {selectedBooking.status === 'PENDING_CONFIRMATION' && ledger && (
+              <div
+                className={cn(
+                  'rounded-xl border px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2',
+                  ledger.summary.isAdvanceMet
+                    ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900'
+                    : 'border-amber-200 bg-amber-50/70 text-amber-900',
+                )}
+              >
+                <span>
+                  {ledger.summary.isAdvanceMet
+                    ? 'Required advance deposit verified — click "Confirm & Auto-Setup" above to lock dates and generate deliverables & tasks.'
+                    : `Advance Policy: ${formatPoisha(ledger.summary.requiredAdvancePoisha, ledger.summary.currency)} required • Verified so far: ${formatPoisha(ledger.summary.verifiedReceiptsPoisha, ledger.summary.currency)}`}
+                </span>
+              </div>
+            )}
+
+            {selectedBooking.status === 'PENDING_CONFIRMATION' &&
+              scheduleOnConfirm &&
+              (selectedBooking.sessions?.length ?? 0) === 0 && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-indigo-900">
+                      Initial Shoot &amp; Crew Slot (confirmed atomically)
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(['HOLUD', 'WEDDING', 'WALIMA', 'CORPORATE'] as const).map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => applyCeremonyPreset(p)}
+                          className="rounded-lg border border-indigo-200 bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                        >
+                          + {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-2.5">
+                    <input
+                      value={schedTitle}
+                      onChange={(e) => setSchedTitle(e.target.value)}
+                      placeholder="Session title"
+                      className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs"
+                    />
+                    <input
+                      value={schedLocation}
+                      onChange={(e) => setSchedLocation(e.target.value)}
+                      placeholder="Venue / Location (optional)"
+                      className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs"
+                    />
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase text-indigo-700 mb-1">
+                        Start ({timezone})
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={schedStart}
+                        onChange={(e) => setSchedStart(e.target.value)}
+                        className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-mono-code"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase text-indigo-700 mb-1">
+                        End ({timezone})
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={schedEnd}
+                        onChange={(e) => setSchedEnd(e.target.value)}
+                        className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-mono-code"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {resources.map((r) => (
                       <button
+                        key={r.id}
                         type="button"
-                        onClick={() => setReceiptBookingId(selectedBooking.id)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        onClick={() => toggleSchedResource(r.id)}
+                        className={cn(
+                          'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                          schedResourceIds.includes(r.id)
+                            ? 'border-indigo-600 bg-indigo-600 text-white'
+                            : 'border-indigo-200 bg-white text-slate-700 hover:bg-indigo-100/50',
+                        )}
                       >
-                        <ReceiptIcon className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Receipt View</span>
+                        {r.name} ({r.type})
                       </button>
-                      <a
-                        href={`/api/bookings/${encodeURIComponent(selectedBooking.id)}/invoice.pdf`}
-                        download
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
-                      >
-                        <span>PDF Invoice</span>
-                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                      {selectedBooking.status === 'PENDING_CONFIRMATION' && (
-                        <>
-                          {(selectedBooking.sessions?.length ?? 0) === 0 && (
+            {/* 4-Card Financial KPI Strip */}
+            {ledger && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-200">
+                  <p className="text-xs font-semibold text-slate-500">Total Price</p>
+                  <p className="font-mono-code text-base font-bold text-slate-900 mt-1 tabular-nums">
+                    {formatPoisha(ledger.summary.effectiveAgreedChargePoisha, ledger.summary.currency)}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-emerald-50/70 p-3.5 border border-emerald-200">
+                  <p className="text-xs font-semibold text-emerald-700">Paid (Verified)</p>
+                  <p className="font-mono-code text-base font-bold text-emerald-900 mt-1 tabular-nums">
+                    {formatPoisha(ledger.summary.verifiedReceiptsPoisha, ledger.summary.currency)}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-amber-50/70 p-3.5 border border-amber-200">
+                  <p className="text-xs font-semibold text-amber-700">Pending Approval</p>
+                  <p className="font-mono-code text-base font-bold text-amber-900 mt-1 tabular-nums">
+                    {formatPoisha(ledger.summary.pendingReceiptsPoisha, ledger.summary.currency)}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-200">
+                  <p className="text-xs font-semibold text-slate-500">Remaining Due</p>
+                  <p className="font-mono-code text-base font-bold text-slate-900 mt-1 tabular-nums">
+                    {formatPoisha(ledger.summary.outstandingDuePoisha, ledger.summary.currency)}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 4 Focused Section Tabs (Eliminates vertical scroll clutter!) */}
+          <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-white p-1 gap-1 shadow-2xs">
+            {[
+              {
+                id: 'payments' as const,
+                label: `1. Payments & Ledger (${ledger?.entries.length ?? 0})`,
+              },
+              {
+                id: 'schedule' as const,
+                label: `2. Shoot Schedule (${selectedBooking.sessions?.length ?? 0})`,
+              },
+              {
+                id: 'deliverables' as const,
+                label: `3. Deliverables (${selectedBooking.deliverables?.length ?? 0})`,
+              },
+              {
+                id: 'tasks' as const,
+                label: `4. Crew Tasks (${selectedBooking.assignments?.length ?? 0})`,
+              },
+            ].map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setDetailSection(t.id)}
+                className={cn(
+                  'rounded-lg px-4 py-2 text-xs font-semibold transition-all',
+                  detailSection === t.id
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* SECTION 1: PAYMENTS & LEDGER */}
+          {detailSection === 'payments' && (
+            <div className="atelier-card p-6 space-y-5">
+              <div className="border-b border-slate-100 pb-3">
+                <h2 className="text-base font-bold text-slate-900">Record &amp; Verify Payments</h2>
+                <p className="text-xs text-slate-500">
+                  Log bKash, Nagad, Bank, or Cash payments. Verifying updates the booking balance.
+                </p>
+              </div>
+
+              <form onSubmit={handleRecordPayment} className="grid sm:grid-cols-4 gap-2.5">
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={payAmountTk}
+                  onChange={(e) => setPayAmountTk(e.target.value)}
+                  placeholder={`Amount (${currency})`}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono-code"
+                />
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium"
+                >
+                  <option value="BKASH">bKash</option>
+                  <option value="NAGAD">Nagad</option>
+                  <option value="BANK">Bank Transfer</option>
+                  <option value="CASH">Cash</option>
+                </select>
+                <input
+                  value={payRef}
+                  onChange={(e) => setPayRef(e.target.value)}
+                  placeholder="TrxID / Receipt Ref (optional)"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                />
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  + Record Payment
+                </button>
+              </form>
+
+              {!ledger || ledger.entries.length === 0 ? (
+                <p className="text-xs text-slate-500 py-6 text-center">
+                  No payments recorded yet for this booking.
+                </p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {ledger.entries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="py-3 flex flex-wrap items-center justify-between gap-3 text-xs"
+                    >
+                      <div>
+                        <span className="font-semibold text-slate-900">{entry.type}</span> •{' '}
+                        <span className="font-mono-code">{entry.method}</span>{' '}
+                        {entry.transactionRef && (
+                          <span className="font-mono-code text-slate-500">
+                            ({entry.transactionRef})
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-mono-code font-bold text-slate-900 tabular-nums">
+                          {formatPoisha(entry.amountPoisha, entry.currency)}
+                        </span>
+                        <StatusBadge status={entry.verificationState} />
+                        {entry.verificationState === 'PENDING' && (
+                          <>
                             <button
                               type="button"
                               disabled={isPending}
-                              onClick={() => setScheduleOnConfirm((v) => !v)}
-                              className={cn(
-                                'rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors',
-                                scheduleOnConfirm
-                                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                              )}
+                              onClick={() => handleVerifyPayment(entry.id, false)}
+                              className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
                             >
-                              {scheduleOnConfirm ? 'Hide Shoot Slot' : '+ Add Shoot on Confirm'}
+                              Verify
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={handleConfirmBooking}
-                            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-                          >
-                            {scheduleOnConfirm && (selectedBooking.sessions?.length ?? 0) === 0
-                              ? 'Confirm & Schedule'
-                              : 'Confirm & Auto-Setup'}
-                          </button>
-                        </>
-                      )}
-                      {selectedBooking.status === 'CONFIRMED' && (
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={handleCompleteBooking}
-                          className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          Mark Completed
-                        </button>
-                      )}
-                      {selectedBooking.status !== 'CANCELLED' &&
-                        selectedBooking.status !== 'COMPLETED' && (
-                          <button
-                            type="button"
-                            onClick={() => setShowCancelBooking((v) => !v)}
-                            className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
-                          >
-                            Cancel
-                          </button>
+                            {selectedBooking.status === 'PENDING_CONFIRMATION' && (
+                              <button
+                                type="button"
+                                disabled={isPending}
+                                onClick={() => handleVerifyPayment(entry.id, true)}
+                                className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+                              >
+                                Verify &amp; Confirm
+                              </button>
+                            )}
+                          </>
                         )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SECTION 2: SHOOT SCHEDULE & CREW */}
+          {detailSection === 'schedule' && (
+            <div className="atelier-card p-6 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-indigo-600" />
+                    <span>Shoot &amp; Event Schedule ({selectedBooking.sessions?.length ?? 0})</span>
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Reserve shoot slots and crew for {selectedBooking.reference} •{' '}
+                    <Link href="/admin/calendar" className="text-indigo-600 hover:underline">
+                      Open Master Calendar ↗
+                    </Link>
+                  </p>
+                </div>
+                {selectedBooking.status !== 'CANCELLED' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleForm((v) => !v)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                  >
+                    <PlusIcon className="w-3.5 h-3.5" />
+                    <span>{showScheduleForm ? 'Close Form' : 'Schedule Session'}</span>
+                  </button>
+                )}
+              </div>
+
+              {showScheduleForm && selectedBooking.status !== 'CANCELLED' && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-600">
+                      Quick Ceremony Presets:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(['HOLUD', 'WEDDING', 'WALIMA', 'CORPORATE'] as const).map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => applyCeremonyPreset(p)}
+                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                        >
+                          + {p}
+                        </button>
+                      ))}
                     </div>
                   </div>
+                  <form onSubmit={handleCreateSession} className="space-y-3">
+                    <div className="grid sm:grid-cols-2 gap-2.5">
+                      <input
+                        required
+                        value={schedTitle}
+                        onChange={(e) => setSchedTitle(e.target.value)}
+                        placeholder="Session title (e.g. Holud, Reception)"
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                      />
+                      <input
+                        value={schedLocation}
+                        onChange={(e) => setSchedLocation(e.target.value)}
+                        placeholder="Venue / Location (optional)"
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                      />
+                      <div>
+                        <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
+                          Start ({timezone})
+                        </label>
+                        <input
+                          required
+                          type="datetime-local"
+                          value={schedStart}
+                          onChange={(e) => setSchedStart(e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-mono-code"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
+                          End ({timezone})
+                        </label>
+                        <input
+                          required
+                          type="datetime-local"
+                          value={schedEnd}
+                          onChange={(e) => setSchedEnd(e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-mono-code"
+                        />
+                      </div>
+                    </div>
 
-                  {showCancelBooking && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-600">
+                          Reserve Crew / Gear
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowQuickResource((v) => !v)}
+                          className="text-xs font-semibold text-indigo-600 hover:underline"
+                        >
+                          {showQuickResource ? 'Cancel Quick Add' : '+ Quick Add Crew/Gear'}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {resources.map((r) => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => toggleSchedResource(r.id)}
+                            className={cn(
+                              'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                              schedResourceIds.includes(r.id)
+                                ? 'border-slate-900 bg-slate-900 text-white'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
+                            )}
+                          >
+                            {r.name} ({r.type})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isPending}
+                      className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                    >
+                      Save Shoot Session &amp; Reserve Crew
+                    </button>
+                  </form>
+
+                  {showQuickResource && (
                     <form
-                      onSubmit={handleCancelBooking}
-                      className="rounded-xl border border-rose-200 bg-rose-50/70 p-3 flex flex-wrap gap-2 items-center"
+                      onSubmit={handleQuickAddResource}
+                      className="pt-3 border-t border-slate-200 flex flex-wrap gap-2 items-center"
                     >
                       <input
                         required
-                        value={bookingCancelReason}
-                        onChange={(e) => setBookingCancelReason(e.target.value)}
-                        placeholder="Cancellation reason (releases all reserved crew & gear)"
-                        className="flex-1 min-w-[220px] rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs"
+                        value={newResName}
+                        onChange={(e) => setNewResName(e.target.value)}
+                        placeholder="Crew or kit name"
+                        className="flex-1 min-w-[160px] rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs"
                       />
+                      <select
+                        value={newResType}
+                        onChange={(e) => setNewResType(e.target.value as ResourceType)}
+                        className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
+                      >
+                        <option value="CREW">Crew</option>
+                        <option value="EQUIPMENT">Equipment</option>
+                        <option value="ROOM">Studio / Room</option>
+                      </select>
                       <button
                         type="submit"
                         disabled={isPending}
-                        className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-rose-700"
+                        className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white"
                       >
-                        Confirm Cancel Booking
+                        Add Resource
                       </button>
                     </form>
                   )}
+                </div>
+              )}
 
-                  {selectedBooking.status === 'PENDING_CONFIRMATION' && ledger && (
-                    <div
-                      className={cn(
-                        'rounded-xl border px-4 py-2.5 text-sm flex flex-wrap items-center justify-between gap-2',
-                        ledger.summary.isAdvanceMet
-                          ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900'
-                          : 'border-amber-200 bg-amber-50/70 text-amber-900',
-                      )}
-                    >
-                      <span>
-                        {ledger.summary.isAdvanceMet
-                          ? 'Required advance deposit verified — click "Confirm & Auto-Setup" to lock dates and generate deliverables & tasks.'
-                          : `Required Advance: ${formatPoisha(ledger.summary.requiredAdvancePoisha, ledger.summary.currency)} • Verified so far: ${formatPoisha(ledger.summary.verifiedReceiptsPoisha, ledger.summary.currency)}`}
-                      </span>
-                    </div>
-                  )}
-
-                  {selectedBooking.status === 'PENDING_CONFIRMATION' &&
-                    scheduleOnConfirm &&
-                    (selectedBooking.sessions?.length ?? 0) === 0 && (
-                      <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-xs font-semibold text-indigo-900">
-                            Initial Shoot &amp; Crew Slot (confirmed together atomically)
+              {!selectedBooking.sessions || selectedBooking.sessions.length === 0 ? (
+                <p className="text-xs text-slate-500 py-6 text-center">
+                  No shoot sessions scheduled yet for this booking. Click &ldquo;Schedule
+                  Session&rdquo; above.
+                </p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {selectedBooking.sessions.map((s) => (
+                    <div key={s.id} className="py-3.5 space-y-2.5">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-slate-900">{s.title}</span>
+                            <StatusBadge status={s.status} />
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5 font-mono-code">
+                            {s.agencyLocalDate || formatLocalDate(s.startAt)} •{' '}
+                            {formatDateTimeInTz(s.startAt, timezone)} →{' '}
+                            {formatDateTimeInTz(s.endAt, timezone)}
+                            {s.location ? ` • ${s.location}` : ''}
                           </p>
+                          {s.reservations && s.reservations.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {s.reservations.map((r) => (
+                                <span
+                                  key={r.id}
+                                  className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700"
+                                >
+                                  {r.resource?.name || r.resourceId}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {s.status === 'SCHEDULED' && (
                           <div className="flex flex-wrap gap-1.5">
-                            {(['HOLUD', 'WEDDING', 'WALIMA', 'CORPORATE'] as const).map((p) => (
+                            <button
+                              type="button"
+                              disabled={isPending}
+                              onClick={() => openReschedule(s)}
+                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              Reschedule
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isPending}
+                              onClick={() => handleCompleteSession(s.id)}
+                              className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                            >
+                              Mark Done
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isPending}
+                              onClick={() => {
+                                setCancellingSessionId(s.id);
+                                setReschedSessionId(null);
+                              }}
+                              className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {reschedSessionId === s.id && (
+                        <form
+                          onSubmit={(e) => handleRescheduleSession(e, s.id)}
+                          className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2"
+                        >
+                          <div className="grid sm:grid-cols-2 gap-2">
+                            <input
+                              required
+                              type="datetime-local"
+                              value={reschedStart}
+                              onChange={(e) => setReschedStart(e.target.value)}
+                              className="rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-mono-code"
+                            />
+                            <input
+                              required
+                              type="datetime-local"
+                              value={reschedEnd}
+                              onChange={(e) => setReschedEnd(e.target.value)}
+                              className="rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-mono-code"
+                            />
+                          </div>
+                          <input
+                            required
+                            value={reschedReason}
+                            onChange={(e) => setReschedReason(e.target.value)}
+                            placeholder="Reason for reschedule (required for audit log)"
+                            className="w-full rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs"
+                          />
+                          <div className="flex flex-wrap gap-1.5">
+                            {resources.map((r) => (
                               <button
-                                key={p}
+                                key={r.id}
                                 type="button"
-                                onClick={() => applyCeremonyPreset(p)}
-                                className="rounded-lg border border-indigo-200 bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                                onClick={() => toggleReschedResource(r.id)}
+                                className={cn(
+                                  'rounded-full border px-2 py-0.5 text-xs font-medium',
+                                  reschedResourceIds.includes(r.id)
+                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                    : 'border-amber-200 bg-white text-slate-700',
+                                )}
                               >
-                                + {p}
+                                {r.name}
                               </button>
                             ))}
                           </div>
-                        </div>
-                        <div className="grid sm:grid-cols-2 gap-2.5">
-                          <input
-                            value={schedTitle}
-                            onChange={(e) => setSchedTitle(e.target.value)}
-                            placeholder="Session title"
-                            className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm"
-                          />
-                          <input
-                            value={schedLocation}
-                            onChange={(e) => setSchedLocation(e.target.value)}
-                            placeholder="Venue / Location (optional)"
-                            className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm"
-                          />
-                          <div>
-                            <label className="block text-xs font-semibold uppercase text-indigo-700 mb-1">
-                              Start ({timezone})
-                            </label>
-                            <input
-                              type="datetime-local"
-                              value={schedStart}
-                              onChange={(e) => setSchedStart(e.target.value)}
-                              className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-mono-code"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold uppercase text-indigo-700 mb-1">
-                              End ({timezone})
-                            </label>
-                            <input
-                              type="datetime-local"
-                              value={schedEnd}
-                              onChange={(e) => setSchedEnd(e.target.value)}
-                              className="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-mono-code"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {resources.map((r) => (
+                          <div className="flex gap-2">
                             <button
-                              key={r.id}
-                              type="button"
-                              onClick={() => toggleSchedResource(r.id)}
-                              className={cn(
-                                'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
-                                schedResourceIds.includes(r.id)
-                                  ? 'border-indigo-600 bg-indigo-600 text-white'
-                                  : 'border-indigo-200 bg-white text-slate-700 hover:bg-indigo-100/50',
-                              )}
+                              type="submit"
+                              disabled={isPending}
+                              className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white"
                             >
-                              {r.name} ({r.type})
+                              Save New Slot
                             </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                  {ledger && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="rounded-xl bg-slate-50 p-3 border border-slate-200">
-                        <p className="text-xs font-semibold text-slate-500">Total Price</p>
-                        <p className="font-mono-code text-sm font-semibold text-slate-900 mt-1 tabular-nums">
-                          {formatPoisha(ledger.summary.effectiveAgreedChargePoisha, ledger.summary.currency)}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-emerald-50/70 p-3 border border-emerald-200">
-                        <p className="text-xs font-semibold text-emerald-700">Paid (Verified)</p>
-                        <p className="font-mono-code text-sm font-semibold text-emerald-900 mt-1 tabular-nums">
-                          {formatPoisha(ledger.summary.verifiedReceiptsPoisha, ledger.summary.currency)}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-amber-50/70 p-3 border border-amber-200">
-                        <p className="text-xs font-semibold text-amber-700">Pending Approval</p>
-                        <p className="font-mono-code text-sm font-semibold text-amber-900 mt-1 tabular-nums">
-                          {formatPoisha(ledger.summary.pendingReceiptsPoisha, ledger.summary.currency)}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 p-3 border border-slate-200">
-                        <p className="text-xs font-semibold text-slate-500">Remaining Due</p>
-                        <p className="font-mono-code text-sm font-semibold text-slate-900 mt-1 tabular-nums">
-                          {formatPoisha(ledger.summary.outstandingDuePoisha, ledger.summary.currency)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Record Payment */}
-                  <div className="space-y-2 pt-1">
-                    <p className="text-sm font-semibold text-slate-600">Add a Payment</p>
-                    <form onSubmit={handleRecordPayment} className="grid sm:grid-cols-4 gap-2.5">
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={payAmountTk}
-                        onChange={(e) => setPayAmountTk(e.target.value)}
-                        placeholder={`Amount (${currency})`}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono-code"
-                      />
-                      <select
-                        value={payMethod}
-                        onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                      >
-                        <option value="BKASH">bKash</option>
-                        <option value="NAGAD">Nagad</option>
-                        <option value="BANK">Bank</option>
-                        <option value="CASH">Cash</option>
-                      </select>
-                      <input
-                        value={payRef}
-                        onChange={(e) => setPayRef(e.target.value)}
-                        placeholder="Receipt / Tx Ref (optional)"
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                      />
-                      <button
-                        type="submit"
-                        disabled={isPending}
-                        className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                      >
-                        Save Payment
-                      </button>
-                    </form>
-                  </div>
-
-                  {/* Payment History */}
-                  {ledger && ledger.entries.length > 0 && (
-                    <div className="divide-y divide-slate-100 pt-2">
-                      {ledger.entries.map((entry) => (
-                        <div key={entry.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                          <div>
-                            <span className="font-semibold text-slate-900">{entry.type}</span> •{' '}
-                            {entry.method}{' '}
-                            {entry.transactionRef && (
-                              <span className="font-mono-code text-slate-500">
-                                ({entry.transactionRef})
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2.5">
-                            <span className="font-mono-code font-semibold tabular-nums">
-                              {formatPoisha(entry.amountPoisha, entry.currency)}
-                            </span>
-                            <StatusBadge status={entry.verificationState} />
-                            {entry.verificationState === 'PENDING' && (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => handleVerifyPayment(entry.id, false)}
-                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-sm font-semibold text-white hover:bg-emerald-700"
-                                >
-                                  Verify
-                                </button>
-                                {selectedBooking.status === 'PENDING_CONFIRMATION' && (
-                                  <button
-                                    type="button"
-                                    disabled={isPending}
-                                    onClick={() => handleVerifyPayment(entry.id, true)}
-                                    className="rounded-lg bg-indigo-600 px-2.5 py-1 text-sm font-semibold text-white hover:bg-indigo-700"
-                                  >
-                                    Verify &amp; Confirm
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Shoot & Event Schedule (managed directly inside Booking Management) */}
-                <div className="atelier-card p-6 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h4 className="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
-                        <CalendarIcon className="w-4 h-4 text-indigo-600" />
-                        <span>Shoot &amp; Event Schedule ({selectedBooking.sessions?.length ?? 0})</span>
-                      </h4>
-                      <p className="text-xs text-slate-500">
-                        Manage shoot slots &amp; crew directly for {selectedBooking.reference} •{' '}
-                        <Link href="/admin/calendar" className="underline underline-offset-2 hover:text-slate-800">
-                          View Master Calendar ↗
-                        </Link>
-                      </p>
-                    </div>
-                    {selectedBooking.status !== 'CANCELLED' && (
-                      <button
-                        type="button"
-                        onClick={() => setShowScheduleForm((v) => !v)}
-                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        <PlusIcon className="w-3.5 h-3.5" />
-                        <span>{showScheduleForm ? 'Close' : 'Schedule Session'}</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {showScheduleForm && selectedBooking.status !== 'CANCELLED' && (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-slate-600">
-                          Quick BD Ceremony Presets:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(['HOLUD', 'WEDDING', 'WALIMA', 'CORPORATE'] as const).map((p) => (
-                            <button
-                              key={p}
-                              type="button"
-                              onClick={() => applyCeremonyPreset(p)}
-                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
-                            >
-                              + {p}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <form onSubmit={handleCreateSession} className="space-y-3">
-                        <div className="grid sm:grid-cols-2 gap-2.5">
-                          <input
-                            required
-                            value={schedTitle}
-                            onChange={(e) => setSchedTitle(e.target.value)}
-                            placeholder="Session title (e.g. Holud, Reception)"
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                          />
-                          <input
-                            value={schedLocation}
-                            onChange={(e) => setSchedLocation(e.target.value)}
-                            placeholder="Venue / Location (optional)"
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                          />
-                          <div>
-                            <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">
-                              Start ({timezone})
-                            </label>
-                            <input
-                              required
-                              type="datetime-local"
-                              value={schedStart}
-                              onChange={(e) => setSchedStart(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-mono-code"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">
-                              End ({timezone})
-                            </label>
-                            <input
-                              required
-                              type="datetime-local"
-                              value={schedEnd}
-                              onChange={(e) => setSchedEnd(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-mono-code"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-slate-600">
-                              Reserve Crew / Gear
-                            </span>
                             <button
                               type="button"
-                              onClick={() => setShowQuickResource((v) => !v)}
-                              className="text-sm font-semibold text-indigo-600 hover:underline"
+                              onClick={() => setReschedSessionId(null)}
+                              className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
                             >
-                              {showQuickResource ? 'Cancel Quick Add' : '+ Quick Add Crew/Gear'}
+                              Dismiss
                             </button>
                           </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {resources.length === 0 ? (
-                              <span className="text-xs text-slate-500">
-                                No crew or equipment added yet.
-                              </span>
-                            ) : (
-                              resources.map((r) => (
-                                <button
-                                  key={r.id}
-                                  type="button"
-                                  onClick={() => toggleSchedResource(r.id)}
-                                  className={cn(
-                                    'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
-                                    schedResourceIds.includes(r.id)
-                                      ? 'border-slate-900 bg-slate-900 text-white'
-                                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
-                                  )}
-                                >
-                                  {r.name} ({r.type})
-                                </button>
-                              ))
-                            )}
-                          </div>
-                        </div>
+                        </form>
+                      )}
 
-                        <button
-                          type="submit"
-                          disabled={isPending}
-                          className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-                        >
-                          Save Shoot Session &amp; Reserve Crew
-                        </button>
-                      </form>
-
-                      {showQuickResource && (
+                      {cancellingSessionId === s.id && (
                         <form
-                          onSubmit={handleQuickAddResource}
-                          className="pt-3 border-t border-slate-200 flex flex-wrap gap-2 items-center"
+                          onSubmit={(e) => handleCancelSession(e, s.id)}
+                          className="rounded-xl border border-rose-200 bg-rose-50/50 p-3 flex flex-wrap gap-2 items-center"
                         >
                           <input
                             required
-                            value={newResName}
-                            onChange={(e) => setNewResName(e.target.value)}
-                            placeholder="Crew or kit name"
-                            className="flex-1 min-w-[160px] rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs"
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            placeholder="Reason for cancelling shoot session"
+                            className="flex-1 min-w-[200px] rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs"
                           />
-                          <select
-                            value={newResType}
-                            onChange={(e) => setNewResType(e.target.value as ResourceType)}
-                            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
-                          >
-                            <option value="CREW">Crew</option>
-                            <option value="EQUIPMENT">Equipment</option>
-                            <option value="ROOM">Studio / Room</option>
-                          </select>
                           <button
                             type="submit"
                             disabled={isPending}
-                            className="rounded-xl bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white"
+                            className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white"
                           >
-                            Add Resource
+                            Confirm Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCancellingSessionId(null)}
+                            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600"
+                          >
+                            Keep Slot
                           </button>
                         </form>
                       )}
                     </div>
-                  )}
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-                  {!selectedBooking.sessions || selectedBooking.sessions.length === 0 ? (
-                    <p className="text-xs text-slate-500">
-                      No shoot sessions scheduled yet for this booking. Click &ldquo;Schedule Session&rdquo;
-                      above (prefilled with this booking&apos;s date &amp; title).
-                    </p>
-                  ) : (
-                    <div className="divide-y divide-slate-100">
-                      {selectedBooking.sessions.map((s) => (
-                        <div key={s.id} className="py-3 space-y-2.5">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-sm text-slate-900">{s.title}</span>
-                                <StatusBadge status={s.status} />
-                              </div>
-                              <p className="text-sm text-slate-500 mt-0.5 font-mono-code">
-                                {s.agencyLocalDate || formatLocalDate(s.startAt)} •{' '}
-                                {formatDateTimeInTz(s.startAt, timezone)} →{' '}
-                                {formatDateTimeInTz(s.endAt, timezone)}
-                                {s.location ? ` • ${s.location}` : ''}
-                              </p>
-                              {s.reservations && s.reservations.length > 0 && (
-                                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                  {s.reservations.map((r) => (
-                                    <span
-                                      key={r.id}
-                                      className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700"
-                                    >
-                                      {r.resource?.name || r.resourceId}
-                                      {r.resource?.type ? ` (${r.resource.type})` : ''}
-                                    </span>
-                                  ))}
-                                </div>
+          {/* SECTION 3: DELIVERABLES & FILES */}
+          {detailSection === 'deliverables' && (
+            <div className="atelier-card p-6 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Deliverables &amp; Client Files ({selectedBooking.deliverables?.length ?? 0})
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Track galleries, films, and albums independently without affecting booking dues.
+                  </p>
+                </div>
+                <form onSubmit={handleAddDeliverable} className="flex flex-wrap gap-2">
+                  <input
+                    required
+                    value={delivLabel}
+                    onChange={(e) => setDelivLabel(e.target.value)}
+                    placeholder="e.g. Photo Gallery, Album"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs"
+                  />
+                  <input
+                    type="date"
+                    value={delivDueDate}
+                    onChange={(e) => setDelivDueDate(e.target.value)}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-mono-code"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                  >
+                    + Add Deliverable
+                  </button>
+                </form>
+              </div>
+
+              {!selectedBooking.deliverables || selectedBooking.deliverables.length === 0 ? (
+                <p className="text-xs text-slate-500 py-6 text-center">
+                  No deliverables added yet. Confirming a booking with Deliverable Rules or adding
+                  above creates them here.
+                </p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {selectedBooking.deliverables.map((d) => {
+                    const isOverdue =
+                      d.reviewStatus !== 'DELIVERED' &&
+                      Boolean(d.dueAt && new Date(d.dueAt).getTime() < renderNowMs);
+                    return (
+                      <div key={d.id} className="py-3.5 space-y-2 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-sm text-slate-900">{d.label}</p>
+                              {isOverdue && (
+                                <span className="rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-xs font-semibold text-rose-700">
+                                  Overdue
+                                </span>
                               )}
                             </div>
-
-                            {s.status === 'SCHEDULED' && (
-                              <div className="flex flex-wrap gap-1.5">
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => openReschedule(s)}
-                                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                                >
-                                  Reschedule
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => handleCompleteSession(s.id)}
-                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-sm font-semibold text-white hover:bg-emerald-700"
-                                >
-                                  Done
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => {
-                                    setCancellingSessionId(s.id);
-                                    setReschedSessionId(null);
-                                  }}
-                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {reschedSessionId === s.id && (
-                            <form
-                              onSubmit={(e) => handleRescheduleSession(e, s.id)}
-                              className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2"
-                            >
-                              <div className="grid sm:grid-cols-2 gap-2">
-                                <input
-                                  required
-                                  type="datetime-local"
-                                  value={reschedStart}
-                                  onChange={(e) => setReschedStart(e.target.value)}
-                                  className="rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-mono-code"
-                                />
-                                <input
-                                  required
-                                  type="datetime-local"
-                                  value={reschedEnd}
-                                  onChange={(e) => setReschedEnd(e.target.value)}
-                                  className="rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-mono-code"
-                                />
-                              </div>
-                              <input
-                                required
-                                value={reschedReason}
-                                onChange={(e) => setReschedReason(e.target.value)}
-                                placeholder="Reason for reschedule (required for audit log)"
-                                className="w-full rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs"
-                              />
-                              <div className="flex flex-wrap gap-1.5">
-                                {resources.map((r) => (
-                                  <button
-                                    key={r.id}
-                                    type="button"
-                                    onClick={() => toggleReschedResource(r.id)}
-                                    className={cn(
-                                      'rounded-full border px-2 py-0.5 text-xs font-medium',
-                                      reschedResourceIds.includes(r.id)
-                                        ? 'border-slate-900 bg-slate-900 text-white'
-                                        : 'border-amber-200 bg-white text-slate-700',
-                                    )}
+                            <p className="text-slate-500 mt-0.5">
+                              {d.dueAt ? `Due ${formatLocalDate(d.dueAt)}` : 'No deadline set'}
+                              {d.deliveredAt ? ` • Delivered ${formatLocalDate(d.deliveredAt)}` : ''}
+                              {d.deliveryUrl && (
+                                <>
+                                  {' • '}
+                                  <a
+                                    href={d.deliveryUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-indigo-600 underline"
                                   >
-                                    {r.name}
-                                  </button>
-                                ))}
-                              </div>
-                              <div className="flex gap-2">
-                                <button
-                                  type="submit"
-                                  disabled={isPending}
-                                  className="rounded-lg bg-slate-900 px-3 py-1 text-sm font-semibold text-white"
-                                >
-                                  Save New Slot
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setReschedSessionId(null)}
-                                  className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-600"
-                                >
-                                  Dismiss
-                                </button>
-                              </div>
-                            </form>
-                          )}
-
-                          {cancellingSessionId === s.id && (
-                            <form
-                              onSubmit={(e) => handleCancelSession(e, s.id)}
-                              className="rounded-xl border border-rose-200 bg-rose-50/50 p-3 flex flex-wrap gap-2 items-center"
-                            >
-                              <input
-                                required
-                                value={cancelReason}
-                                onChange={(e) => setCancelReason(e.target.value)}
-                                placeholder="Reason for cancelling shoot session"
-                                className="flex-1 min-w-[200px] rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs"
-                              />
-                              <button
-                                type="submit"
-                                disabled={isPending}
-                                className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white"
-                              >
-                                Confirm Cancel
-                              </button>
+                                    Open Link ↗
+                                  </a>
+                                </>
+                              )}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status={d.reviewStatus} />
+                            {d.reviewStatus !== 'DELIVERED' && (
                               <button
                                 type="button"
-                                onClick={() => setCancellingSessionId(null)}
-                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600"
+                                disabled={isPending}
+                                onClick={() => {
+                                  setDeliveringId(deliveringId === d.id ? null : d.id);
+                                  setDeliveryUrlInput(d.deliveryUrl || '');
+                                }}
+                                className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800"
                               >
-                                Keep Slot
+                                {deliveringId === d.id ? 'Close' : 'Deliver'}
                               </button>
-                            </form>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
 
-            {/* Crew & Workflow Assignments */}
+                        {deliveringId === d.id && (
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 flex flex-wrap gap-2">
+                            <input
+                              value={deliveryUrlInput}
+                              onChange={(e) => setDeliveryUrlInput(e.target.value)}
+                              placeholder="Optional cloud gallery / Google Drive URL"
+                              className="flex-1 min-w-[200px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
+                            />
+                            <button
+                              type="button"
+                              disabled={isPending}
+                              onClick={() => handleDeliverItem(d, deliveryUrlInput)}
+                              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                            >
+                              Confirm Delivered
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SECTION 4: CREW TASKS */}
+          {detailSection === 'tasks' && (
             <div className="atelier-card p-6 space-y-4">
               <div className="border-b border-slate-100 pb-3">
-                <h4 className="text-lg font-bold tracking-tight text-slate-900">
+                <h2 className="text-base font-bold text-slate-900">
                   Crew &amp; Workflow Tasks ({selectedBooking.assignments?.length ?? 0})
-                </h4>
+                </h2>
                 <p className="text-xs text-slate-500">
                   Auto-created from templates on confirmation or manually assigned to studio staff.
                 </p>
@@ -2147,7 +2556,7 @@ export function BookingsWorkspace({
                     required
                     value={assignRoleLabel}
                     onChange={(e) => setAssignRoleLabel(e.target.value)}
-                    placeholder="Role / task (e.g. Holud Lead)"
+                    placeholder="Role / task (e.g. Holud Lead, Color Grade)"
                     className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:col-span-4"
                   />
                   <select
@@ -2165,23 +2574,23 @@ export function BookingsWorkspace({
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="rounded-xl bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800 sm:col-span-2"
+                    className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 sm:col-span-2"
                   >
-                    Assign
+                    + Assign
                   </button>
                 </form>
               )}
 
               {!selectedBooking.assignments || selectedBooking.assignments.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  No tasks assigned yet. Confirming a booking with Task Templates or adding above creates them here.
+                <p className="text-xs text-slate-500 py-6 text-center">
+                  No tasks assigned yet.
                 </p>
               ) : (
                 <div className="divide-y divide-slate-100">
                   {selectedBooking.assignments.map((a) => (
                     <div
                       key={a.id}
-                      className="py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs"
+                      className="py-3 flex flex-wrap items-center justify-between gap-2 text-xs"
                     >
                       <div>
                         <p className="font-semibold text-slate-900">{a.roleLabel}</p>
@@ -2200,7 +2609,7 @@ export function BookingsWorkspace({
                             onClick={() => handleUpdateAssignmentStatus(a, 'COMPLETED')}
                             className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
                           >
-                            Done
+                            Mark Done
                           </button>
                         )}
                       </div>
@@ -2209,120 +2618,7 @@ export function BookingsWorkspace({
                 </div>
               )}
             </div>
-
-            <div className="atelier-card p-6 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-lg font-bold tracking-tight text-slate-900">
-                  Files &amp; Items to Deliver ({selectedBooking.deliverables?.length ?? 0})
-                </h4>
-                    <form onSubmit={handleAddDeliverable} className="flex flex-wrap gap-2">
-                      <input
-                        value={delivLabel}
-                        onChange={(e) => setDelivLabel(e.target.value)}
-                        placeholder="e.g. Photo Gallery, Album"
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs"
-                      />
-                      <input
-                        type="date"
-                        value={delivDueDate}
-                        onChange={(e) => setDelivDueDate(e.target.value)}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-mono-code"
-                      />
-                      <button
-                        type="submit"
-                        disabled={isPending}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        + Add
-                      </button>
-                    </form>
-                  </div>
-
-                  {!selectedBooking.deliverables || selectedBooking.deliverables.length === 0 ? (
-                    <p className="text-xs text-slate-500">
-                      No deliverables added yet. Confirming a booking with Deliverable Templates or
-                      adding above creates them here.
-                    </p>
-                  ) : (
-                    <div className="divide-y divide-slate-100">
-                      {selectedBooking.deliverables.map((d) => {
-                        const isOverdue =
-                          d.reviewStatus !== 'DELIVERED' &&
-                          Boolean(d.dueAt && new Date(d.dueAt).getTime() < renderNowMs);
-                        return (
-                          <div key={d.id} className="py-3 space-y-2 text-xs">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <p className="font-semibold text-sm text-slate-900">{d.label}</p>
-                                  {isOverdue && (
-                                    <span className="rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-xs font-semibold text-rose-700">
-                                      Overdue
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-slate-500 mt-0.5">
-                                  {d.dueAt ? `Due ${formatLocalDate(d.dueAt)}` : 'No deadline set'}
-                                  {d.deliveredAt ? ` • Delivered ${formatLocalDate(d.deliveredAt)}` : ''}
-                                  {d.deliveryUrl && (
-                                    <>
-                                      {' • '}
-                                      <a
-                                        href={d.deliveryUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-indigo-600 underline"
-                                      >
-                                        Open Link
-                                      </a>
-                                    </>
-                                  )}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <StatusBadge status={d.reviewStatus} />
-                                {d.reviewStatus !== 'DELIVERED' && (
-                                  <button
-                                    type="button"
-                                    disabled={isPending}
-                                    onClick={() => {
-                                      setDeliveringId(deliveringId === d.id ? null : d.id);
-                                      setDeliveryUrlInput(d.deliveryUrl || '');
-                                    }}
-                                    className="rounded-lg bg-slate-900 px-2.5 py-1 text-sm font-semibold text-white hover:bg-slate-800"
-                                  >
-                                    {deliveringId === d.id ? 'Close' : 'Deliver'}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {deliveringId === d.id && (
-                              <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 flex flex-wrap gap-2">
-                                <input
-                                  value={deliveryUrlInput}
-                                  onChange={(e) => setDeliveryUrlInput(e.target.value)}
-                                  placeholder="Optional cloud gallery / Drive URL"
-                                  className="flex-1 min-w-[200px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
-                                />
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => handleDeliverItem(d, deliveryUrlInput)}
-                                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700"
-                                >
-                                  Confirm Delivered
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </>
-          </div>
+          )}
         </div>
       )}
 

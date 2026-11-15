@@ -7,9 +7,27 @@ import { getCalendar, listResources } from '@/service/schedule/schedule.service'
 import { CalendarWorkspace } from '@/components/module/admin/CalendarWorkspace';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
 
-function addDaysIso(days: number): string {
-  const d = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-  return d.toISOString().slice(0, 10);
+function formatYmdInTz(date: Date, timezone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+}
+
+function getMonthBounds(ymd: string): { monthStart: string; monthEnd: string } {
+  const year = Number(ymd.slice(0, 4));
+  const month = Number(ymd.slice(5, 7));
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return {
+    monthStart: `${ymd.slice(0, 7)}-01`,
+    monthEnd: `${ymd.slice(0, 7)}-${String(lastDay).padStart(2, '0')}`,
+  };
 }
 
 async function AdminCalendarContent() {
@@ -17,21 +35,25 @@ async function AdminCalendarContent() {
   if (!session) redirect('/login');
   if (session.role === 'STAFF') redirect('/staff');
 
-  const from = addDaysIso(-7);
-  const to = addDaysIso(30);
+  const settingsRes = await getAgencySettings();
+  const timezone =
+    settingsRes.ok && settingsRes.data ? settingsRes.data.timezone : 'Asia/Dhaka';
 
-  const [settingsRes, calRes, resRes, bookingsRes] = await Promise.all([
-    getAgencySettings(),
-    getCalendar(from, to),
+  const todayIso = formatYmdInTz(new Date(), timezone);
+  const { monthStart, monthEnd } = getMonthBounds(todayIso);
+
+  const [calRes, resRes, bookingsRes] = await Promise.all([
+    getCalendar(monthStart, monthEnd),
     listResources(),
     listBookings(),
   ]);
 
   return (
     <CalendarWorkspace
-      timezone={settingsRes.ok && settingsRes.data ? settingsRes.data.timezone : 'Asia/Dhaka'}
-      initialFrom={from}
-      initialTo={to}
+      timezone={timezone}
+      todayIso={todayIso}
+      initialFrom={monthStart}
+      initialTo={monthEnd}
       initialSessions={calRes.ok && calRes.data ? calRes.data.sessions : []}
       initialResources={resRes.ok && resRes.data ? resRes.data : []}
       bookings={bookingsRes.ok && bookingsRes.data ? bookingsRes.data.data : []}

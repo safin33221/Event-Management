@@ -234,6 +234,24 @@ export interface Resource {
   isActive: boolean;
 }
 
+export interface ResourceAvailabilityItem extends Resource {
+  available: boolean;
+  conflict: {
+    sessionId: string;
+    title: string;
+    startAt: string;
+    endAt: string;
+    bookingReference: string | null;
+    eventTitle: string | null;
+  } | null;
+}
+
+export interface CalendarSubscriptionInfo {
+  studioName: string;
+  timezone: string;
+  feedPath: string;
+}
+
 export interface EventSession {
   id: string;
   bookingId: string;

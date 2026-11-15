@@ -2,7 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { serverFetch } from '@/lib/serverFetch';
-import { EventSession, Resource, ResourceType } from '@/types/event-management';
+import {
+  CalendarSubscriptionInfo,
+  EventSession,
+  Resource,
+  ResourceAvailabilityItem,
+  ResourceType,
+} from '@/types/event-management';
 import { ActionResult, parseApiResponse } from '../shared/apiResult';
 
 export async function listResources(): Promise<ActionResult<Resource[]>> {
@@ -110,4 +116,24 @@ export async function getCalendar(
   const qs = new URLSearchParams({ from, to });
   const res = await serverFetch.get(`/calendar?${qs.toString()}`);
   return parseApiResponse(res);
+}
+
+export async function checkResourceAvailability(
+  startAt: string,
+  endAt: string,
+  excludeSessionId?: string,
+): Promise<
+  ActionResult<{ startAt: string; endAt: string; resources: ResourceAvailabilityItem[] }>
+> {
+  const qs = new URLSearchParams({ startAt, endAt });
+  if (excludeSessionId) {
+    qs.set('excludeSessionId', excludeSessionId);
+  }
+  const res = await serverFetch.get(`/resources/availability?${qs.toString()}`);
+  return parseApiResponse(res);
+}
+
+export async function getCalendarSubscription(): Promise<ActionResult<CalendarSubscriptionInfo>> {
+  const res = await serverFetch.get('/calendar/subscription');
+  return parseApiResponse<CalendarSubscriptionInfo>(res);
 }

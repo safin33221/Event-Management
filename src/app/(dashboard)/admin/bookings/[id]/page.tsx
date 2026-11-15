@@ -6,19 +6,31 @@ import { getAgencySettings, listAgencyMembers } from '@/service/agency/agency.se
 import { getBooking } from '@/service/bookings/bookings.service';
 import { getBookingLedger } from '@/service/payments/payments.service';
 import { listResources } from '@/service/schedule/schedule.service';
-import { BookingsWorkspace } from '@/components/module/admin/BookingsWorkspace';
+import {
+  BookingDetailSection,
+  BookingsWorkspace,
+} from '@/components/module/admin/BookingsWorkspace';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
 
 interface AdminBookingDetailPageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ section?: string }>;
 }
 
-async function AdminBookingDetailContent({ params }: AdminBookingDetailPageProps) {
+async function AdminBookingDetailContent({ params, searchParams }: AdminBookingDetailPageProps) {
   const session = await getMe();
   if (!session) redirect('/login');
   if (session.role === 'STAFF') redirect('/staff');
 
   const { id } = await params;
+  const resolvedSearch = searchParams ? await searchParams : {};
+
+  const initialSection: BookingDetailSection =
+    resolvedSearch.section === 'schedule' ||
+    resolvedSearch.section === 'deliverables' ||
+    resolvedSearch.section === 'tasks'
+      ? resolvedSearch.section
+      : 'payments';
 
   const [bookingRes, ledgerRes, settingsRes, resourcesRes, membersRes] = await Promise.all([
     getBooking(id),
@@ -49,6 +61,7 @@ async function AdminBookingDetailContent({ params }: AdminBookingDetailPageProps
 
   return (
     <BookingsWorkspace
+      mode="detail"
       initialInquiries={[]}
       initialQuotes={[]}
       initialBookings={[bookingRes.data]}
@@ -58,19 +71,22 @@ async function AdminBookingDetailContent({ params }: AdminBookingDetailPageProps
       members={membersRes.ok && membersRes.data ? membersRes.data.filter((m) => m.isActive) : []}
       currency={settingsRes.ok && settingsRes.data ? settingsRes.data.currency : 'BDT'}
       timezone={settingsRes.ok && settingsRes.data ? settingsRes.data.timezone : 'Asia/Dhaka'}
-      initialTab="bookings"
       initialSelectedBookingId={bookingRes.data.id}
       initialSelectedBooking={bookingRes.data}
       initialLedger={ledgerRes.ok && ledgerRes.data ? ledgerRes.data : null}
       isDetailPage
+      initialDetailSection={initialSection}
     />
   );
 }
 
-export default function AdminBookingDetailPage({ params }: AdminBookingDetailPageProps) {
+export default function AdminBookingDetailPage({
+  params,
+  searchParams,
+}: AdminBookingDetailPageProps) {
   return (
-    <Suspense fallback={<PageSkeleton label="Loading booking details..." />}>
-      <AdminBookingDetailContent params={params} />
+    <Suspense fallback={<PageSkeleton label="Loading booking workspace..." />}>
+      <AdminBookingDetailContent params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
