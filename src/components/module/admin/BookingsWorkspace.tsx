@@ -516,7 +516,42 @@ export function BookingsWorkspace({
   const handleRecordPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBooking) return;
+    if (selectedBooking.status === 'CANCELLED') {
+      notify('err', `Cannot record a payment on cancelled booking ${selectedBooking.reference}.`);
+      return;
+    }
     const amountPoisha = Math.round(Number(payAmountTk) * 100);
+    if (!Number.isFinite(amountPoisha) || amountPoisha <= 0) {
+      notify('err', 'Please enter a valid payment amount greater than Tk 0.');
+      return;
+    }
+    if (ledger) {
+      const outstandingDuePoisha = ledger.summary.outstandingDuePoisha;
+      const pendingReceiptsPoisha = ledger.summary.pendingReceiptsPoisha;
+      const maxCollectiblePoisha = Math.max(0, outstandingDuePoisha - pendingReceiptsPoisha);
+
+      if (outstandingDuePoisha <= 0) {
+        notify(
+          'err',
+          `Booking ${selectedBooking.reference} is already fully paid (${formatPoisha(ledger.summary.effectiveAgreedChargePoisha, currency)}). No additional payment can be recorded.`,
+        );
+        return;
+      }
+      if (amountPoisha > outstandingDuePoisha) {
+        notify(
+          'err',
+          `Payment of ${formatPoisha(amountPoisha, currency)} exceeds the remaining due balance of ${formatPoisha(outstandingDuePoisha, currency)} (Total price: ${formatPoisha(ledger.summary.effectiveAgreedChargePoisha, currency)}).`,
+        );
+        return;
+      }
+      if (amountPoisha > maxCollectiblePoisha) {
+        notify(
+          'err',
+          `Payment of ${formatPoisha(amountPoisha, currency)} plus pending unverified receipts (${formatPoisha(pendingReceiptsPoisha, currency)}) exceeds the remaining due of ${formatPoisha(outstandingDuePoisha, currency)}. Verify or reject the pending payment first.`,
+        );
+        return;
+      }
+    }
     startTransition(async () => {
       const res = await recordPayment(selectedBooking.id, {
         amountPoisha,
@@ -983,12 +1018,28 @@ export function BookingsWorkspace({
                         {formatLocalDate(inq.requestedDate)}
                       </p>
                     </div>
-                    <Link
-                      href={`/admin/quotes?inquiryId=${encodeURIComponent(inq.id)}`}
-                      className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors"
-                    >
-                      Create Quote →
-                    </Link>
+                    {inq.status === 'CONVERTED' ? (
+                      <Link
+                        href="/admin/bookings"
+                        className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors"
+                      >
+                        Converted • View Bookings →
+                      </Link>
+                    ) : inq.status === 'QUOTED' ? (
+                      <Link
+                        href="/admin/quotes"
+                        className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        Quoted • View Quotes →
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/admin/quotes?inquiryId=${encodeURIComponent(inq.id)}`}
+                        className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors"
+                      >
+                        Create Quote →
+                      </Link>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1976,47 +2027,119 @@ export function BookingsWorkspace({
           {/* SECTION 1: PAYMENTS & LEDGER */}
           {detailSection === 'payments' && (
             <div className="atelier-card p-6 space-y-5">
-              <div className="border-b border-slate-100 pb-3">
-                <h2 className="text-base font-bold text-slate-900">Record &amp; Verify Payments</h2>
-                <p className="text-xs text-slate-500">
-                  Log bKash, Nagad, Bank, or Cash payments. Verifying updates the booking balance.
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Record &amp; Verify Payments</h2>
+                  <p className="text-xs text-slate-500">
+                    Log bKash, Nagad, Bank, or Cash payments. Total paid can never exceed the agreed
+                    booking price.
+                  </p>
+                </div>
+                {ledger &&
+                  selectedBooking.status !== 'CANCELLED' &&
+                  ledger.summary.outstandingDuePoisha - ledger.summary.pendingReceiptsPoisha > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPayAmountTk(
+                          String(
+                            Math.round(
+                              (ledger.summary.outstandingDuePoisha -
+                                ledger.summary.pendingReceiptsPoisha) /
+                                100,
+                            ),
+                          ),
+                        )
+                      }
+                      className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                    >
+                      Fill Remaining Collectible (
+                      {formatPoisha(
+                        ledger.summary.outstandingDuePoisha - ledger.summary.pendingReceiptsPoisha,
+                        ledger.summary.currency,
+                      )}
+                      )
+                    </button>
+                  )}
               </div>
 
-              <form onSubmit={handleRecordPayment} className="grid sm:grid-cols-4 gap-2.5">
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={payAmountTk}
-                  onChange={(e) => setPayAmountTk(e.target.value)}
-                  placeholder={`Amount (${currency})`}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono-code"
-                />
-                <select
-                  value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium"
-                >
-                  <option value="BKASH">bKash</option>
-                  <option value="NAGAD">Nagad</option>
-                  <option value="BANK">Bank Transfer</option>
-                  <option value="CASH">Cash</option>
-                </select>
-                <input
-                  value={payRef}
-                  onChange={(e) => setPayRef(e.target.value)}
-                  placeholder="TrxID / Receipt Ref (optional)"
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
-                />
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-                >
-                  + Record Payment
-                </button>
-              </form>
+              {selectedBooking.status === 'CANCELLED' ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-xs font-medium text-rose-800">
+                  This booking is cancelled. Recording or verifying new payments is disabled.
+                </div>
+              ) : ledger && ledger.summary.outstandingDuePoisha <= 0 ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-xs font-semibold text-emerald-900 flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    Paid in Full ✓ — Total price (
+                    {formatPoisha(
+                      ledger.summary.effectiveAgreedChargePoisha,
+                      ledger.summary.currency,
+                    )}
+                    ) has been completely settled.
+                  </span>
+                  <span className="font-mono-code text-emerald-700">Remaining Due: Tk 0</span>
+                </div>
+              ) : ledger &&
+                ledger.summary.outstandingDuePoisha - ledger.summary.pendingReceiptsPoisha <= 0 ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-xs font-medium text-amber-900">
+                  Full remaining balance (
+                  {formatPoisha(ledger.summary.outstandingDuePoisha, ledger.summary.currency)}) is
+                  already recorded as <strong>PENDING</strong> below. Click{' '}
+                  <strong>Verify</strong> on the pending receipt below to settle the balance.
+                </div>
+              ) : (
+                <form onSubmit={handleRecordPayment} className="grid sm:grid-cols-4 gap-2.5">
+                  <input
+                    type="number"
+                    min="1"
+                    max={
+                      ledger
+                        ? Math.floor(
+                            (ledger.summary.outstandingDuePoisha -
+                              ledger.summary.pendingReceiptsPoisha) /
+                              100,
+                          )
+                        : undefined
+                    }
+                    required
+                    value={payAmountTk}
+                    onChange={(e) => setPayAmountTk(e.target.value)}
+                    placeholder={`Max ${
+                      ledger
+                        ? formatPoisha(
+                            ledger.summary.outstandingDuePoisha -
+                              ledger.summary.pendingReceiptsPoisha,
+                            ledger.summary.currency,
+                          )
+                        : currency
+                    }`}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono-code"
+                  />
+                  <select
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium"
+                  >
+                    <option value="BKASH">bKash</option>
+                    <option value="NAGAD">Nagad</option>
+                    <option value="BANK">Bank Transfer</option>
+                    <option value="CASH">Cash</option>
+                  </select>
+                  <input
+                    value={payRef}
+                    onChange={(e) => setPayRef(e.target.value)}
+                    placeholder="TrxID / Receipt Ref (optional)"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                  >
+                    + Record Payment
+                  </button>
+                </form>
+              )}
 
               {!ledger || ledger.entries.length === 0 ? (
                 <p className="text-xs text-slate-500 py-6 text-center">
@@ -2089,19 +2212,22 @@ export function BookingsWorkspace({
                     </Link>
                   </p>
                 </div>
-                {selectedBooking.status !== 'CANCELLED' && (
-                  <button
-                    type="button"
-                    onClick={() => setShowScheduleForm((v) => !v)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
-                  >
-                    <PlusIcon className="w-3.5 h-3.5" />
-                    <span>{showScheduleForm ? 'Close Form' : 'Schedule Session'}</span>
-                  </button>
-                )}
+                {selectedBooking.status !== 'CANCELLED' &&
+                  selectedBooking.status !== 'COMPLETED' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowScheduleForm((v) => !v)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                    >
+                      <PlusIcon className="w-3.5 h-3.5" />
+                      <span>{showScheduleForm ? 'Close Form' : 'Schedule Session'}</span>
+                    </button>
+                  )}
               </div>
 
-              {showScheduleForm && selectedBooking.status !== 'CANCELLED' && (
+              {showScheduleForm &&
+                selectedBooking.status !== 'CANCELLED' &&
+                selectedBooking.status !== 'COMPLETED' && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-slate-600">
@@ -2414,28 +2540,31 @@ export function BookingsWorkspace({
                     Track galleries, films, and albums independently without affecting booking dues.
                   </p>
                 </div>
-                <form onSubmit={handleAddDeliverable} className="flex flex-wrap gap-2">
-                  <input
-                    required
-                    value={delivLabel}
-                    onChange={(e) => setDelivLabel(e.target.value)}
-                    placeholder="e.g. Photo Gallery, Album"
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs"
-                  />
-                  <input
-                    type="date"
-                    value={delivDueDate}
-                    onChange={(e) => setDelivDueDate(e.target.value)}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-mono-code"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
-                  >
-                    + Add Deliverable
-                  </button>
-                </form>
+                {selectedBooking.status !== 'CANCELLED' &&
+                  selectedBooking.status !== 'COMPLETED' && (
+                    <form onSubmit={handleAddDeliverable} className="flex flex-wrap gap-2">
+                      <input
+                        required
+                        value={delivLabel}
+                        onChange={(e) => setDelivLabel(e.target.value)}
+                        placeholder="e.g. Photo Gallery, Album"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs"
+                      />
+                      <input
+                        type="date"
+                        value={delivDueDate}
+                        onChange={(e) => setDelivDueDate(e.target.value)}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-mono-code"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isPending}
+                        className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                      >
+                        + Add Deliverable
+                      </button>
+                    </form>
+                  )}
               </div>
 
               {!selectedBooking.deliverables || selectedBooking.deliverables.length === 0 ? (
@@ -2535,7 +2664,9 @@ export function BookingsWorkspace({
                 </p>
               </div>
 
-              {members.length > 0 && selectedBooking.status !== 'CANCELLED' && (
+              {members.length > 0 &&
+                selectedBooking.status !== 'CANCELLED' &&
+                selectedBooking.status !== 'COMPLETED' && (
                 <form
                   onSubmit={handleCreateAssignment}
                   className="grid sm:grid-cols-12 gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3"

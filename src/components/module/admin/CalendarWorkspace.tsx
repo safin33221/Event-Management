@@ -181,10 +181,10 @@ export function CalendarWorkspace({
   const [resName, setResName] = useState('');
   const [resType, setResType] = useState<ResourceType>('CREW');
 
-  // Schedulable bookings (non-cancelled, prioritize confirmed)
+  // Schedulable bookings (exclude cancelled and completed, prioritize confirmed)
   const schedulableBookings = useMemo(() => {
     return bookings
-      .filter((b) => b.status !== 'CANCELLED')
+      .filter((b) => b.status !== 'CANCELLED' && b.status !== 'COMPLETED')
       .sort((a, b) => {
         if (a.status === b.status) return a.reference.localeCompare(b.reference);
         if (a.status === 'CONFIRMED') return -1;
