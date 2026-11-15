@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import {
   CalendarIcon,
   LayersIcon,
-  LogOutIcon,
+  LogOutIcon, 
   PaletteIcon,
   ReceiptIcon,
   SparklesIcon,

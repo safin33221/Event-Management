@@ -68,17 +68,23 @@ export async function login(
       maxAge: 60 * 60 * 24,
     });
     await setCookie('userSession', JSON.stringify(session), {
-      ...getDefaultCookieOptions({ httpOnly: false }),
+      ...getDefaultCookieOptions(),
       maxAge: 60 * 60 * 24,
     });
 
     const isSafeCallback =
-      callbackUrl.startsWith('/') && !callbackUrl.startsWith('//') && !callbackUrl.includes('://');
+      callbackUrl.startsWith('/') &&
+      !callbackUrl.startsWith('//') &&
+      !callbackUrl.includes('\\') &&
+      !callbackUrl.includes('://');
+    const isPermittedCallback =
+      isSafeCallback &&
+      !(session.role === 'STAFF' && (callbackUrl === '/admin' || callbackUrl.startsWith('/admin/')));
 
     return {
       success: true,
       message: 'Signed in successfully.',
-      redirectTo: isSafeCallback ? callbackUrl : getDefaultDashboard(session.role),
+      redirectTo: isPermittedCallback ? callbackUrl : getDefaultDashboard(session.role),
     };
   } catch (err) {
     console.error('Login error:', err);

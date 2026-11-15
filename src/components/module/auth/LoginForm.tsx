@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { login } from '@/service/auth';
 import { ArrowRightIcon, ShieldCheckIcon, SparklesIcon } from '@/components/shared/Icons';
 
-export function LoginForm() {
+export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [state, formAction, isPending] = useActionState(login, {
@@ -65,6 +65,7 @@ export function LoginForm() {
           </p>
 
           <form action={formAction} className="mt-6 space-y-4">
+            {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
             {state.message && !state.success && (
               <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
                 {state.message}

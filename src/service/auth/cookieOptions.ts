@@ -8,7 +8,7 @@ export const getDefaultCookieOptions = (
     return {
         httpOnly: true,
         secure: isProd,
-        sameSite: isProd ? "none" : "lax",
+        sameSite: "lax",
         path: "/",
         ...overrides,
     };

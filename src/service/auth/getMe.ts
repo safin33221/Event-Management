@@ -1,6 +1,7 @@
 'use server';
 
 import { serverFetch } from '@/lib/serverFetch';
+import { verifyAccessToken } from '@/lib/jwtHandler';
 import { AuthUserSession } from '@/types/event-management';
 import { getCookies } from './tokenHandler';
 
@@ -8,11 +9,20 @@ export async function getMe(): Promise<AuthUserSession | null> {
   const token = await getCookies('accessToken');
   if (!token) return null;
 
+  const verifiedToken = verifyAccessToken(token);
+  if (!verifiedToken) return null;
+
   const sessionStr = await getCookies('userSession');
   if (sessionStr) {
     try {
       const parsed = JSON.parse(sessionStr) as AuthUserSession;
-      if (parsed?.id && parsed?.role && parsed?.studioName) {
+      if (
+        parsed?.id &&
+        parsed?.role &&
+        parsed?.studioName &&
+        parsed.id === verifiedToken.sub &&
+        parsed.role === verifiedToken.role
+      ) {
         return parsed;
       }
     } catch {
