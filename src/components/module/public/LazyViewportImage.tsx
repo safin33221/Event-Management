@@ -29,17 +29,14 @@ export function LazyViewportImage({
   rootMargin = '80px 0px',
 }: LazyViewportImageProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [isInViewport, setIsInViewport] = useState(false);
+  const [isInViewport, setIsInViewport] = useState(
+    () => typeof window !== 'undefined' && typeof IntersectionObserver === 'undefined',
+  );
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || isInViewport) return;
-
-    if (typeof IntersectionObserver === 'undefined') {
-      setIsInViewport(true);
-      return;
-    }
+    if (!el || isInViewport || typeof IntersectionObserver === 'undefined') return;
 
     const observer = new IntersectionObserver(
       (entries) => {

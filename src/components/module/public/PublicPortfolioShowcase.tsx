@@ -64,17 +64,7 @@ export function PublicPortfolioShowcase({
   // 1. Observe when the user scrolls near #portfolio
   useEffect(() => {
     const el = sectionRef.current;
-    if (!el || hasEnteredSection) return;
-
-    if (typeof window !== 'undefined' && window.location.hash === '#portfolio') {
-      setHasEnteredSection(true);
-      return;
-    }
-
-    if (typeof IntersectionObserver === 'undefined') {
-      setHasEnteredSection(true);
-      return;
-    }
+    if (!el || hasEnteredSection || typeof IntersectionObserver === 'undefined') return;
 
     const observer = new IntersectionObserver(
       (entries) => {
