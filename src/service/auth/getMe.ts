@@ -1,11 +1,13 @@
 'use server';
 
+import { connection } from 'next/server';
 import { serverFetch } from '@/lib/serverFetch';
 import { verifyAccessToken } from '@/lib/jwtHandler';
 import { AuthUserSession } from '@/types/event-management';
 import { getCookies } from './tokenHandler';
 
 export async function getMe(): Promise<AuthUserSession | null> {
+  await connection();
   const token = await getCookies('accessToken');
   if (!token) return null;
 

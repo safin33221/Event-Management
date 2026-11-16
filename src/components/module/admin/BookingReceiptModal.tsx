@@ -33,10 +33,27 @@ export function BookingReceiptModal({ bookingId, onClose }: BookingReceiptModalP
     };
   }, [bookingId]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 overflow-y-auto">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50 print:hidden">
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[1px]"
+    >
+      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4 bg-slate-50 print:hidden">
           <div>
             <p className="text-sm font-bold text-slate-900">Money Receipt &amp; Booking Invoice</p>
             <p className="text-xs text-slate-500">
@@ -73,14 +90,14 @@ export function BookingReceiptModal({ bookingId, onClose }: BookingReceiptModalP
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100 cursor-pointer"
             >
-              Close
+              ✕ Close
             </button>
           </div>
         </div>
 
-        <div className="p-6 sm:p-8 space-y-6 text-sm text-slate-800">
+        <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 text-sm text-slate-800">
           {loading && <p className="text-center text-slate-500 py-8">Loading receipt...</p>}
           {error && (
             <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800">
