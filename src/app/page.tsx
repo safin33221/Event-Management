@@ -6,7 +6,7 @@ import { PageSkeleton } from '@/components/shared/PageSkeleton';
 import { loadPublicStorefront } from '@/lib/publicStorefront';
 
 async function RootStorefrontContent() {
-  const { branding, eventTypes, packages, portfolio, isBackendConnected } =
+  const { branding, eventTypes, packages, portfolio, portfolioEvents, isBackendConnected } =
     await loadPublicStorefront();
 
   return (
@@ -17,6 +17,7 @@ async function RootStorefrontContent() {
         eventTypes={eventTypes}
         packages={packages}
         portfolio={portfolio}
+        portfolioEvents={portfolioEvents}
         isBackendConnected={isBackendConnected}
       />
       <Footer branding={branding} />

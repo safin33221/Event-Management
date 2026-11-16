@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { PortfolioItem } from '@/types/event-management';
-import { parseShowcaseMedia } from '@/lib/showcaseMedia';
+import {
+  buildCloudinaryImageUrl,
+  buildCloudinaryVideoPosterUrl,
+  parseShowcaseMedia,
+} from '@/lib/showcaseMedia';
 
 interface ShowcaseLightboxModalProps {
   item: PortfolioItem;
@@ -12,9 +16,13 @@ interface ShowcaseLightboxModalProps {
 export function ShowcaseLightboxModal({ item, onClose }: ShowcaseLightboxModalProps) {
   const media = parseShowcaseMedia(item.mediaUrl);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [isPlayingVideo, setIsPlayingVideo] = useState(false);
 
   const totalPhotos = media.photos.length;
   const activePhoto = media.photos[photoIndex] || media.coverUrl;
+  const posterUrl =
+    media.coverUrl ||
+    (media.videoUrl ? buildCloudinaryVideoPosterUrl(media.videoUrl) : '');
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -71,8 +79,32 @@ export function ShowcaseLightboxModal({ item, onClose }: ShowcaseLightboxModalPr
         {/* Media Stage */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col items-center justify-center gap-4">
           {media.kind === 'video' ? (
-            <div className="w-full aspect-video rounded-xl overflow-hidden bg-black">
-              {media.embedUrl ? (
+            <div className="w-full aspect-video rounded-xl overflow-hidden bg-black relative">
+              {!isPlayingVideo ? (
+                <button
+                  type="button"
+                  onClick={() => setIsPlayingVideo(true)}
+                  aria-label={`Play video: ${item.title}`}
+                  className="group relative w-full h-full flex items-center justify-center cursor-pointer overflow-hidden"
+                >
+                  {posterUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={posterUrl}
+                      alt={item.title}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover opacity-90 transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-slate-900" />
+                  )}
+                  <span className="absolute inset-0 bg-slate-950/35 group-hover:bg-slate-950/20 transition-colors" />
+                  <span className="relative z-10 flex items-center gap-2 rounded-full bg-white/95 px-5 py-3 text-sm font-bold text-slate-900 shadow-2xl transition-transform duration-200 group-hover:scale-105">
+                    <span>▶ Play Video Film</span>
+                  </span>
+                </button>
+              ) : media.embedUrl ? (
                 <iframe
                   src={media.embedUrl}
                   title={item.title}
@@ -83,10 +115,11 @@ export function ShowcaseLightboxModal({ item, onClose }: ShowcaseLightboxModalPr
               ) : (
                 <video
                   src={media.videoUrl}
-                  poster={media.coverUrl || undefined}
+                  poster={posterUrl || undefined}
                   controls
                   autoPlay
                   playsInline
+                  preload="metadata"
                   className="w-full h-full object-contain"
                 />
               )}
@@ -96,7 +129,7 @@ export function ShowcaseLightboxModal({ item, onClose }: ShowcaseLightboxModalPr
               <div className="relative w-full flex items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={activePhoto}
+                  src={buildCloudinaryImageUrl(activePhoto, { width: 1600, crop: 'limit' })}
                   alt={`${item.title} — photo ${photoIndex + 1}`}
                   className="max-h-[62vh] w-auto rounded-xl object-contain"
                 />
@@ -139,7 +172,13 @@ export function ShowcaseLightboxModal({ item, onClose }: ShowcaseLightboxModalPr
                       }`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={buildCloudinaryImageUrl(url, { width: 320, height: 240, crop: 'fill' })}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
                     </button>
                   ))}
                 </div>

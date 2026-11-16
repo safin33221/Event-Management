@@ -131,6 +131,77 @@ export interface PortfolioItem {
   isPublished?: boolean;
 }
 
+export type PortfolioEventStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type PortfolioMediaType = 'IMAGE' | 'VIDEO';
+export type PortfolioMediaStatus = 'UPLOADING' | 'PROCESSING' | 'READY' | 'FAILED';
+
+export interface PortfolioMediaDeliveryUrls {
+  coverUrl: string;
+  thumbnailUrl: string;
+  fullUrl: string;
+  posterUrl: string | null;
+}
+
+export interface PortfolioMediaItem {
+  id: string;
+  eventId: string;
+  assetId: string;
+  publicId: string;
+  resourceType: PortfolioMediaType;
+  format: string;
+  secureUrl: string;
+  bytes: number;
+  width: number | null;
+  height: number | null;
+  durationSeconds: number | null;
+  caption: string | null;
+  altText: string | null;
+  displayOrder: number;
+  status: PortfolioMediaStatus;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deliveryUrls?: PortfolioMediaDeliveryUrls;
+}
+
+export interface PortfolioShowcaseEvent {
+  id: string;
+  eventTypeId: string | null;
+  eventType?: { id: string; name: string; slug: string } | null;
+  title: string;
+  slug: string;
+  eventDate: string | null;
+  description: string | null;
+  location: string | null;
+  status: PortfolioEventStatus;
+  coverMediaId: string | null;
+  coverMedia: PortfolioMediaItem | null;
+  media: PortfolioMediaItem[];
+  sortOrder: number;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  counts?: {
+    photos: number;
+    videos: number;
+    totalReady: number;
+  };
+}
+
+export interface SignedCloudinaryUploadPayload {
+  uploadUrl: string;
+  cloudName: string;
+  apiKey: string;
+  signature: string;
+  timestamp: number;
+  folder: string;
+  allowedFormats: string[];
+  context: string;
+  uploadPreset: string | null;
+  resourceType: PortfolioMediaType;
+  maxBytes: number;
+}
+
 export interface Inquiry {
   id: string;
   reference: string;

@@ -6,8 +6,12 @@ import {
   DeliverableLabelTemplate,
   EventType,
   PaginatedResponse,
+  PortfolioEventStatus,
   PortfolioItem,
+  PortfolioMediaItem,
+  PortfolioShowcaseEvent,
   ServiceItem,
+  SignedCloudinaryUploadPayload,
   StudioPackage,
   TaskTemplate,
 } from '@/types/event-management';
@@ -193,5 +197,237 @@ export async function updateTaskTemplate(
   });
   const result = await parseApiResponse<TaskTemplate>(res);
   if (result.ok) revalidatePath('/admin/catalog');
+  return result;
+}
+
+function revalidatePortfolioPaths(slug?: string) {
+  revalidatePath('/', 'layout');
+  revalidatePath('/portfolio');
+  if (slug) {
+    revalidatePath(`/portfolio/${slug}`);
+  }
+  revalidatePath('/admin/portfolio');
+  revalidatePath('/admin/catalog');
+}
+
+export async function getPublicPortfolioEvents(): Promise<
+  ActionResult<PaginatedResponse<PortfolioShowcaseEvent>>
+> {
+  const res = await serverFetch.get('/public/portfolio/events?limit=50');
+  return parseApiResponse<PaginatedResponse<PortfolioShowcaseEvent>>(res);
+}
+
+export async function getPublicPortfolioEventBySlug(
+  slug: string,
+): Promise<ActionResult<PortfolioShowcaseEvent>> {
+  const res = await serverFetch.get(`/public/portfolio/events/${encodeURIComponent(slug)}`);
+  return parseApiResponse<PortfolioShowcaseEvent>(res);
+}
+
+export async function listAdminPortfolioEvents(
+  status?: PortfolioEventStatus,
+): Promise<ActionResult<PaginatedResponse<PortfolioShowcaseEvent>>> {
+  const qs = status ? `?status=${encodeURIComponent(status)}&limit=100` : '?limit=100';
+  const res = await serverFetch.get(`/catalog/portfolio-events${qs}`);
+  return parseApiResponse<PaginatedResponse<PortfolioShowcaseEvent>>(res);
+}
+
+export async function getAdminPortfolioEvent(
+  eventId: string,
+): Promise<ActionResult<PortfolioShowcaseEvent>> {
+  const res = await serverFetch.get(`/catalog/portfolio-events/${encodeURIComponent(eventId)}`);
+  return parseApiResponse<PortfolioShowcaseEvent>(res);
+}
+
+export async function createPortfolioEvent(payload: {
+  title: string;
+  slug: string;
+  eventDate?: string;
+  description?: string;
+  location?: string;
+  eventTypeId?: string;
+}): Promise<ActionResult<PortfolioShowcaseEvent>> {
+  const res = await serverFetch.post('/catalog/portfolio-events', {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<PortfolioShowcaseEvent>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths(result.data?.slug);
+  }
+  return result;
+}
+
+export async function updatePortfolioEvent(
+  eventId: string,
+  payload: {
+    title?: string;
+    slug?: string;
+    eventDate?: string;
+    description?: string;
+    location?: string;
+    eventTypeId?: string;
+    coverMediaId?: string;
+    sortOrder?: number;
+  },
+): Promise<ActionResult<PortfolioShowcaseEvent>> {
+  const res = await serverFetch.patch(`/catalog/portfolio-events/${encodeURIComponent(eventId)}`, {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<PortfolioShowcaseEvent>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths(result.data?.slug);
+  }
+  return result;
+}
+
+export async function signPortfolioUpload(
+  eventId: string,
+  payload: {
+    resourceType: 'IMAGE' | 'VIDEO';
+    format: string;
+    bytes: number;
+  },
+): Promise<ActionResult<SignedCloudinaryUploadPayload>> {
+  const res = await serverFetch.post(
+    `/catalog/portfolio-events/${encodeURIComponent(eventId)}/upload-signature`,
+    {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  return parseApiResponse<SignedCloudinaryUploadPayload>(res);
+}
+
+export async function registerPortfolioMedia(
+  eventId: string,
+  payload: {
+    assetId: string;
+    publicId: string;
+    resourceType: 'IMAGE' | 'VIDEO';
+    format: string;
+    secureUrl: string;
+    bytes: number;
+    width?: number;
+    height?: number;
+    durationSeconds?: number;
+    caption?: string;
+    altText?: string;
+    status?: 'PROCESSING' | 'READY' | 'FAILED';
+    errorMessage?: string;
+    version?: number;
+    responseSignature?: string;
+  },
+): Promise<ActionResult<{ media: PortfolioMediaItem; idempotentReplay: boolean }>> {
+  const res = await serverFetch.post(
+    `/catalog/portfolio-events/${encodeURIComponent(eventId)}/media`,
+    {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  const result = await parseApiResponse<{ media: PortfolioMediaItem; idempotentReplay: boolean }>(
+    res,
+  );
+  if (result.ok) {
+    revalidatePortfolioPaths();
+  }
+  return result;
+}
+
+export async function updatePortfolioMedia(
+  eventId: string,
+  mediaId: string,
+  payload: {
+    caption?: string;
+    altText?: string;
+    status?: 'PROCESSING' | 'READY' | 'FAILED';
+    errorMessage?: string;
+    isCover?: boolean;
+  },
+): Promise<ActionResult<PortfolioMediaItem>> {
+  const res = await serverFetch.patch(
+    `/catalog/portfolio-events/${encodeURIComponent(eventId)}/media/${encodeURIComponent(mediaId)}`,
+    {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  const result = await parseApiResponse<PortfolioMediaItem>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths();
+  }
+  return result;
+}
+
+export async function reorderPortfolioMedia(
+  eventId: string,
+  mediaIds: string[],
+): Promise<ActionResult<PortfolioShowcaseEvent>> {
+  const res = await serverFetch.put(
+    `/catalog/portfolio-events/${encodeURIComponent(eventId)}/media/reorder`,
+    {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mediaIds }),
+    },
+  );
+  const result = await parseApiResponse<PortfolioShowcaseEvent>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths(result.data?.slug);
+  }
+  return result;
+}
+
+export async function removePortfolioMedia(
+  eventId: string,
+  mediaId: string,
+): Promise<ActionResult<{ deletedMediaId: string }>> {
+  const res = await serverFetch.delete(
+    `/catalog/portfolio-events/${encodeURIComponent(eventId)}/media/${encodeURIComponent(mediaId)}`,
+  );
+  const result = await parseApiResponse<{ deletedMediaId: string }>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths();
+  }
+  return result;
+}
+
+export async function publishPortfolioEvent(
+  eventId: string,
+): Promise<ActionResult<PortfolioShowcaseEvent>> {
+  const res = await serverFetch.post(
+    `/catalog/portfolio-events/${encodeURIComponent(eventId)}/publish`,
+  );
+  const result = await parseApiResponse<PortfolioShowcaseEvent>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths(result.data?.slug);
+  }
+  return result;
+}
+
+export async function unpublishPortfolioEvent(
+  eventId: string,
+): Promise<ActionResult<PortfolioShowcaseEvent>> {
+  const res = await serverFetch.post(
+    `/catalog/portfolio-events/${encodeURIComponent(eventId)}/unpublish`,
+  );
+  const result = await parseApiResponse<PortfolioShowcaseEvent>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths(result.data?.slug);
+  }
+  return result;
+}
+
+export async function archivePortfolioEvent(
+  eventId: string,
+): Promise<ActionResult<PortfolioShowcaseEvent>> {
+  const res = await serverFetch.post(
+    `/catalog/portfolio-events/${encodeURIComponent(eventId)}/archive`,
+  );
+  const result = await parseApiResponse<PortfolioShowcaseEvent>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths(result.data?.slug);
+  }
   return result;
 }

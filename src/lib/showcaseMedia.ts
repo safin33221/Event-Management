@@ -105,3 +105,50 @@ function buildVideoMedia(videoUrl: string, customCover?: string): ParsedShowcase
     isDirectVideo: true,
   };
 }
+
+/**
+ * Injects Cloudinary automatic format, quality, and responsive width transformations.
+ */
+export function buildCloudinaryImageUrl(
+  url: string,
+  options: { width: number; height?: number; crop?: 'limit' | 'fill' } = { width: 1200 },
+): string {
+  if (!url || !url.includes('res.cloudinary.com') || !url.includes('/upload/')) {
+    return url;
+  }
+  // Avoid double-transforming URLs that already contain f_auto,q_auto
+  const cleanUrl = url.replace(/\/upload\/[^/]*f_auto,q_auto[^/]*\//, '/upload/');
+  const cropMode = options.crop ?? 'limit';
+  const heightSegment = options.height ? `,h_${options.height}` : '';
+  const gravitySegment = cropMode === 'fill' ? ',g_auto' : '';
+  return cleanUrl.replace(
+    '/upload/',
+    `/upload/f_auto,q_auto,c_${cropMode}${gravitySegment},w_${options.width}${heightSegment}/`,
+  );
+}
+
+export function buildCloudinarySrcSet(
+  url: string,
+  widths: number[] = [480, 800, 1200, 1600],
+): string | undefined {
+  if (!url || !url.includes('res.cloudinary.com') || !url.includes('/upload/')) {
+    return undefined;
+  }
+  return widths
+    .map((w) => `${buildCloudinaryImageUrl(url, { width: w, crop: 'limit' })} ${w}w`)
+    .join(', ');
+}
+
+/**
+ * Generates a lightweight JPEG poster frame from a Cloudinary video URL without downloading the video.
+ */
+export function buildCloudinaryVideoPosterUrl(videoUrl: string, width = 960): string {
+  if (!videoUrl || !videoUrl.includes('res.cloudinary.com') || !videoUrl.includes('/upload/')) {
+    return '';
+  }
+  const cleanUrl = videoUrl.replace(/\/upload\/[^/]*f_auto,q_auto[^/]*\//, '/upload/');
+  return cleanUrl
+    .replace('/upload/', `/upload/so_auto,f_jpg,q_auto,c_limit,w_${width}/`)
+    .replace(/\.[a-z0-9]+(\?.*)?$/i, '.jpg');
+}
+

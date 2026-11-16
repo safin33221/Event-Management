@@ -1,8 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { EventType, PortfolioItem, PublicBranding, StudioPackage } from '@/types/event-management';
-import { formatPoisha } from '@/lib/utils';
+import {
+  EventType,
+  PortfolioItem,
+  PortfolioShowcaseEvent,
+  PublicBranding,
+  StudioPackage,
+} from '@/types/event-management';
+import { formatLocalDate, formatPoisha } from '@/lib/utils';
 import {
   ArrowRightIcon,
   CalendarIcon,
@@ -10,8 +16,13 @@ import {
   CheckCircleIcon,
   SparklesIcon,
 } from '@/components/shared/Icons';
-import { parseShowcaseMedia } from '@/lib/showcaseMedia';
+import {
+  buildCloudinaryImageUrl,
+  buildCloudinarySrcSet,
+  parseShowcaseMedia,
+} from '@/lib/showcaseMedia';
 import { InquiryForm } from './InquiryForm';
+import { PortfolioEventDetailModal } from './PortfolioEventDetailModal';
 import { ShowcaseLightboxModal } from './ShowcaseLightboxModal';
 
 interface PublicAgencyHomeProps {
@@ -19,6 +30,7 @@ interface PublicAgencyHomeProps {
   eventTypes: EventType[];
   packages: StudioPackage[];
   portfolio: PortfolioItem[];
+  portfolioEvents?: PortfolioShowcaseEvent[];
   isBackendConnected: boolean;
 }
 
@@ -27,13 +39,23 @@ export function PublicAgencyHome({
   eventTypes,
   packages,
   portfolio,
+  portfolioEvents = [],
   isBackendConnected,
 }: PublicAgencyHomeProps) {
   const [selectedPackageId, setSelectedPackageId] = useState<string>('');
   const [showcaseFilter, setShowcaseFilter] = useState<'all' | 'photo' | 'video'>('all');
   const [activeShowcaseItem, setActiveShowcaseItem] = useState<PortfolioItem | null>(null);
+  const [activeShowcaseEvent, setActiveShowcaseEvent] = useState<PortfolioShowcaseEvent | null>(
+    null,
+  );
   const primary = branding.themeTokens.primaryColor || '#0F172A';
   const accent = branding.themeTokens.accentColor || '#4F46E5';
+
+  const filteredPortfolioEvents = portfolioEvents.filter((ev) => {
+    if (showcaseFilter === 'all') return true;
+    if (showcaseFilter === 'video') return (ev.counts?.videos ?? 0) > 0;
+    return (ev.counts?.photos ?? 0) > 0;
+  });
 
   const filteredPortfolio = portfolio.filter((item) => {
     if (showcaseFilter === 'all') return true;
@@ -294,16 +316,86 @@ export function PublicAgencyHome({
             </div>
           </div>
 
-          {filteredPortfolio.length === 0 ? (
+          {filteredPortfolioEvents.length === 0 && filteredPortfolio.length === 0 ? (
             <div className="atelier-card p-10 text-center text-sm text-slate-500 bg-slate-50">
-              {portfolio.length === 0
+              {portfolioEvents.length === 0 && portfolio.length === 0
                 ? `Approved photo galleries and video films will appear here once published by ${branding.displayName}.`
                 : 'No items match this filter yet.'}
             </div>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredPortfolio.map((item) => {
+              {/* Published Portfolio Showcase Events (Cover + Title + Event Date + Gallery/Video Counts) */}
+              {filteredPortfolioEvents.map((ev, idx) => {
+                const rawCoverUrl = ev.coverMedia?.secureUrl || '';
+                const coverUrl =
+                  ev.coverMedia?.deliveryUrls?.coverUrl ||
+                  buildCloudinaryImageUrl(rawCoverUrl, { width: 800, crop: 'limit' });
+                const isFirstRow = idx < 3;
+
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => setActiveShowcaseEvent(ev)}
+                    className="group text-left atelier-card atelier-card-hover overflow-hidden flex flex-col cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+                  >
+                    <div className="aspect-[4/3] w-full bg-slate-100 relative overflow-hidden">
+                      {coverUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={coverUrl}
+                          srcSet={rawCoverUrl ? buildCloudinarySrcSet(rawCoverUrl) : undefined}
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px"
+                          alt={ev.coverMedia?.altText || ev.title}
+                          loading={isFirstRow ? 'eager' : 'lazy'}
+                          fetchPriority={isFirstRow ? 'high' : 'auto'}
+                          decoding="async"
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-slate-900 text-slate-400 text-xs font-medium">
+                          Showcase Event
+                        </div>
+                      )}
+
+                      <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-slate-950/75 backdrop-blur-xs px-3 py-1 text-xs font-medium text-white">
+                        {ev.counts?.photos ? `${ev.counts.photos} Photos` : 'Showcase'}
+                        {ev.counts?.videos ? ` • ${ev.counts.videos} Video` : ''}
+                      </span>
+                    </div>
+
+                    <div className="p-5 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-1">
+                          {ev.eventDate && (
+                            <span className="font-mono-code">
+                              {formatLocalDate(ev.eventDate)}
+                            </span>
+                          )}
+                          {ev.eventType && (
+                            <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+                              {ev.eventType.name}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-lg font-semibold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
+                          {ev.title}
+                        </h3>
+                        {ev.description && (
+                          <p className="mt-1.5 text-sm text-slate-600 leading-relaxed line-clamp-2">
+                            {ev.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+
+              {/* Legacy Portfolio Items */}
+              {filteredPortfolio.map((item, idx) => {
                 const parsed = parseShowcaseMedia(item.mediaUrl);
+                const isFirstRow = filteredPortfolioEvents.length + idx < 3;
                 return (
                   <button
                     key={item.id}
@@ -315,8 +407,16 @@ export function PublicAgencyHome({
                       {parsed.coverUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={parsed.coverUrl}
+                          src={buildCloudinaryImageUrl(parsed.coverUrl, {
+                            width: 800,
+                            crop: 'limit',
+                          })}
+                          srcSet={buildCloudinarySrcSet(parsed.coverUrl)}
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px"
                           alt={item.title}
+                          loading={isFirstRow ? 'eager' : 'lazy'}
+                          fetchPriority={isFirstRow ? 'high' : 'auto'}
+                          decoding="async"
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                         />
                       ) : (
@@ -359,6 +459,13 @@ export function PublicAgencyHome({
           )}
         </div>
       </section>
+
+      {activeShowcaseEvent && (
+        <PortfolioEventDetailModal
+          event={activeShowcaseEvent}
+          onClose={() => setActiveShowcaseEvent(null)}
+        />
+      )}
 
       {activeShowcaseItem && (
         <ShowcaseLightboxModal
