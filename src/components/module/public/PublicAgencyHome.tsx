@@ -10,7 +10,9 @@ import {
   CheckCircleIcon,
   SparklesIcon,
 } from '@/components/shared/Icons';
+import { parseShowcaseMedia } from '@/lib/showcaseMedia';
 import { InquiryForm } from './InquiryForm';
+import { ShowcaseLightboxModal } from './ShowcaseLightboxModal';
 
 interface PublicAgencyHomeProps {
   branding: PublicBranding;
@@ -28,8 +30,15 @@ export function PublicAgencyHome({
   isBackendConnected,
 }: PublicAgencyHomeProps) {
   const [selectedPackageId, setSelectedPackageId] = useState<string>('');
+  const [showcaseFilter, setShowcaseFilter] = useState<'all' | 'photo' | 'video'>('all');
+  const [activeShowcaseItem, setActiveShowcaseItem] = useState<PortfolioItem | null>(null);
   const primary = branding.themeTokens.primaryColor || '#0F172A';
   const accent = branding.themeTokens.accentColor || '#4F46E5';
+
+  const filteredPortfolio = portfolio.filter((item) => {
+    if (showcaseFilter === 'all') return true;
+    return parseShowcaseMedia(item.mediaUrl).kind === showcaseFilter;
+  });
 
   const handleSelectPackage = (id: string) => {
     setSelectedPackageId(id);
@@ -245,58 +254,118 @@ export function PublicAgencyHome({
         )}
       </section>
 
-      {/* Approved & Published Portfolio */}
+      {/* Approved & Published Portfolio (Photo Galleries & Video Films) */}
       <section id="portfolio" className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <div className="flex items-end justify-between mb-10">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
                 Our Work
               </p>
-              <h2 className="text-2xl sm:text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 mt-1">
-                Past Events
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
+                Photo Galleries &amp; Video Films
               </h2>
             </div>
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-              <CameraIcon className="w-5 h-5" />
-            </span>
+
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
+                {[
+                  { id: 'all' as const, label: 'All' },
+                  { id: 'photo' as const, label: 'Photo Galleries' },
+                  { id: 'video' as const, label: 'Video Films' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setShowcaseFilter(tab.id)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                      showcaseFilter === tab.id
+                        ? 'bg-slate-900 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <span className="hidden sm:flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                <CameraIcon className="w-5 h-5" />
+              </span>
+            </div>
           </div>
 
-          {portfolio.length === 0 ? (
+          {filteredPortfolio.length === 0 ? (
             <div className="atelier-card p-10 text-center text-sm text-slate-500 bg-slate-50">
-              Approved portfolio stories will appear here once published by {branding.displayName}.
+              {portfolio.length === 0
+                ? `Approved photo galleries and video films will appear here once published by ${branding.displayName}.`
+                : 'No items match this filter yet.'}
             </div>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {portfolio.map((item) => (
-                <article
-                  key={item.id}
-                  className="group atelier-card atelier-card-hover overflow-hidden flex flex-col"
-                >
-                  <div className="aspect-[4/3] bg-slate-100 relative overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.mediaUrl}
-                      alt={item.title}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                    />
-                  </div>
-                  <div className="p-5">
-                    <h3 className="text-lg font-bold tracking-tight text-slate-900">
-                      {item.title}
-                    </h3>
-                    {item.description && (
-                      <p className="mt-1.5 text-sm text-slate-600 leading-relaxed">
-                        {item.description}
-                      </p>
-                    )}
-                  </div>
-                </article>
-              ))}
+              {filteredPortfolio.map((item) => {
+                const parsed = parseShowcaseMedia(item.mediaUrl);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveShowcaseItem(item)}
+                    className="group text-left atelier-card atelier-card-hover overflow-hidden flex flex-col cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+                  >
+                    <div className="aspect-[4/3] w-full bg-slate-100 relative overflow-hidden">
+                      {parsed.coverUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={parsed.coverUrl}
+                          alt={item.title}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-slate-900 text-slate-400 text-xs font-medium">
+                          Video Film
+                        </div>
+                      )}
+
+                      {/* Media type badge */}
+                      <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-slate-950/75 backdrop-blur-xs px-3 py-1 text-xs font-medium text-white">
+                        {parsed.kind === 'video'
+                          ? '▶ Video Film'
+                          : parsed.photos.length > 1
+                            ? `Gallery • ${parsed.photos.length} Photos`
+                            : 'Photo'}
+                      </span>
+
+                      {parsed.kind === 'video' && (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition-transform duration-200 group-hover:scale-110">
+                            ▶
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-5 flex-1">
+                      <h3 className="text-lg font-semibold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
+                        {item.title}
+                      </h3>
+                      {item.description && (
+                        <p className="mt-1.5 text-sm text-slate-600 leading-relaxed line-clamp-2">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
       </section>
+
+      {activeShowcaseItem && (
+        <ShowcaseLightboxModal
+          item={activeShowcaseItem}
+          onClose={() => setActiveShowcaseItem(null)}
+        />
+      )}
 
       {/* Inquiry Section */}
       <section id="inquire" className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
