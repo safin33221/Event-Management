@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { getMe } from '@/service/auth';
 import { getAgencySettings, listAgencyMembers } from '@/service/agency/agency.service';
 import {
-  listAdminPortfolioEvents,
   listDeliverableLabels,
   listEventTypes,
   listPackages,
@@ -17,16 +16,14 @@ async function AdminCatalogContent() {
   if (!session) redirect('/login');
   if (session.role === 'STAFF') redirect('/staff');
 
-  const [settingsRes, pkgRes, etRes, memRes, delLabelsRes, taskTplRes, portEventsRes] =
-    await Promise.all([
-      getAgencySettings(),
-      listPackages(),
-      listEventTypes(),
-      listAgencyMembers(),
-      listDeliverableLabels(),
-      listTaskTemplates(),
-      listAdminPortfolioEvents(),
-    ]);
+  const [settingsRes, pkgRes, etRes, memRes, delLabelsRes, taskTplRes] = await Promise.all([
+    getAgencySettings(),
+    listPackages(),
+    listEventTypes(),
+    listAgencyMembers(),
+    listDeliverableLabels(),
+    listTaskTemplates(),
+  ]);
 
   return (
     <CatalogWorkspace
@@ -36,16 +33,13 @@ async function AdminCatalogContent() {
       initialMembers={memRes.ok && memRes.data ? memRes.data : []}
       initialDeliverableLabels={delLabelsRes.ok && delLabelsRes.data ? delLabelsRes.data : []}
       initialTaskTemplates={taskTplRes.ok && taskTplRes.data ? taskTplRes.data : []}
-      initialPortfolioEvents={
-        portEventsRes.ok && portEventsRes.data ? portEventsRes.data.data : []
-      }
     />
   );
 }
 
 export default function AdminCatalogPage() {
   return (
-    <Suspense fallback={<PageSkeleton label="Loading catalog & branding..." />}>
+    <Suspense fallback={<PageSkeleton label="Loading packages..." />}>
       <AdminCatalogContent />
     </Suspense>
   );

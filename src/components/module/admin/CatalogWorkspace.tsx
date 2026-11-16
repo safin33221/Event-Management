@@ -4,7 +4,6 @@ import React, { useState, useTransition } from 'react';
 import {
   DeliverableLabelTemplate,
   EventType,
-  PortfolioShowcaseEvent,
   StudioPackage,
   StudioSettings,
   TaskTemplate,
@@ -25,7 +24,6 @@ import {
 } from '@/service/catalog/catalog.service';
 import { cn, formatPoisha } from '@/lib/utils';
 import { PaletteIcon, PlusIcon, SparklesIcon, UsersIcon } from '@/components/shared/Icons';
-import { PortfolioEventManager } from './PortfolioEventManager';
 
 export type StudioSetupSection = 'catalog' | 'team' | 'settings';
 
@@ -43,7 +41,6 @@ interface CatalogWorkspaceProps {
   }>;
   initialDeliverableLabels?: DeliverableLabelTemplate[];
   initialTaskTemplates?: TaskTemplate[];
-  initialPortfolioEvents?: PortfolioShowcaseEvent[];
 }
 
 export function CatalogWorkspace({
@@ -54,7 +51,6 @@ export function CatalogWorkspace({
   initialMembers,
   initialDeliverableLabels = [],
   initialTaskTemplates = [],
-  initialPortfolioEvents = [],
 }: CatalogWorkspaceProps) {
   const [settings, setSettings] = useState<StudioSettings | null>(initialSettings);
   const [packages, setPackages] = useState<StudioPackage[]>(initialPackages);
@@ -64,8 +60,7 @@ export function CatalogWorkspace({
     useState<DeliverableLabelTemplate[]>(initialDeliverableLabels);
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>(initialTaskTemplates);
 
-  // Sub-tabs within each dedicated section (only 2 focused tabs per route!)
-  const [catalogTab, setCatalogTab] = useState<'packages' | 'showcase'>('packages');
+  // Sub-tabs for Team & Rules
   const [teamTab, setTeamTab] = useState<'members' | 'automation'>('members');
 
   // Modals for clean creation
@@ -318,63 +313,34 @@ export function CatalogWorkspace({
       )}
 
       {/* =====================================================================
-          ROUTE 1: /admin/catalog — PACKAGES & PUBLIC SHOWCASE
+          ROUTE 1: /admin/catalog — SERVICE PACKAGES & EVENT CATEGORIES
       ===================================================================== */}
       {section === 'catalog' && (
         <>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Packages &amp; Showcase
+                Service Packages
               </h1>
               <p className="text-xs text-muted-foreground font-medium mt-1">
-                Configure service packages, event categories, and public portfolio stories.
+                Configure service packages and event categories. Manage public galleries under Public
+                Showcase.
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="inline-flex rounded-xl border border-border/60 bg-card p-1 gap-1">
-                <button
-                  type="button"
-                  onClick={() => setCatalogTab('packages')}
-                  className={cn(
-                    'rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors',
-                    catalogTab === 'packages'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-600 hover:text-slate-900',
-                  )}
-                >
-                  Packages ({packages.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCatalogTab('showcase')}
-                  className={cn(
-                    'rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors',
-                    catalogTab === 'showcase'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-600 hover:text-slate-900',
-                  )}
-                >
-                  Public Showcase
-                </button>
-              </div>
-
-              {catalogTab === 'packages' && (
-                <button
-                  type="button"
-                  onClick={() => setShowAddPkg(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
-                >
-                  <PlusIcon className="w-3.5 h-3.5" />
-                  <span>New Package</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowAddPkg(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+              >
+                <PlusIcon className="w-3.5 h-3.5" />
+                <span>New Package</span>
+              </button>
             </div>
           </div>
 
-          {catalogTab === 'packages' && (
-            <div className="grid gap-6 lg:grid-cols-12">
+          <div className="grid gap-6 lg:grid-cols-12">
               <div className="lg:col-span-8 atelier-card p-6 space-y-4">
                 <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <div>
@@ -469,14 +435,6 @@ export function CatalogWorkspace({
                 </div>
               </div>
             </div>
-          )}
-
-          {catalogTab === 'showcase' && (
-            <PortfolioEventManager
-              initialEvents={initialPortfolioEvents}
-              eventTypes={eventTypes}
-            />
-          )}
 
           {/* Add Package Modal */}
           {showAddPkg && (
