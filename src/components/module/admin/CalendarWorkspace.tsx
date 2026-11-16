@@ -668,24 +668,24 @@ export function CalendarWorkspace({
       {/* Header + Action Buttons */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Schedule &amp; Google Calendar
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="text-xs text-muted-foreground font-medium mt-1">
             Interactive studio calendar, live crew conflict checks, and Google Calendar sync •{' '}
             {timezone}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={openGoogleSyncPanel}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors',
+              'inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200',
               activePanel === 'google'
-                ? 'border-emerald-700 bg-emerald-700 text-white'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100',
+                ? 'border-emerald-700 bg-emerald-700 text-white shadow-xs'
+                : 'border-emerald-200 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100/80',
             )}
           >
             <CalendarIcon className="w-4 h-4" />
@@ -696,10 +696,10 @@ export function CalendarWorkspace({
             type="button"
             onClick={() => setActivePanel(activePanel === 'resources' ? 'none' : 'resources')}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-semibold transition-colors',
+              'inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200',
               activePanel === 'resources'
-                ? 'border-slate-900 bg-slate-900 text-white'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                : 'border-border/60 bg-card text-slate-700 hover:bg-slate-50 hover:border-primary/40',
             )}
           >
             <span>Crew &amp; Gear ({resources.length})</span>
@@ -717,31 +717,39 @@ export function CalendarWorkspace({
                 }
               }
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 transition-all duration-200"
           >
-            <PlusIcon className="w-3.5 h-3.5" />
+            <PlusIcon className="w-4 h-4" />
             <span>{activePanel === 'schedule' ? 'Close Form' : 'Schedule Event'}</span>
           </button>
         </div>
       </div>
 
       {/* KPI Summary Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="atelier-card px-4 py-3">
-          <p className="text-xs font-medium text-slate-500">Sessions in Range</p>
-          <p className="text-2xl font-bold text-slate-900 mt-0.5">{sessions.length}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm transition-all duration-200">
+          <p className="text-sm font-medium text-muted-foreground">Sessions in Range</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900 mt-2 tabular-nums">
+            {sessions.length}
+          </p>
         </div>
-        <div className="atelier-card px-4 py-3">
-          <p className="text-xs font-medium text-slate-500">Upcoming Scheduled</p>
-          <p className="text-2xl font-bold text-indigo-600 mt-0.5">{scheduledCount}</p>
+        <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm transition-all duration-200">
+          <p className="text-sm font-medium text-muted-foreground">Upcoming Scheduled</p>
+          <p className="text-2xl font-bold tracking-tight text-primary mt-2 tabular-nums">
+            {scheduledCount}
+          </p>
         </div>
-        <div className="atelier-card px-4 py-3">
-          <p className="text-xs font-medium text-slate-500">Completed Shoots</p>
-          <p className="text-2xl font-bold text-emerald-600 mt-0.5">{completedCount}</p>
+        <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm transition-all duration-200">
+          <p className="text-sm font-medium text-muted-foreground">Completed Shoots</p>
+          <p className="text-2xl font-bold tracking-tight text-emerald-600 mt-2 tabular-nums">
+            {completedCount}
+          </p>
         </div>
-        <div className="atelier-card px-4 py-3">
-          <p className="text-xs font-medium text-slate-500">Crew &amp; Equipment Pool</p>
-          <p className="text-2xl font-bold text-slate-900 mt-0.5">{resources.length}</p>
+        <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm transition-all duration-200">
+          <p className="text-sm font-medium text-muted-foreground">Crew &amp; Equipment Pool</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900 mt-2 tabular-nums">
+            {resources.length}
+          </p>
         </div>
       </div>
 

@@ -344,16 +344,16 @@ export function CatalogWorkspace({
         <>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
                 Packages &amp; Showcase
               </h1>
-              <p className="text-sm text-slate-500 mt-0.5">
+              <p className="text-xs text-muted-foreground font-medium mt-1">
                 Configure service packages, event categories, and public portfolio stories.
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 gap-1">
+              <div className="inline-flex rounded-xl border border-border/60 bg-card p-1 gap-1">
                 <button
                   type="button"
                   onClick={() => setCatalogTab('packages')}
@@ -396,7 +396,7 @@ export function CatalogWorkspace({
           {catalogTab === 'packages' && (
             <div className="grid gap-6 lg:grid-cols-12">
               <div className="lg:col-span-8 atelier-card p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <div>
                     <h2 className="text-base font-bold text-slate-900">Service Packages</h2>
                     <p className="text-xs text-slate-500">
@@ -422,7 +422,7 @@ export function CatalogWorkspace({
                               </span>
                             )}
                           </div>
-                          <p className="font-mono-code text-xs text-slate-500 mt-0.5 tabular-nums">
+                          <p className="font-mono-code text-xs text-muted-foreground font-medium mt-0.5 tabular-nums">
                             {formatPoisha(pkg.basePricePoisha, currency)}
                             {pkg.description ? ` • ${pkg.description}` : ''}
                           </p>
@@ -447,7 +447,7 @@ export function CatalogWorkspace({
 
               {/* Event Types Side Card */}
               <div className="lg:col-span-4 atelier-card p-6 space-y-4">
-                <div className="border-b border-slate-100 pb-3">
+                <div className="border-b border-border/60 pb-3">
                   <h2 className="text-base font-bold text-slate-900">
                     Event Categories ({eventTypes.length})
                   </h2>
@@ -493,9 +493,9 @@ export function CatalogWorkspace({
 
           {catalogTab === 'showcase' && (
             <form onSubmit={handleAddPortfolio} className="atelier-card p-6 space-y-4 max-w-xl">
-              <div className="border-b border-slate-100 pb-3">
+              <div className="border-b border-border/60 pb-3">
                 <h2 className="text-base font-bold text-slate-900">Publish Showcase Story</h2>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-muted-foreground font-medium mt-0.5">
                   Add an approved photo or highlight to your public storefront gallery.
                 </p>
               </div>
@@ -534,8 +534,8 @@ export function CatalogWorkspace({
           {/* Add Package Modal */}
           {showAddPkg && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-              <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="w-full max-w-lg rounded-2xl border border-border/60 bg-card p-6 shadow-xl space-y-4">
+                <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <h3 className="text-base font-bold text-slate-900">Create Service Package</h3>
                   <button
                     type="button"
@@ -631,16 +631,16 @@ export function CatalogWorkspace({
         <>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
                 Team &amp; Automation
               </h1>
-              <p className="text-sm text-slate-500 mt-0.5">
+              <p className="text-xs text-muted-foreground font-medium mt-1">
                 Manage studio staff accounts and automatic post-confirmation deliverables &amp; tasks.
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 gap-1">
+              <div className="inline-flex rounded-xl border border-border/60 bg-card p-1 gap-1">
                 <button
                   type="button"
                   onClick={() => setTeamTab('members')}
@@ -682,7 +682,7 @@ export function CatalogWorkspace({
 
           {teamTab === 'members' && (
             <div className="atelier-card p-6 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center justify-between border-b border-border/60 pb-3">
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
                     <UsersIcon className="w-4 h-4" />
@@ -729,7 +729,7 @@ export function CatalogWorkspace({
               <div className="grid gap-6 lg:grid-cols-2">
                 {/* Deliverable Rules */}
                 <div className="atelier-card p-6 space-y-4">
-                  <div className="border-b border-slate-100 pb-3">
+                  <div className="border-b border-border/60 pb-3">
                     <h2 className="text-base font-bold text-slate-900">
                       Auto-Deliverable Rules ({deliverableLabels.length})
                     </h2>
@@ -803,7 +803,7 @@ export function CatalogWorkspace({
 
                 {/* Task Templates */}
                 <div className="atelier-card p-6 space-y-4">
-                  <div className="border-b border-slate-100 pb-3">
+                  <div className="border-b border-border/60 pb-3">
                     <h2 className="text-base font-bold text-slate-900">
                       Auto-Task Templates ({taskTemplates.length})
                     </h2>
@@ -894,8 +894,8 @@ export function CatalogWorkspace({
           {/* Add Team Member Modal */}
           {showAddMember && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-              <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="w-full max-w-md rounded-2xl border border-border/60 bg-card p-6 shadow-xl space-y-4">
+                <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <h3 className="text-base font-bold text-slate-900">Add Studio Team Member</h3>
                   <button
                     type="button"
@@ -989,10 +989,10 @@ export function CatalogWorkspace({
       {section === 'settings' && (
         <>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               Branding &amp; Booking Rules
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-xs text-muted-foreground font-medium mt-1">
               Configure your white-label studio identity, theme colors, timezone, and advance deposit requirements.
             </p>
           </div>
@@ -1002,7 +1002,7 @@ export function CatalogWorkspace({
               onSubmit={handleSaveBranding}
               className="lg:col-span-7 atelier-card p-6 space-y-5"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center justify-between border-b border-border/60 pb-3">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">
                     Studio Identity &amp; Operational Policy
@@ -1137,7 +1137,7 @@ export function CatalogWorkspace({
                 style={{ backgroundColor: primaryColor || '#0F172A' }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-lg font-bold tracking-tight">
+                  <span className="text-lg font-semibold tracking-tight">
                     {brandName || 'Your Studio Name'}
                   </span>
                   <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-mono-code">

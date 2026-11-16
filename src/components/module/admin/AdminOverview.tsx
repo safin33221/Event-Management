@@ -77,24 +77,24 @@ export function AdminOverview({
       {/* Clean Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             {settings?.displayName || 'Studio Dashboard'}
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="text-xs text-muted-foreground font-medium mt-1">
             Daily overview of your inquiries, quotes, bookings, and upcoming shoots ({timezone})
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/admin/calendar"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl border border-border/60 bg-card px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200"
           >
-            <CalendarIcon className="w-4 h-4 text-indigo-600" />
+            <CalendarIcon className="w-4 h-4 text-primary" />
             <span>Shoot Calendar</span>
           </Link>
           <Link
             href="/admin/bookings"
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 transition-all duration-200"
           >
             <span>All Bookings</span>
             <ArrowRightIcon className="w-4 h-4" />
@@ -106,21 +106,21 @@ export function AdminOverview({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link
           href="/admin/inquiries"
-          className="atelier-card p-5 hover:border-indigo-300 transition-all group"
+          className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200 group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-sm font-medium text-muted-foreground">
               1. Inquiries
             </span>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50/80 text-indigo-600 ring-1 ring-inset ring-indigo-600/15 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-200">
               <SparklesIcon className="w-4 h-4" />
             </span>
           </div>
-          <p className="text-3xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
+          <p className="text-2xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
             {newInquiriesCount}
-            <span className="text-sm font-medium text-slate-400 ml-1.5">new</span>
+            <span className="text-xs font-medium text-muted-foreground ml-1.5">new</span>
           </p>
-          <p className="text-xs font-medium text-indigo-600 mt-2 flex items-center gap-1">
+          <p className="text-xs font-medium text-muted-foreground mt-2 flex items-center gap-1 group-hover:text-primary transition-colors">
             <span>{inquiries.length} total requests • Open Inquiries</span>
             <ArrowRightIcon className="w-3 h-3" />
           </p>
@@ -128,21 +128,21 @@ export function AdminOverview({
 
         <Link
           href="/admin/quotes"
-          className="atelier-card p-5 hover:border-amber-300 transition-all group"
+          className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200 group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-sm font-medium text-muted-foreground">
               2. Price Quotes
             </span>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50/80 text-amber-600 ring-1 ring-inset ring-amber-600/15 group-hover:bg-amber-500 group-hover:text-white transition-colors duration-200">
               <ReceiptIcon className="w-4 h-4" />
             </span>
           </div>
-          <p className="text-3xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
+          <p className="text-2xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
             {openQuotesCount}
-            <span className="text-sm font-medium text-slate-400 ml-1.5">open</span>
+            <span className="text-xs font-medium text-muted-foreground ml-1.5">open</span>
           </p>
-          <p className="text-xs font-medium text-amber-700 mt-2 flex items-center gap-1">
+          <p className="text-xs font-medium text-muted-foreground mt-2 flex items-center gap-1 group-hover:text-amber-700 transition-colors">
             <span>{quotes.length} total proposals • Manage Quotes</span>
             <ArrowRightIcon className="w-3 h-3" />
           </p>
@@ -150,69 +150,69 @@ export function AdminOverview({
 
         <Link
           href="/admin/bookings"
-          className="atelier-card p-5 hover:border-emerald-300 transition-all group"
+          className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200 group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-sm font-medium text-muted-foreground">
               3. Bookings
             </span>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50/80 text-emerald-600 ring-1 ring-inset ring-emerald-600/15 group-hover:bg-emerald-600 group-hover:text-white transition-colors duration-200">
               <UsersIcon className="w-4 h-4" />
             </span>
           </div>
-          <p className="text-3xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
+          <p className="text-2xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
             {confirmedCount}
-            <span className="text-sm font-medium text-slate-400 ml-1.5">
+            <span className="text-xs font-medium text-muted-foreground ml-1.5">
               confirmed {pendingConfirmCount > 0 ? `(+${pendingConfirmCount} pending)` : ''}
             </span>
           </p>
-          <p className="text-xs font-mono-code font-semibold text-emerald-700 mt-2 tabular-nums">
+          <p className="text-xs font-mono-code font-medium text-emerald-700 mt-2 tabular-nums">
             Pipeline: {formatPoisha(totalAgreedPoisha, currency)} →
           </p>
         </Link>
 
         <Link
           href="/admin/calendar"
-          className="atelier-card p-5 hover:border-sky-300 transition-all group"
+          className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200 group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-sm font-medium text-muted-foreground">
               4. Upcoming Shoots
             </span>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 group-hover:bg-sky-600 group-hover:text-white transition-colors">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50/80 text-sky-600 ring-1 ring-inset ring-sky-600/15 group-hover:bg-sky-600 group-hover:text-white transition-colors duration-200">
               <CalendarIcon className="w-4 h-4" />
             </span>
           </div>
-          <p className="text-3xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
+          <p className="text-2xl font-bold tracking-tight text-slate-900 mt-3 tabular-nums">
             {upcomingSessions.length}
-            <span className="text-sm font-medium text-slate-400 ml-1.5">next 14d</span>
+            <span className="text-xs font-medium text-muted-foreground ml-1.5">next 14d</span>
           </p>
-          <p className="text-xs font-medium text-sky-700 mt-2 flex items-center gap-1">
+          <p className="text-xs font-medium text-muted-foreground mt-2 flex items-center gap-1 group-hover:text-sky-700 transition-colors">
             <span>View Calendar &amp; Crew</span>
             <ArrowRightIcon className="w-3 h-3" />
           </p>
         </Link>
       </div>
 
-      {/* Focused Tabbed Action Center (Replaces the 4-box clutter) */}
+      {/* Focused Tabbed Action Center */}
       {alerts && (
-        <div className="atelier-card p-5 sm:p-6 space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+        <div className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6 space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-border/60 pb-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50/80 text-primary ring-1 ring-inset ring-indigo-600/15">
                 <CheckCircleIcon className="w-4 h-4" />
               </span>
               <div>
-                <h2 className="text-base font-bold tracking-tight text-slate-900">
+                <h2 className="text-lg font-semibold tracking-tight text-slate-900">
                   Needs Your Attention ({totalAlerts})
                 </h2>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground font-medium">
                   Click any category below to act on pending payments, confirmations, or shoots.
                 </p>
               </div>
             </div>
 
-            <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
+            <div className="inline-flex flex-wrap rounded-xl border border-border/60 bg-slate-50/80 p-1 gap-1">
               {[
                 {
                   id: 'payments' as const,
@@ -432,24 +432,24 @@ export function AdminOverview({
               No bookings yet. Accept a quote in Price Quotes to create one.
             </p>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-border/50">
               {bookings.slice(0, 5).map((b) => (
                 <Link
                   key={b.id}
                   href={`/admin/bookings/${b.id}`}
-                  className="py-3 px-2 -mx-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-between gap-4 group"
+                  className="py-3.5 px-3 -mx-3 rounded-xl hover:bg-slate-50/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200 flex items-center justify-between gap-4 group"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono-code text-xs font-semibold text-slate-500">
+                      <span className="font-mono-code text-xs font-medium text-muted-foreground">
                         {b.reference}
                       </span>
                       <StatusBadge status={b.status} />
                     </div>
-                    <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate mt-1">
+                    <p className="text-sm font-medium text-slate-900 group-hover:text-primary transition-colors truncate mt-1">
                       {b.eventTitle}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground font-medium">
                       {b.clientName} • {formatLocalDate(b.eventDate)}
                     </p>
                   </div>
@@ -457,7 +457,7 @@ export function AdminOverview({
                     <p className="font-mono-code text-sm font-semibold text-slate-900 tabular-nums">
                       {formatPoisha(b.agreedTotalPoisha, b.currency)}
                     </p>
-                    <span className="text-xs font-medium text-indigo-600">Open →</span>
+                    <span className="text-xs font-medium text-primary">Open →</span>
                   </div>
                 </Link>
               ))}
@@ -465,45 +465,45 @@ export function AdminOverview({
           )}
         </div>
 
-        <div className="lg:col-span-5 atelier-card p-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-3">
+        <div className="lg:col-span-5 rounded-2xl border border-border/60 bg-card p-6">
+          <div className="flex items-center justify-between border-b border-border/60 pb-4 mb-4">
             <div>
-              <h2 className="text-base font-bold tracking-tight text-slate-900">
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900">
                 Upcoming Schedule
               </h2>
-              <p className="text-xs text-slate-500">Next 14 days in {timezone}</p>
+              <p className="text-xs text-muted-foreground font-medium">Next 14 days in {timezone}</p>
             </div>
             <Link
               href="/admin/calendar"
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+              className="text-xs font-medium text-primary hover:text-indigo-700"
             >
               Open calendar →
             </Link>
           </div>
           {upcomingSessions.length === 0 ? (
-            <p className="text-sm text-slate-500 py-8 text-center">
+            <p className="text-xs text-muted-foreground font-medium py-8 text-center">
               No sessions scheduled in the next 14 days.
             </p>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {upcomingSessions.slice(0, 5).map((s) => (
                 <Link
                   key={s.id}
                   href={s.bookingId ? `/admin/bookings/${s.bookingId}?section=schedule` : '/admin/calendar'}
-                  className="block rounded-xl border border-slate-200/80 bg-slate-50/60 hover:border-indigo-300 hover:bg-white p-3.5 space-y-1 transition-all"
+                  className="block rounded-xl border border-border/60 bg-slate-50/50 hover:border-primary/40 hover:bg-card hover:shadow-xs p-3.5 space-y-1 transition-all duration-200"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-mono-code font-semibold text-indigo-600">
+                    <span className="text-xs font-mono-code font-medium text-primary">
                       {s.agencyLocalDate || formatLocalDate(s.startAt)}
                     </span>
                     <StatusBadge status={s.status} />
                   </div>
-                  <p className="text-sm font-semibold text-slate-900 truncate">{s.title}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm font-medium text-slate-900 truncate">{s.title}</p>
+                  <p className="text-xs text-muted-foreground font-medium">
                     {formatDateTimeInTz(s.startAt, timezone)} → {formatDateTimeInTz(s.endAt, timezone)}
                   </p>
                   {s.booking && (
-                    <p className="text-xs text-slate-600 truncate">
+                    <p className="text-xs text-muted-foreground font-medium truncate">
                       {s.booking.reference} — {s.booking.eventTitle}
                     </p>
                   )}

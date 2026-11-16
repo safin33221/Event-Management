@@ -939,48 +939,48 @@ export function BookingsWorkspace({
           MODE 1: DEDICATED INQUIRIES ROUTE (/admin/inquiries)
       ===================================================================== */}
       {resolvedMode === 'inquiries' && (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
                 1. Client Inquiries
               </h1>
-              <p className="text-sm text-slate-500 mt-0.5">
+              <p className="text-xs text-muted-foreground font-medium mt-1">
                 Log phone/walk-in requests or review public storefront inquiries before sending a quote.
               </p>
             </div>
             <button
               type="button"
               onClick={() => setShowInquiryForm(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 transition-all duration-200"
             >
-              <PlusIcon className="w-3.5 h-3.5" />
+              <PlusIcon className="w-4 h-4" />
               <span>Log Phone / Walk-In Inquiry</span>
             </button>
           </div>
 
           {/* Search & Status Filters */}
-          <div className="atelier-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="rounded-2xl border border-border/60 bg-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="relative flex-1 max-w-sm">
-              <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <SearchIcon className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search client, event, or ref..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white"
+                className="w-full rounded-xl border border-border/60 bg-slate-50/70 pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-muted-foreground outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all duration-200"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               {(['ALL', 'NEW', 'QUOTED', 'CONVERTED'] as const).map((st) => (
                 <button
                   key={st}
                   type="button"
                   onClick={() => setStatusFilter(st)}
                   className={cn(
-                    'rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors',
+                    'rounded-lg px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200',
                     statusFilter === st
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-slate-900 text-white shadow-xs'
                       : 'text-slate-600 hover:bg-slate-100',
                   )}
                 >
@@ -1196,13 +1196,13 @@ export function BookingsWorkspace({
           MODE 2: DEDICATED QUOTES ROUTE (/admin/quotes)
       ===================================================================== */}
       {resolvedMode === 'quotes' && (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
                 2. Price Quotes
               </h1>
-              <p className="text-sm text-slate-500 mt-0.5">
+              <p className="text-xs text-muted-foreground font-medium mt-1">
                 Build itemized proposals, revise versions, and accept a quote to create a booking.
               </p>
             </div>
@@ -1212,35 +1212,35 @@ export function BookingsWorkspace({
                 setEditingQuoteId(null);
                 setShowQuoteForm(true);
               }}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 transition-all duration-200"
             >
-              <PlusIcon className="w-3.5 h-3.5" />
+              <PlusIcon className="w-4 h-4" />
               <span>Create Price Quote</span>
             </button>
           </div>
 
           {/* Search & Status Filters */}
-          <div className="atelier-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="rounded-2xl border border-border/60 bg-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="relative flex-1 max-w-sm">
-              <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <SearchIcon className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search quote reference, client, or event..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white"
+                className="w-full rounded-xl border border-border/60 bg-slate-50/70 pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-muted-foreground outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all duration-200"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               {(['ALL', 'DRAFT', 'SENT', 'ACCEPTED'] as const).map((st) => (
                 <button
                   key={st}
                   type="button"
                   onClick={() => setStatusFilter(st)}
                   className={cn(
-                    'rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors',
+                    'rounded-lg px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200',
                     statusFilter === st
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-slate-900 text-white shadow-xs'
                       : 'text-slate-600 hover:bg-slate-100',
                   )}
                 >
@@ -1619,37 +1619,37 @@ export function BookingsWorkspace({
           MODE 3: DEDICATED BOOKINGS LIST ROUTE (/admin/bookings)
       ===================================================================== */}
       {resolvedMode === 'bookings' && (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
                 3. Bookings &amp; Ledger
               </h1>
-              <p className="text-sm text-slate-500 mt-0.5">
+              <p className="text-xs text-muted-foreground font-medium mt-1">
                 Select any booking to manage payments, shoot schedule, deliverables, and invoices.
               </p>
             </div>
             <Link
               href="/admin/quotes"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-card px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200"
             >
               <span>Go to Price Quotes →</span>
             </Link>
           </div>
 
           {/* Search & Status Filters */}
-          <div className="atelier-card p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="rounded-2xl border border-border/60 bg-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="relative flex-1 max-w-sm">
-              <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <SearchIcon className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search booking ref, client, or event..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white"
+                className="w-full rounded-xl border border-border/60 bg-slate-50/70 pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-muted-foreground outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all duration-200"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               {(
                 ['ALL', 'PENDING_CONFIRMATION', 'CONFIRMED', 'COMPLETED', 'CANCELLED'] as const
               ).map((st) => (
@@ -1658,9 +1658,9 @@ export function BookingsWorkspace({
                   type="button"
                   onClick={() => setStatusFilter(st)}
                   className={cn(
-                    'rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors',
+                    'rounded-lg px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200',
                     statusFilter === st
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-slate-900 text-white shadow-xs'
                       : 'text-slate-600 hover:bg-slate-100',
                   )}
                 >

@@ -55,7 +55,7 @@ export function StaffWorkspace({
                   <span className="font-mono-code text-xs text-slate-500">
                     {a.booking?.reference || 'BOOKING'}
                   </span>
-                  <h2 className="text-lg font-bold tracking-tight text-slate-900">
+                  <h2 className="text-lg font-semibold tracking-tight text-slate-900">
                     {a.booking?.eventTitle || a.roleLabel}
                   </h2>
                 </div>
