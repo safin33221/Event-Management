@@ -53,7 +53,8 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
   const studioNav: NavItem[] = isStaffOnly
     ? []
     : [
-        { href: '/admin/portfolio', label: 'Public Showcase', icon: CameraIcon },
+        { href: '/admin/gallery', label: 'Gallery', icon: CameraIcon },
+        { href: '/admin/portfolio', label: 'Public Showcase', icon: LayersIcon },
         { href: '/admin/catalog', label: 'Packages', icon: PaletteIcon },
         { href: '/admin/team', label: 'Team & Rules', icon: UsersIcon },
         { href: '/admin/settings', label: 'Settings', icon: SparklesIcon },

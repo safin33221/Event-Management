@@ -81,12 +81,15 @@ function detectFileFormat(file: File): {
 interface PortfolioEventManagerProps {
   initialEvents: PortfolioShowcaseEvent[];
   eventTypes: EventType[];
+  mode?: 'portfolio' | 'gallery';
 }
 
 export function PortfolioEventManager({
   initialEvents,
   eventTypes,
+  mode = 'portfolio',
 }: PortfolioEventManagerProps) {
+  const isGalleryMode = mode === 'gallery';
   const [events, setEvents] = useState<PortfolioShowcaseEvent[]>(initialEvents);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(
     initialEvents[0]?.id ?? null,
@@ -582,7 +585,13 @@ export function PortfolioEventManager({
           className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
         >
           <PlusIcon className="w-3.5 h-3.5" />
-          <span>{showCreateForm ? 'Close Create Form' : 'Create Event'}</span>
+          <span>
+            {showCreateForm
+              ? 'Close Form'
+              : isGalleryMode
+                ? 'New Gallery Album'
+                : 'Create Event'}
+          </span>
         </button>
       </div>
 
@@ -595,11 +604,12 @@ export function PortfolioEventManager({
           <div className="flex items-center justify-between border-b border-slate-200/70 pb-3">
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Create Showcase Event (Draft)
+                {isGalleryMode ? 'Create New Gallery Album' : 'Create Showcase Event (Draft)'}
               </h3>
               <p className="text-xs text-slate-500">
-                Create a standalone portfolio event (no customer booking required), then drag &amp;
-                drop photos and highlight videos.
+                {isGalleryMode
+                  ? 'Name your album, then drag & drop photos and videos right from your computer.'
+                  : 'Create a standalone portfolio event (no customer booking required), then drag & drop photos and highlight videos.'}
               </p>
             </div>
           </div>
@@ -607,7 +617,7 @@ export function PortfolioEventManager({
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Event Title *
+                {isGalleryMode ? 'Album Title *' : 'Event Title *'}
               </label>
               <input
                 required
@@ -624,21 +634,23 @@ export function PortfolioEventManager({
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                URL Slug *
-              </label>
-              <input
-                required
-                value={newSlug}
-                onChange={(e) => {
-                  setSlugManuallyEdited(true);
-                  setNewSlug(slugifyTitle(e.target.value));
-                }}
-                placeholder="ayesha-rafiq-royal-wedding"
-                className={`${inputClass} font-mono-code`}
-              />
-            </div>
+            {!isGalleryMode && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  URL Slug *
+                </label>
+                <input
+                  required
+                  value={newSlug}
+                  onChange={(e) => {
+                    setSlugManuallyEdited(true);
+                    setNewSlug(slugifyTitle(e.target.value));
+                  }}
+                  placeholder="ayesha-rafiq-royal-wedding"
+                  className={`${inputClass} font-mono-code`}
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -886,8 +898,9 @@ export function PortfolioEventManager({
                   </div>
                 )}
 
-                {/* Editable Event Metadata Form */}
-                <form onSubmit={handleSaveEventMetadata} className="space-y-3">
+                {/* Editable Event Metadata Form (shown in portfolio mode) */}
+                {!isGalleryMode && (
+                  <form onSubmit={handleSaveEventMetadata} className="space-y-3">
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
@@ -972,6 +985,7 @@ export function PortfolioEventManager({
                     </button>
                   </div>
                 </form>
+                )}
               </div>
 
               {/* Direct Browser-to-Cloudinary Drag-and-Drop Uploader */}

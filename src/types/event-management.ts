@@ -202,6 +202,26 @@ export interface SignedCloudinaryUploadPayload {
   maxBytes: number;
 }
 
+export interface CloudinaryStatusSummary {
+  configured: boolean;
+  missingVariables: string[];
+  cloudName: string | null;
+  folderPrefix: string;
+  allowedImageFormats: string[];
+  allowedVideoFormats: string[];
+  maxImageBytes: number;
+  maxVideoBytes: number;
+}
+
+export interface GalleryMediaListResponse {
+  data: PortfolioMediaItem[];
+  counts: {
+    total: number;
+    photos: number;
+    videos: number;
+  };
+}
+
 export interface Inquiry {
   id: string;
   reference: string;

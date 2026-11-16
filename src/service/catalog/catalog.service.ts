@@ -3,12 +3,15 @@
 import { revalidatePath } from 'next/cache';
 import { serverFetch } from '@/lib/serverFetch';
 import {
+  CloudinaryStatusSummary,
   DeliverableLabelTemplate,
   EventType,
+  GalleryMediaListResponse,
   PaginatedResponse,
   PortfolioEventStatus,
   PortfolioItem,
   PortfolioMediaItem,
+  PortfolioMediaType,
   PortfolioShowcaseEvent,
   ServiceItem,
   SignedCloudinaryUploadPayload,
@@ -203,10 +206,12 @@ export async function updateTaskTemplate(
 function revalidatePortfolioPaths(slug?: string) {
   revalidatePath('/', 'layout');
   revalidatePath('/portfolio');
+  revalidatePath('/showcase');
   if (slug) {
     revalidatePath(`/portfolio/${slug}`);
   }
   revalidatePath('/admin/portfolio');
+  revalidatePath('/admin/gallery');
   revalidatePath('/admin/catalog');
 }
 
@@ -428,6 +433,85 @@ export async function archivePortfolioEvent(
   const result = await parseApiResponse<PortfolioShowcaseEvent>(res);
   if (result.ok) {
     revalidatePortfolioPaths(result.data?.slug);
+  }
+  return result;
+}
+
+export async function getGalleryStatus(): Promise<ActionResult<CloudinaryStatusSummary>> {
+  const res = await serverFetch.get('/catalog/gallery/status');
+  return parseApiResponse<CloudinaryStatusSummary>(res);
+}
+
+export async function listGalleryMedia(
+  resourceType?: PortfolioMediaType,
+): Promise<ActionResult<GalleryMediaListResponse>> {
+  const qs = resourceType ? `?resourceType=${encodeURIComponent(resourceType)}` : '';
+  const res = await serverFetch.get(`/catalog/gallery${qs}`);
+  return parseApiResponse<GalleryMediaListResponse>(res);
+}
+
+export async function signGalleryUpload(payload: {
+  resourceType: PortfolioMediaType;
+  format: string;
+  bytes: number;
+}): Promise<ActionResult<SignedCloudinaryUploadPayload>> {
+  const res = await serverFetch.post('/catalog/gallery/sign-upload', {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return parseApiResponse<SignedCloudinaryUploadPayload>(res);
+}
+
+export async function registerGalleryMedia(payload: {
+  assetId: string;
+  publicId: string;
+  resourceType: PortfolioMediaType;
+  format: string;
+  secureUrl: string;
+  bytes: number;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
+  version?: number;
+  responseSignature?: string;
+  caption?: string;
+  altText?: string;
+}): Promise<ActionResult<{ media: PortfolioMediaItem; idempotentReplay: boolean }>> {
+  const res = await serverFetch.post('/catalog/gallery/register', {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<{ media: PortfolioMediaItem; idempotentReplay: boolean }>(
+    res,
+  );
+  if (result.ok) {
+    revalidatePortfolioPaths();
+  }
+  return result;
+}
+
+export async function updateGalleryMedia(
+  mediaId: string,
+  payload: { caption?: string; altText?: string },
+): Promise<ActionResult<PortfolioMediaItem>> {
+  const res = await serverFetch.patch(`/catalog/gallery/${encodeURIComponent(mediaId)}`, {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<PortfolioMediaItem>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths();
+  }
+  return result;
+}
+
+export async function deleteGalleryMedia(
+  mediaId: string,
+): Promise<ActionResult<{ deletedMediaId: string }>> {
+  const res = await serverFetch.delete(`/catalog/gallery/${encodeURIComponent(mediaId)}`);
+  const result = await parseApiResponse<{ deletedMediaId: string }>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths();
   }
   return result;
 }
