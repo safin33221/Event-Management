@@ -599,3 +599,103 @@ export interface PaginatedResponse<T> {
     total: number;
   };
 }
+
+export interface FinancialReportSummary {
+  totalContractedPoisha: number;
+  effectiveContractedPoisha: number;
+  verifiedReceiptsPoisha: number;
+  pendingVerificationPoisha: number;
+  completedRefundsPoisha: number;
+  netCollectedRevenuePoisha: number;
+  totalCreditNotesPoisha: number;
+  totalChargeAdjustmentsPoisha: number;
+  totalOutstandingDuePoisha: number;
+  totalCustomerCreditPoisha: number;
+  collectionRatePercent: number;
+  activeBookingsCount: number;
+  completedBookingsCount: number;
+  cancelledBookingsCount: number;
+  fullyPaidBookingsCount: number;
+  bookingsWithDueCount: number;
+  pendingReceiptsCount: number;
+}
+
+export interface FinancialMethodBreakdown {
+  method: PaymentMethod;
+  verifiedReceiptsPoisha: number;
+  pendingReceiptsPoisha: number;
+  refundsPoisha: number;
+  netCollectedPoisha: number;
+  transactionCount: number;
+  sharePercent: number;
+}
+
+export interface FinancialMonthBreakdown {
+  month: string;
+  bookingsCount: number;
+  contractedPoisha: number;
+  collectedPoisha: number;
+  refundedPoisha: number;
+  netCollectedPoisha: number;
+}
+
+export interface FinancialEventTypeBreakdown {
+  eventTypeId: string;
+  eventTypeName: string;
+  bookingsCount: number;
+  agreedTotalPoisha: number;
+  collectedPoisha: number;
+  outstandingDuePoisha: number;
+}
+
+export interface FinancialBookingReceivable {
+  bookingId: string;
+  reference: string;
+  eventTitle: string;
+  eventTypeName: string | null;
+  clientName: string;
+  clientPhone: string;
+  eventDate: string | null;
+  status: BookingStatus;
+  createdAt: string;
+  agreedTotalPoisha: number;
+  effectiveAgreedChargePoisha: number;
+  verifiedReceiptsPoisha: number;
+  pendingReceiptsPoisha: number;
+  completedRefundsPoisha: number;
+  creditNotesPoisha: number;
+  outstandingDuePoisha: number;
+  customerCreditPoisha: number;
+  requiredAdvancePoisha: number;
+  isAdvanceMet: boolean;
+}
+
+export interface FinancialTransactionRow extends PaymentEntry {
+  booking: {
+    id: string;
+    reference: string;
+    eventTitle: string;
+    clientName: string;
+    clientPhone: string;
+    status: BookingStatus;
+  };
+}
+
+export interface FinancialReportData {
+  currency: string;
+  timezone: string;
+  generatedAt: string;
+  filters: {
+    from: string | null;
+    to: string | null;
+    method: PaymentMethod | null;
+    bookingStatus: BookingStatus | null;
+  };
+  summary: FinancialReportSummary;
+  byMethod: FinancialMethodBreakdown[];
+  byMonth: FinancialMonthBreakdown[];
+  byEventType: FinancialEventTypeBreakdown[];
+  receivables: FinancialBookingReceivable[];
+  transactions: FinancialTransactionRow[];
+}
+

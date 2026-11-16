@@ -5,6 +5,8 @@ import { serverFetch } from '@/lib/serverFetch';
 import {
   AdjustmentType,
   BookingLedgerSummary,
+  BookingStatus,
+  FinancialReportData,
   PaymentEntry,
   PaymentMethod,
 } from '@/types/event-management';
@@ -117,6 +119,27 @@ export async function createAdjustment(
     body: JSON.stringify(payload),
   });
   const result = await parseApiResponse<{ ledger: BookingLedgerSummary }>(res);
-  if (result.ok) revalidatePath('/admin/bookings');
+  if (result.ok) {
+    revalidatePath('/admin/bookings');
+    revalidatePath('/admin/finance');
+  }
   return result;
 }
+
+export async function getFinancialReport(filters?: {
+  from?: string;
+  to?: string;
+  method?: PaymentMethod;
+  bookingStatus?: BookingStatus;
+}): Promise<ActionResult<FinancialReportData>> {
+  const params = new URLSearchParams();
+  if (filters?.from) params.set('from', filters.from);
+  if (filters?.to) params.set('to', filters.to);
+  if (filters?.method) params.set('method', filters.method);
+  if (filters?.bookingStatus) params.set('bookingStatus', filters.bookingStatus);
+
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const res = await serverFetch.get(`/finance/report${qs}`);
+  return parseApiResponse<FinancialReportData>(res);
+}
+

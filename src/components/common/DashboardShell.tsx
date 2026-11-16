@@ -38,6 +38,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
   const [isPending, startTransition] = useTransition();
 
   const isStaffOnly = session.role === 'STAFF';
+  const canViewFinance = session.role === 'OWNER' || session.role === 'ACCOUNTANT';
 
   const primaryNav: NavItem[] = isStaffOnly
     ? [{ href: '/staff', label: 'My Tasks', icon: CheckCircleIcon }]
@@ -47,6 +48,9 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
         { href: '/admin/quotes', label: 'Quotes', icon: ReceiptIcon },
         { href: '/admin/bookings', label: 'Bookings', icon: ShieldCheckIcon },
         { href: '/admin/calendar', label: 'Schedule', icon: CalendarIcon },
+        ...(canViewFinance
+          ? [{ href: '/admin/finance', label: 'Finance Report', icon: ReceiptIcon }]
+          : []),
         { href: '/staff', label: 'Crew Tasks', icon: LayersIcon },
       ];
 
