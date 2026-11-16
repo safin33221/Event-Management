@@ -20,18 +20,30 @@ export async function submitPublicInquiry(payload: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return parseApiResponse(res);
+  const result = await parseApiResponse<{
+    reference: string;
+    status: InquiryStatus;
+    requestedDate: string | null;
+  }>(res);
+  if (result.ok) {
+    revalidatePath('/admin/inquiries');
+    revalidatePath('/admin/bookings');
+    revalidatePath('/admin');
+  }
+  return result;
 }
 
 export async function listInquiries(params?: {
   status?: InquiryStatus;
   reference?: string;
   page?: number;
+  limit?: number;
 }): Promise<ActionResult<PaginatedResponse<Inquiry>>> {
   const qs = new URLSearchParams();
   if (params?.status) qs.set('status', params.status);
   if (params?.reference) qs.set('reference', params.reference);
   if (params?.page) qs.set('page', String(params.page));
+  qs.set('limit', String(params?.limit ?? 100));
   const query = qs.toString();
   const res = await serverFetch.get(`/inquiries${query ? `?${query}` : ''}`);
   return parseApiResponse<PaginatedResponse<Inquiry>>(res);
@@ -52,7 +64,11 @@ export async function createPhoneInquiry(payload: {
     body: JSON.stringify(payload),
   });
   const result = await parseApiResponse<Inquiry>(res);
-  if (result.ok) revalidatePath('/admin/bookings');
+  if (result.ok) {
+    revalidatePath('/admin/inquiries');
+    revalidatePath('/admin/bookings');
+    revalidatePath('/admin');
+  }
   return result;
 }
 
@@ -65,6 +81,10 @@ export async function updateInquiryStatus(
     body: JSON.stringify({ status }),
   });
   const result = await parseApiResponse<Inquiry>(res);
-  if (result.ok) revalidatePath('/admin/bookings');
+  if (result.ok) {
+    revalidatePath('/admin/inquiries');
+    revalidatePath('/admin/bookings');
+    revalidatePath('/admin');
+  }
   return result;
 }

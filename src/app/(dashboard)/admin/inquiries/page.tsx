@@ -29,6 +29,7 @@ async function AdminInquiriesContent({ searchParams }: AdminInquiriesPageProps) 
     <BookingsWorkspace
       mode="inquiries"
       initialInquiries={inqRes.ok && inqRes.data ? inqRes.data.data : []}
+      initialLoadError={!inqRes.ok ? inqRes.message || 'Unable to load inquiries from backend.' : undefined}
       initialQuotes={[]}
       initialBookings={[]}
       packages={pkgRes.ok && pkgRes.data ? pkgRes.data.data : []}

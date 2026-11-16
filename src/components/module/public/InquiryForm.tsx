@@ -54,17 +54,25 @@ export function InquiryForm({
     e.preventDefault();
     setError(null);
 
+    const trimmedTitle = eventTitle.trim();
+    const trimmedName = clientName.trim();
+    const trimmedPhone = clientPhone.trim();
+    if (!trimmedTitle || !trimmedName || !trimmedPhone) {
+      setError('Please enter event title, your name, and phone number.');
+      return;
+    }
+
     startTransition(async () => {
       const resolvedEventTypeId = eventTypeId || selectedPkg?.eventTypeId || undefined;
       const res = await submitPublicInquiry({
         eventTypeId: resolvedEventTypeId,
         packageId: packageId || undefined,
-        eventTitle,
+        eventTitle: trimmedTitle,
         requestedDate: requestedDate || undefined,
-        clientName,
-        clientPhone,
-        clientEmail: clientEmail || undefined,
-        notes: notes || undefined,
+        clientName: trimmedName,
+        clientPhone: trimmedPhone,
+        clientEmail: clientEmail.trim() || undefined,
+        notes: notes.trim() || undefined,
       });
 
       if (!res.ok || !res.data) {

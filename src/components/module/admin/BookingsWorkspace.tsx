@@ -98,6 +98,7 @@ interface BookingsWorkspaceProps {
   initialDetailSection?: BookingDetailSection;
   initialInquiryIdForQuote?: string;
   initialOpenCreateModal?: boolean;
+  initialLoadError?: string;
 }
 
 function getDefaultSlotFromEventDate(eventDate?: string | null): { start: string; end: string } {
@@ -135,6 +136,7 @@ export function BookingsWorkspace({
   initialDetailSection = 'payments',
   initialInquiryIdForQuote,
   initialOpenCreateModal = false,
+  initialLoadError,
 }: BookingsWorkspaceProps) {
   const router = useRouter();
 
@@ -155,6 +157,11 @@ export function BookingsWorkspace({
   );
 
   const [inquiries, setInquiries] = useState<Inquiry[]>(initialInquiries);
+  const [prevInitialInquiries, setPrevInitialInquiries] = useState<Inquiry[]>(initialInquiries);
+  if (initialInquiries !== prevInitialInquiries) {
+    setPrevInitialInquiries(initialInquiries);
+    setInquiries(initialInquiries);
+  }
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [resources, setResources] = useState<Resource[]>(initialResources);
@@ -163,7 +170,9 @@ export function BookingsWorkspace({
     summary: BookingLedgerSummary;
     entries: PaymentEntry[];
   } | null>(initialLedger);
-  const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(
+    initialLoadError ? { type: 'err', text: initialLoadError } : null,
+  );
   const [isPending, startTransition] = useTransition();
   const [renderNowMs] = useState(() => Date.now());
 
@@ -174,7 +183,9 @@ export function BookingsWorkspace({
   const [inqDate, setInqDate] = useState('');
   const [inqClient, setInqClient] = useState('');
   const [inqPhone, setInqPhone] = useState('');
+  const [inqEmail, setInqEmail] = useState('');
   const [inqNotes, setInqNotes] = useState('');
+  const [inquiryError, setInquiryError] = useState<string | null>(null);
 
   const prefilledInquiry = initialInquiryIdForQuote
     ? initialInquiries.find((i) => i.id === initialInquiryIdForQuote)
@@ -350,30 +361,47 @@ export function BookingsWorkspace({
 
   const handleCreateInquiry = (e: React.FormEvent) => {
     e.preventDefault();
+    setInquiryError(null);
+    const trimmedTitle = inqTitle.trim();
+    const trimmedClient = inqClient.trim();
+    const trimmedPhone = inqPhone.trim();
+    if (!trimmedTitle || !trimmedClient || !trimmedPhone) {
+      setInquiryError('Event title, client name, and client phone are required.');
+      return;
+    }
+
     startTransition(async () => {
       const matchedPkg = packages.find((p) => p.id === inqPackageId);
       const res = await createPhoneInquiry({
         eventTypeId: inqEventTypeId || matchedPkg?.eventTypeId || undefined,
         packageId: inqPackageId || undefined,
-        eventTitle: inqTitle,
+        eventTitle: trimmedTitle,
         requestedDate: inqDate || undefined,
-        clientName: inqClient,
-        clientPhone: inqPhone,
+        clientName: trimmedClient,
+        clientPhone: trimmedPhone,
+        clientEmail: inqEmail.trim() || undefined,
         notes: inqNotes.trim() || undefined,
       });
       if (!res.ok || !res.data) {
-        notify('err', res.message || 'Failed to create inquiry');
+        const msg = res.message || 'Failed to save inquiry. Check your connection and login session.';
+        setInquiryError(msg);
+        notify('err', msg);
         return;
       }
-      setInquiries([res.data, ...inquiries]);
+      setInquiries((prev) => [res.data!, ...prev]);
       setInqTitle('');
       setInqEventTypeId('');
       setInqPackageId('');
+      setInqDate('');
       setInqClient('');
       setInqPhone('');
+      setInqEmail('');
       setInqNotes('');
+      setStatusFilter('ALL');
+      setSearchQuery('');
       setShowInquiryForm(false);
-      notify('ok', `Logged inquiry ${res.data.reference}`);
+      notify('ok', `Saved inquiry ${res.data.reference}`);
+      router.refresh();
     });
   };
 
@@ -1068,6 +1096,11 @@ export function BookingsWorkspace({
                   </button>
                 </div>
                 <form onSubmit={handleCreateInquiry} className="space-y-3">
+                  {inquiryError && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-800">
+                      {inquiryError}
+                    </div>
+                  )}
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -1107,6 +1140,18 @@ export function BookingsWorkspace({
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Client Email (optional)
+                      </label>
+                      <input
+                        type="email"
+                        value={inqEmail}
+                        onChange={(e) => setInqEmail(e.target.value)}
+                        placeholder="client@example.com"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
                         Requested Date
                       </label>
                       <input
@@ -1116,7 +1161,7 @@ export function BookingsWorkspace({
                         className={inputClass}
                       />
                     </div>
-                    <div>
+                    <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-slate-600 mb-1">
                         Event Category
                       </label>
@@ -1180,9 +1225,9 @@ export function BookingsWorkspace({
                     <button
                       type="submit"
                       disabled={isPending}
-                      className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                      className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
                     >
-                      Save Inquiry
+                      {isPending ? 'Saving...' : 'Save Inquiry'}
                     </button>
                   </div>
                 </form>
