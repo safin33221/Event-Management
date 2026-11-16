@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { PortfolioMediaItem, PortfolioShowcaseEvent } from '@/types/event-management';
 import {
   buildCloudinaryImageUrl,
   buildCloudinarySrcSet,
   buildCloudinaryVideoPosterUrl,
 } from '@/lib/showcaseMedia';
-import { formatLocalDate } from '@/lib/utils';
+import { cn, formatLocalDate } from '@/lib/utils';
+import { LazyViewportImage } from './LazyViewportImage';
 
 interface PortfolioEventDetailModalProps {
   event: PortfolioShowcaseEvent;
@@ -24,10 +26,25 @@ export function PortfolioEventDetailModal({
   const photos = readyMedia.filter((m) => m.resourceType === 'IMAGE');
   const videos = readyMedia.filter((m) => m.resourceType === 'VIDEO');
 
+  const [activeTab, setActiveTab] = useState<'all' | 'photos' | 'videos'>('all');
   // High-res photo lightbox state (only fetched when a thumbnail is clicked!)
   const [selectedPhoto, setSelectedPhoto] = useState<PortfolioMediaItem | null>(null);
   // Video Play gate: NO <video> element or video file is downloaded until the user clicks Play
   const [playingVideoIds, setPlayingVideoIds] = useState<Record<string, boolean>>({});
+
+  const selectedPhotoIndex = selectedPhoto
+    ? photos.findIndex((p) => p.id === selectedPhoto.id)
+    : -1;
+
+  const goPrevPhoto = () => {
+    if (photos.length <= 1 || selectedPhotoIndex === -1) return;
+    setSelectedPhoto(photos[(selectedPhotoIndex - 1 + photos.length) % photos.length]);
+  };
+
+  const goNextPhoto = () => {
+    if (photos.length <= 1 || selectedPhotoIndex === -1) return;
+    setSelectedPhoto(photos[(selectedPhotoIndex + 1) % photos.length]);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -38,19 +55,17 @@ export function PortfolioEventDetailModal({
           onClose();
         }
       } else if (selectedPhoto && photos.length > 1) {
-        const idx = photos.findIndex((p) => p.id === selectedPhoto.id);
-        if (idx !== -1) {
-          if (e.key === 'ArrowRight') {
-            setSelectedPhoto(photos[(idx + 1) % photos.length]);
-          } else if (e.key === 'ArrowLeft') {
-            setSelectedPhoto(photos[(idx - 1 + photos.length) % photos.length]);
-          }
+        if (e.key === 'ArrowRight') {
+          goNextPhoto();
+        } else if (e.key === 'ArrowLeft') {
+          goPrevPhoto();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedPhoto, photos, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPhoto, selectedPhotoIndex, photos.length]);
 
   const coverUrl =
     event.coverMedia?.deliveryUrls?.coverUrl ||
@@ -71,7 +86,7 @@ export function PortfolioEventDetailModal({
     >
       <div className="w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl bg-white text-slate-900 border border-slate-200 shadow-2xl overflow-hidden">
         {/* Top Header */}
-        <div className="shrink-0 flex items-center justify-between gap-4 px-5 py-4 border-b border-slate-100 bg-white">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-4 px-5 py-4 border-b border-slate-100 bg-white">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               {isPreview && (
@@ -98,20 +113,30 @@ export function PortfolioEventDetailModal({
             </h2>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            ✕ Close
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {!isPreview && event.status === 'PUBLISHED' && (
+              <Link
+                href={`/portfolio/${event.slug}`}
+                className="rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+              >
+                Open Full Page ↗
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              ✕ Close
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Showcase Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-8">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-7">
           {/* Hero Cover Banner */}
           {coverUrl && (
-            <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[16/9] max-h-[420px] w-full">
+            <div className="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[16/9] max-h-[400px] w-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={coverUrl}
@@ -126,7 +151,7 @@ export function PortfolioEventDetailModal({
                 fetchPriority="high"
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-transparent flex flex-col justify-end p-5 sm:p-6 text-white">
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent flex flex-col justify-end p-5 sm:p-6 text-white">
                 <h3 className="text-xl sm:text-2xl font-bold">{event.title}</h3>
                 {event.description && (
                   <p className="text-xs sm:text-sm text-white/85 mt-1 max-w-2xl leading-relaxed">
@@ -141,15 +166,45 @@ export function PortfolioEventDetailModal({
             <p className="text-sm text-slate-600 leading-relaxed">{event.description}</p>
           )}
 
-          {/* Video Highlights Section (Poster + Play Button First — No Preload Before Play!) */}
-          {videos.length > 0 && (
+          {/* Media Filter Bar inside Modal */}
+          {photos.length > 0 && videos.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
+                {[
+                  { id: 'all' as const, label: `All Media (${readyMedia.length})` },
+                  { id: 'photos' as const, label: `Photo Gallery (${photos.length})` },
+                  { id: 'videos' as const, label: `Video Highlights (${videos.length})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cn(
+                      'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                      activeTab === tab.id
+                        ? 'bg-slate-900 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900',
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-slate-500">
+                Click any photo for full-screen view • Videos stream on Play
+              </span>
+            </div>
+          )}
+
+          {/* Video Highlights Section (Poster + Play Button First — Zero Preload Before Play!) */}
+          {(activeTab === 'all' || activeTab === 'videos') && videos.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <h3 className="text-base font-bold text-slate-900">
                   Video Highlights ({videos.length})
                 </h3>
                 <span className="text-xs text-slate-500">
-                  Click Play to stream highlight film
+                  Lightweight poster loaded • Click Play to stream film
                 </span>
               </div>
 
@@ -165,7 +220,7 @@ export function PortfolioEventDetailModal({
                   return (
                     <div
                       key={video.id}
-                      className="rounded-2xl border border-slate-200 bg-slate-950 overflow-hidden flex flex-col"
+                      className="rounded-2xl border border-slate-200 bg-slate-950 overflow-hidden flex flex-col shadow-xs"
                     >
                       <div className="aspect-video w-full relative bg-slate-900">
                         {isPlaying ? (
@@ -188,18 +243,16 @@ export function PortfolioEventDetailModal({
                             className="group relative w-full h-full flex items-center justify-center cursor-pointer overflow-hidden"
                           >
                             {posterUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
+                              <LazyViewportImage
                                 src={posterUrl}
                                 alt={video.altText || video.caption || `${event.title} video poster`}
-                                loading="lazy"
-                                decoding="async"
+                                containerClassName="w-full h-full bg-slate-900"
                                 className="w-full h-full object-cover opacity-90 transition-transform duration-300 group-hover:scale-105"
                               />
                             ) : (
                               <div className="w-full h-full bg-slate-900" />
                             )}
-                            <span className="absolute inset-0 bg-slate-950/30 group-hover:bg-slate-950/20 transition-colors" />
+                            <span className="absolute inset-0 bg-slate-950/30 group-hover:bg-slate-950/15 transition-colors" />
                             <span className="relative z-10 flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-xs font-bold text-slate-900 shadow-xl transition-transform duration-200 group-hover:scale-105">
                               <span>▶ Play Highlight</span>
                               {video.durationSeconds ? (
@@ -223,15 +276,15 @@ export function PortfolioEventDetailModal({
             </div>
           )}
 
-          {/* Photo Gallery Section (Lazy-loaded thumbnails; high-res loaded only on click!) */}
-          {photos.length > 0 && (
+          {/* Photo Gallery Section (Strict Viewport Lazy-Loaded Thumbnails; High-Res Fetched Only on Click!) */}
+          {(activeTab === 'all' || activeTab === 'photos') && photos.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <h3 className="text-base font-bold text-slate-900">
                   Event Photo Gallery ({photos.length})
                 </h3>
                 <span className="text-xs text-slate-500">
-                  Click any photo thumbnail to open full-resolution view
+                  Click any thumbnail to open high-resolution cinema viewer
                 </span>
               </div>
 
@@ -252,16 +305,12 @@ export function PortfolioEventDetailModal({
                       onClick={() => setSelectedPhoto(photo)}
                       className="group text-left rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex flex-col cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                     >
-                      <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={thumbUrl}
-                          alt={photo.altText || photo.caption || event.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                      </div>
+                      <LazyViewportImage
+                        src={thumbUrl}
+                        alt={photo.altText || photo.caption || event.title}
+                        containerClassName="aspect-[4/3] w-full"
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
                       {photo.caption && (
                         <p className="px-2.5 py-1.5 text-[11px] text-slate-600 truncate w-full bg-white">
                           {photo.caption}
@@ -276,7 +325,7 @@ export function PortfolioEventDetailModal({
         </div>
       </div>
 
-      {/* High-Resolution Lightbox Modal (Only mounts & fetches large image when a thumbnail is clicked!) */}
+      {/* High-Resolution Cinema Lightbox Modal (Only mounts & fetches large image when a thumbnail is clicked!) */}
       {selectedPhoto && (
         <div
           role="dialog"
@@ -285,15 +334,20 @@ export function PortfolioEventDetailModal({
             e.stopPropagation();
             if (e.target === e.currentTarget) setSelectedPhoto(null);
           }}
-          className="fixed inset-0 z-60 flex flex-col items-center justify-center bg-slate-950/95 p-4"
+          className="fixed inset-0 z-60 flex flex-col items-center justify-between bg-slate-950/95 p-4"
         >
-          <div className="w-full max-w-5xl flex items-center justify-between text-white pb-3">
+          <div className="w-full max-w-5xl flex items-center justify-between text-white pb-2">
             <div>
-              <p className="text-sm font-semibold">
-                {selectedPhoto.caption || event.title}
-              </p>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-mono-code">
+                  {selectedPhotoIndex + 1} / {photos.length}
+                </span>
+                <p className="text-sm font-semibold">
+                  {selectedPhoto.caption || event.title}
+                </p>
+              </div>
               {selectedPhoto.altText && (
-                <p className="text-xs text-slate-400">{selectedPhoto.altText}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{selectedPhoto.altText}</p>
               )}
             </div>
             <button
@@ -305,7 +359,7 @@ export function PortfolioEventDetailModal({
             </button>
           </div>
 
-          <div className="relative flex-1 flex items-center justify-center w-full max-w-5xl overflow-hidden">
+          <div className="relative flex-1 flex items-center justify-center w-full max-w-5xl overflow-hidden py-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={
@@ -315,9 +369,77 @@ export function PortfolioEventDetailModal({
               srcSet={buildCloudinarySrcSet(selectedPhoto.secureUrl, [800, 1200, 1600, 1920])}
               sizes="95vw"
               alt={selectedPhoto.altText || selectedPhoto.caption || event.title}
-              className="max-h-[78vh] w-auto rounded-xl object-contain shadow-2xl"
+              className="max-h-[72vh] w-auto rounded-xl object-contain shadow-2xl"
             />
+
+            {photos.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goPrevPhoto();
+                  }}
+                  aria-label="Previous photo"
+                  className="absolute left-2 sm:left-4 rounded-full bg-slate-900/80 border border-white/20 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goNextPhoto();
+                  }}
+                  aria-label="Next photo"
+                  className="absolute right-2 sm:right-4 rounded-full bg-slate-900/80 border border-white/20 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  →
+                </button>
+              </>
+            )}
           </div>
+
+          {/* Bottom Filmstrip */}
+          {photos.length > 1 && (
+            <div className="flex items-center gap-2 overflow-x-auto max-w-4xl py-2">
+              {photos.map((p, idx) => {
+                const stripThumb =
+                  p.deliveryUrls?.thumbnailUrl ||
+                  buildCloudinaryImageUrl(p.secureUrl, {
+                    width: 240,
+                    height: 160,
+                    crop: 'fill',
+                  });
+                const isActive = p.id === selectedPhoto.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPhoto(p);
+                    }}
+                    className={cn(
+                      'h-12 w-16 shrink-0 rounded-lg overflow-hidden border-2 transition-all cursor-pointer',
+                      isActive
+                        ? 'border-indigo-400 opacity-100 scale-105'
+                        : 'border-transparent opacity-50 hover:opacity-85',
+                    )}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={stripThumb}
+                      alt={p.altText || `Photo ${idx + 1}`}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

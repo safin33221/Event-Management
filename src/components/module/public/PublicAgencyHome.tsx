@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import {
   EventType,
   PortfolioItem,
@@ -9,14 +8,15 @@ import {
   PublicBranding,
   StudioPackage,
 } from '@/types/event-management';
+import { formatPoisha } from '@/lib/utils';
 import {
   ArrowRightIcon,
   CalendarIcon,
-  CameraIcon,
-  PaletteIcon,
+  CheckCircleIcon,
   SparklesIcon,
 } from '@/components/shared/Icons';
 import { InquiryForm } from './InquiryForm';
+import { PublicPortfolioShowcase } from './PublicPortfolioShowcase';
 
 interface PublicAgencyHomeProps {
   branding: PublicBranding;
@@ -40,7 +40,12 @@ export function PublicAgencyHome({
   const [selectedPackageId, setSelectedPackageId] = useState<string>(initialPackageId);
   const primary = branding.themeTokens.primaryColor || '#0F172A';
   const accent = branding.themeTokens.accentColor || '#4F46E5';
-  const showcaseCount = portfolioEvents.length + portfolio.length;
+
+  const handleSelectPackage = (id: string) => {
+    setSelectedPackageId(id);
+    const el = document.getElementById('inquire');
+    el?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
     <div className="flex-1">
@@ -87,18 +92,18 @@ export function PublicAgencyHome({
                   <span>Ask for a Date &amp; Price</span>
                   <ArrowRightIcon className="w-4 h-4" />
                 </a>
-                <Link
-                  href="/packages"
+                <a
+                  href="#packages"
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-colors"
                 >
                   See Packages
-                </Link>
-                <Link
-                  href="/showcase"
+                </a>
+                <a
+                  href="#portfolio"
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-colors"
                 >
-                  View Showcase
-                </Link>
+                  Explore Gallery
+                </a>
               </div>
             </div>
 
@@ -157,59 +162,114 @@ export function PublicAgencyHome({
         </div>
       </section>
 
-      {/* Explore Dedicated Routes Strip: Packages & Public Showcase */}
-      <section className="mx-auto max-w-6xl px-4 pt-14 pb-4 sm:px-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          <Link
-            href="/packages"
-            className="atelier-card atelier-card-hover p-6 flex items-center justify-between gap-4 group"
-          >
-            <div className="flex items-start gap-4">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                <PaletteIcon className="w-5 h-5" />
-              </span>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
-                  {packages.length} {packages.length === 1 ? 'Package' : 'Packages'}
-                </p>
-                <h2 className="text-lg font-bold tracking-tight text-slate-900 mt-0.5 group-hover:text-indigo-600 transition-colors">
-                  Browse Event Packages
-                </h2>
-                <p className="text-sm text-slate-500 mt-1">
-                  Compare transparent pricing and select a package for your quote.
-                </p>
-              </div>
-            </div>
-            <ArrowRightIcon className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 shrink-0 transition-colors" />
-          </Link>
-
-          <Link
-            href="/showcase"
-            className="atelier-card atelier-card-hover p-6 flex items-center justify-between gap-4 group"
-          >
-            <div className="flex items-start gap-4">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                <CameraIcon className="w-5 h-5" />
-              </span>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
-                  {showcaseCount} {showcaseCount === 1 ? 'Story' : 'Stories'}
-                </p>
-                <h2 className="text-lg font-bold tracking-tight text-slate-900 mt-0.5 group-hover:text-emerald-700 transition-colors">
-                  Photo Galleries &amp; Video Films
-                </h2>
-                <p className="text-sm text-slate-500 mt-1">
-                  Explore approved event photography albums and highlight films.
-                </p>
-              </div>
-            </div>
-            <ArrowRightIcon className="w-5 h-5 text-slate-400 group-hover:text-emerald-700 shrink-0 transition-colors" />
-          </Link>
+      {/* Packages & Collections */}
+      <section id="packages" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 scroll-mt-16">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
+              Our Offerings
+            </p>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 mt-1">
+              Event Packages
+            </h2>
+          </div>
+          <p className="text-sm text-slate-500 max-w-md">
+            Every package can be adjusted to fit your event before you book.
+          </p>
         </div>
+
+        {packages.length === 0 ? (
+          <div className="atelier-card p-10 text-center text-sm text-slate-500">
+            No packages listed yet. Send us a message below and we will make a custom price quote
+            for your event.
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {packages.map((pkg) => {
+              const isSelected = selectedPackageId === pkg.id;
+              return (
+                <div
+                  key={pkg.id}
+                  className={`atelier-card atelier-card-hover flex flex-col justify-between p-6 ${
+                    isSelected ? 'ring-2 ring-indigo-600/25 border-indigo-500' : ''
+                  }`}
+                >
+                  <div>
+                    {pkg.eventType && (
+                      <span className="inline-block mb-2 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-indigo-700">
+                        {pkg.eventType.name}
+                      </span>
+                    )}
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="text-lg font-bold tracking-tight text-slate-900">
+                        {pkg.name}
+                      </h3>
+                      <span
+                        className="rounded-lg px-2.5 py-1 text-xs font-mono-code font-semibold text-white shrink-0 tabular-nums"
+                        style={{ backgroundColor: primary }}
+                      >
+                        {formatPoisha(pkg.basePricePoisha, branding.currency)}
+                      </span>
+                    </div>
+                    {pkg.description && (
+                      <p className="mt-2.5 text-sm text-slate-600 leading-relaxed">
+                        {pkg.description}
+                      </p>
+                    )}
+
+                    {pkg.items && pkg.items.length > 0 && (
+                      <ul className="mt-5 space-y-2 border-t border-slate-100 pt-4 text-xs text-slate-600">
+                        {pkg.items.map((item) => (
+                          <li key={item.id} className="flex items-center justify-between gap-2">
+                            <span>
+                              {item.quantity}× {item.description}
+                            </span>
+                            <span className="font-mono-code text-slate-500 tabular-nums">
+                              {formatPoisha(item.unitPricePoisha * item.quantity, branding.currency)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectPackage(pkg.id)}
+                    className={`mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                        : 'border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-900 hover:text-white hover:border-slate-900'
+                    }`}
+                  >
+                    {isSelected ? (
+                      <>
+                        <CheckCircleIcon className="w-3.5 h-3.5" />
+                        <span>Selected for Quote</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Select for Quote Inquiry</span>
+                        <ArrowRightIcon className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
+      {/* Strict Viewport-Lazy Gallery & Showcase Section (Nothing loads until user scrolls here!) */}
+      <PublicPortfolioShowcase
+        branding={branding}
+        portfolio={portfolio}
+        portfolioEvents={portfolioEvents}
+      />
+
       {/* Inquiry Section */}
-      <section id="inquire" className="mx-auto max-w-4xl px-4 py-14 sm:px-6">
+      <section id="inquire" className="mx-auto max-w-4xl px-4 py-16 sm:px-6 scroll-mt-16">
         <InquiryForm
           branding={branding}
           eventTypes={eventTypes}

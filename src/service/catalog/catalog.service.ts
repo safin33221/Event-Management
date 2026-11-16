@@ -222,6 +222,14 @@ export async function getPublicPortfolioEvents(): Promise<
   return parseApiResponse<PaginatedResponse<PortfolioShowcaseEvent>>(res);
 }
 
+export async function getPublicGalleryMedia(
+  resourceType?: PortfolioMediaType,
+): Promise<ActionResult<GalleryMediaListResponse>> {
+  const qs = resourceType ? `?resourceType=${encodeURIComponent(resourceType)}` : '';
+  const res = await serverFetch.get(`/public/gallery${qs}`);
+  return parseApiResponse<GalleryMediaListResponse>(res);
+}
+
 export async function getPublicPortfolioEventBySlug(
   slug: string,
 ): Promise<ActionResult<PortfolioShowcaseEvent>> {
