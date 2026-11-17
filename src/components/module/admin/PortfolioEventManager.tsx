@@ -9,6 +9,7 @@ import {
   PortfolioMediaItem,
   PortfolioMediaType,
   PortfolioShowcaseEvent,
+  PublicBranding,
 } from '@/types/event-management';
 import {
   archivePortfolioEvent,
@@ -33,6 +34,7 @@ import {
   AlbumFontStyle,
   AlbumThemeConfig,
   DEFAULT_ALBUM_THEME,
+  generateMatchingAlbumTheme,
   parseAlbumDescriptionAndTheme,
   serializeAlbumDescriptionWithTheme,
   shortenTitleToSlug,
@@ -40,6 +42,23 @@ import {
 import { cn, formatLocalDate } from '@/lib/utils';
 import { PlusIcon } from '@/components/shared/Icons';
 import { PortfolioEventDetailModal } from '../public/PortfolioEventDetailModal';
+import { PortfolioEventPageClient } from '../public/PortfolioEventPageClient';
+
+const PREVIEW_ALBUM_BRANDING: PublicBranding = {
+  displayName: 'Studio Digital Album',
+  logoUrl: null,
+  themeTokens: {
+    primaryColor: '#0F172A',
+    secondaryColor: '#475569',
+    accentColor: '#4F46E5',
+    backgroundColor: '#FAF8F5',
+    textColor: '#1C1917',
+    fontFamily: 'Inter, system-ui, sans-serif',
+  },
+  contactDetails: {},
+  timezone: 'Asia/Dhaka',
+  currency: 'BDT',
+};
 
 interface UploadQueueItem {
   localId: string;
@@ -153,6 +172,9 @@ export function PortfolioEventManager({
   const [editEventTypeId, setEditEventTypeId] = useState(selectedEvent?.eventTypeId || '');
   const [editDescription, setEditDescription] = useState(initialParsed.cleanDescription);
   const [editTheme, setEditTheme] = useState<AlbumThemeConfig>(initialParsed.theme);
+  const [themeHistory, setThemeHistory] = useState<AlbumThemeConfig[]>([]);
+  const [generatedThemeName, setGeneratedThemeName] = useState<string | null>(null);
+  const [showFullThemePreview, setShowFullThemePreview] = useState(false);
 
   // Per-file upload queue (keyed by eventId)
   const [uploadQueues, setUploadQueues] = useState<Record<string, UploadQueueItem[]>>({});
@@ -219,6 +241,8 @@ export function PortfolioEventManager({
     setEditEventTypeId(ev.eventTypeId || '');
     setEditDescription(parsed.cleanDescription);
     setEditTheme(parsed.theme);
+    setThemeHistory([]);
+    setGeneratedThemeName(null);
     setShowCreateForm(false);
   };
 
@@ -332,6 +356,24 @@ export function PortfolioEventManager({
     });
   };
 
+  const handleAutoGenerateTheme = () => {
+    setThemeHistory((prev) => [...prev.slice(-14), editTheme]);
+    const preferDynamic = themeHistory.length >= 6 && themeHistory.length % 2 === 1;
+    const generated = generateMatchingAlbumTheme(editTheme, preferDynamic);
+    setEditTheme(generated.theme);
+    setGeneratedThemeName(generated.name);
+  };
+
+  const handleUndoGeneratedTheme = () => {
+    setThemeHistory((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      setEditTheme(last);
+      setGeneratedThemeName(null);
+      return prev.slice(0, -1);
+    });
+  };
+
   const handleSaveThemeSettings = () => {
     if (!selectedEvent) return;
 
@@ -345,6 +387,8 @@ export function PortfolioEventManager({
         return;
       }
       setEvents((prev) => prev.map((ev) => (ev.id === res.data!.id ? res.data! : ev)));
+      setGeneratedThemeName(null);
+      setShowFullThemePreview(false);
       notify('ok', 'Custom theme settings saved for this digital album.');
     });
   };
@@ -1776,236 +1820,468 @@ export function PortfolioEventManager({
               )}
 
               {/* Category 4: Per-Album Theme Settings Tab */}
-              {!isGalleryMode && activeEditorTab === 'theme' && (
-                <div className="atelier-card p-5 space-y-6">
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900">
-                        Digital Album Theme Settings
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Give this client a unique look—pick a curated color theme or customize
-                        colors and typography just for this album.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditTheme({ ...DEFAULT_ALBUM_THEME })}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                    >
-                      Reset Default
-                    </button>
-                  </div>
+              {!isGalleryMode && activeEditorTab === 'theme' && (() => {
+                const savedThemeConfig = parseAlbumDescriptionAndTheme(selectedEvent.description).theme;
+                const hasUnsavedTheme =
+                  JSON.stringify(editTheme) !== JSON.stringify(savedThemeConfig);
+                const previewCover =
+                  selectedEvent.coverMedia ||
+                  selectedPhotos[0] ||
+                  null;
+                const previewCoverUrl = previewCover
+                  ? buildCloudinaryImageUrl(previewCover.secureUrl, { width: 480, crop: 'limit' })
+                  : '';
+                const previewGridThumbs = selectedPhotos.slice(0, 3);
 
-                  {/* Preset Palettes Grid */}
-                  <div className="space-y-2.5">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      Curated Theme Presets
-                    </p>
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {ALBUM_THEME_PRESETS.map((preset) => {
-                        const isSelected = editTheme.preset === preset.id;
-                        return (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() =>
-                              setEditTheme({
-                                preset: preset.id,
-                                bg: preset.bg,
-                                surface: preset.surface,
-                                text: preset.text,
-                                accent: preset.accent,
-                                isDark: preset.isDark,
-                                fontStyle: preset.fontStyle,
-                              })
-                            }
-                            className={cn(
-                              'text-left rounded-xl border p-3.5 transition-all cursor-pointer space-y-2',
-                              isSelected
-                                ? 'border-indigo-600 ring-2 ring-indigo-600/20 bg-indigo-50/30'
-                                : 'border-slate-200 bg-white hover:border-slate-300',
-                            )}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-bold text-slate-900">
-                                {preset.name}
-                              </span>
-                              <div className="flex items-center gap-1 shrink-0">
-                                {[preset.bg, preset.surface, preset.accent].map((hex, i) => (
-                                  <span
-                                    key={i}
-                                    style={{ backgroundColor: hex }}
-                                    className="h-4 w-4 rounded-full border border-slate-300/80 shadow-2xs"
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                            <p className="text-[11px] text-slate-500">{preset.tagline}</p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Custom Color Pickers + Typography */}
-                  <div className="grid sm:grid-cols-2 gap-4 pt-1">
-                    {(
-                      [
-                        { key: 'bg', label: 'Page Background Color' },
-                        { key: 'surface', label: 'Hero & Card Surface Color' },
-                        { key: 'text', label: 'Heading & Text Color' },
-                        { key: 'accent', label: 'Primary Accent & Buttons' },
-                      ] as const
-                    ).map((field) => (
-                      <div
-                        key={field.key}
-                        className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 flex items-center justify-between gap-3"
-                      >
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-800">
-                            {field.label}
-                          </label>
-                          <span className="font-mono-code text-[11px] text-slate-500">
-                            {editTheme[field.key]}
-                          </span>
+                return (
+                  <div className="atelier-card p-5 space-y-6">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-bold text-slate-900">
+                            Digital Album Theme Settings
+                          </h3>
+                          {hasUnsavedTheme && (
+                            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+                              Unsaved Preview
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={editTheme[field.key]}
-                            onChange={(e) =>
-                              setEditTheme((prev) => ({
-                                ...prev,
-                                preset: 'custom',
-                                [field.key]: e.target.value.toUpperCase(),
-                              }))
-                            }
-                            className="h-8 w-10 rounded-lg border border-slate-200 cursor-pointer bg-white p-0.5"
-                          />
-                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Auto-generate harmonious color + typography pairings, preview live with
+                          this client&apos;s real photos, and save the one you love.
+                        </p>
                       </div>
-                    ))}
-                  </div>
 
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
-                      <p className="text-xs font-semibold text-slate-800">Heading Font Style</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(
-                          [
-                            { id: 'serif', label: 'Editorial Serif' },
-                            { id: 'sans', label: 'Modern Sans' },
-                          ] as { id: AlbumFontStyle; label: string }[]
-                        ).map((fontOpt) => (
-                          <button
-                            key={fontOpt.id}
-                            type="button"
-                            onClick={() =>
-                              setEditTheme((prev) => ({ ...prev, fontStyle: fontOpt.id }))
-                            }
-                            className={cn(
-                              'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
-                              editTheme.fontStyle === fontOpt.id
-                                ? 'border-slate-900 bg-slate-900 text-white'
-                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
-                            )}
-                          >
-                            {fontOpt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
-                      <p className="text-xs font-semibold text-slate-800">Default Brightness Mode</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { val: false, label: '☀ Daylight' },
-                          { val: true, label: '☾ Dark Cinema' },
-                        ].map((modeOpt) => (
-                          <button
-                            key={String(modeOpt.val)}
-                            type="button"
-                            onClick={() =>
-                              setEditTheme((prev) => ({
-                                ...prev,
-                                preset: 'custom',
-                                isDark: modeOpt.val,
-                              }))
-                            }
-                            className={cn(
-                              'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
-                              editTheme.isDark === modeOpt.val
-                                ? 'border-slate-900 bg-slate-900 text-white'
-                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
-                            )}
-                          >
-                            {modeOpt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Live Theme Preview Strip */}
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      Live Client Album Preview
-                    </p>
-                    <div
-                      style={{
-                        backgroundColor: editTheme.bg,
-                        color: editTheme.text,
-                      }}
-                      className="rounded-2xl border border-slate-200 p-5 transition-colors"
-                    >
-                      <div
-                        style={{ backgroundColor: editTheme.surface }}
-                        className="rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 border border-black/10 shadow-xs"
-                      >
-                        <div className="space-y-1 min-w-0">
-                          <p className="text-[10px] uppercase tracking-[0.25em] opacity-65">
-                            Digital Photo &amp; Film Album
-                          </p>
-                          <p
-                            style={{
-                              fontFamily:
-                                editTheme.fontStyle === 'serif'
-                                  ? 'Georgia, serif'
-                                  : 'var(--font-sans), sans-serif',
-                            }}
-                            className="text-lg sm:text-xl font-semibold truncate"
-                          >
-                            {selectedEvent.title}
-                          </p>
-                        </div>
-                        <span
-                          style={{ backgroundColor: editTheme.accent, color: '#FFFFFF' }}
-                          className="rounded-full px-4 py-1.5 text-xs font-semibold shrink-0"
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleAutoGenerateTheme}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition-colors cursor-pointer"
                         >
-                          ▶ Watch Cinematic Film
+                          <span>✨ Auto-Generate Theme</span>
+                        </button>
+
+                        {themeHistory.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleUndoGeneratedTheme}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                          >
+                            ← Previous
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setShowFullThemePreview(true)}
+                          className="rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+                        >
+                          👁 Full-Screen Preview
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setThemeHistory((prev) => [...prev.slice(-14), editTheme]);
+                            setEditTheme({ ...DEFAULT_ALBUM_THEME });
+                            setGeneratedThemeName(null);
+                          }}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                        >
+                          Reset Default
+                        </button>
+                      </div>
+                    </div>
+
+                    {generatedThemeName && (
+                      <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span className="font-medium text-indigo-950">
+                          ✨ Generated Palette: <strong>{generatedThemeName}</strong>
+                        </span>
+                        <span className="text-indigo-700">
+                          Click &ldquo;Auto-Generate Theme&rdquo; again to try another, or save
+                          below when ready.
                         </span>
                       </div>
+                    )}
+
+                    {/* Rich Visual Live Client Album Preview */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                          Live Album Preview ({editTheme.isDark ? 'Dark Cinema' : 'Daylight'} •{' '}
+                          {editTheme.fontStyle === 'serif' ? 'Editorial Serif' : 'Modern Sans'})
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowFullThemePreview(true)}
+                          className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                        >
+                          Expand Full Album Preview ⤢
+                        </button>
+                      </div>
+
+                      <div
+                        style={{
+                          backgroundColor: editTheme.bg,
+                          color: editTheme.text,
+                        }}
+                        className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm transition-colors duration-300"
+                      >
+                        {/* Mini Top Bar */}
+                        <div
+                          style={{
+                            borderColor: editTheme.isDark
+                              ? 'rgba(255,255,255,0.1)'
+                              : 'rgba(0,0,0,0.08)',
+                          }}
+                          className="border-b px-4 py-2.5 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-[9px] uppercase tracking-[0.22em] opacity-65">
+                              Digital Album
+                            </p>
+                            <p className="text-xs font-semibold truncate">{selectedEvent.title}</p>
+                          </div>
+                          <span
+                            style={{ backgroundColor: editTheme.accent, color: '#FFFFFF' }}
+                            className="rounded-full px-3 py-1 text-[10px] font-semibold shrink-0"
+                          >
+                            Share Album
+                          </span>
+                        </div>
+
+                        {/* Mini Framed Cover Hero */}
+                        <div
+                          style={{ backgroundColor: editTheme.surface }}
+                          className="p-4 sm:p-5 grid sm:grid-cols-12 gap-4 items-center"
+                        >
+                          <div className="sm:col-span-5 flex justify-center">
+                            {previewCoverUrl ? (
+                              <div
+                                style={{ backgroundColor: editTheme.bg }}
+                                className="rounded-xl p-1.5 border border-black/10 shadow-md max-w-[200px]"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={previewCoverUrl}
+                                  alt=""
+                                  className="w-full h-28 object-cover rounded-lg"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-full h-28 rounded-xl border border-dashed border-current/25 flex items-center justify-center text-[11px] opacity-60">
+                                Cover Photo Preview
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="sm:col-span-7 space-y-2.5 text-center sm:text-left">
+                            <p className="text-[9px] uppercase tracking-[0.26em] opacity-65">
+                              Digital Photo &amp; Film Album
+                            </p>
+                            <p
+                              style={{
+                                fontFamily:
+                                  editTheme.fontStyle === 'serif'
+                                    ? 'Georgia, serif'
+                                    : 'var(--font-sans), sans-serif',
+                              }}
+                              className="text-lg sm:text-xl font-semibold leading-tight line-clamp-2"
+                            >
+                              {selectedEvent.title}
+                            </p>
+                            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-0.5">
+                              <span
+                                style={{ backgroundColor: editTheme.accent, color: '#FFFFFF' }}
+                                className="rounded-full px-3.5 py-1 text-[10px] font-semibold"
+                              >
+                                ▶ Watch Cinematic Film
+                              </span>
+                              <span className="rounded-full border border-current/25 px-3 py-1 text-[10px] font-medium opacity-85">
+                                Browse Photo Grid ↓
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Mini Photo Grid Row */}
+                        {previewGridThumbs.length > 0 && (
+                          <div className="p-4 grid grid-cols-3 gap-2.5">
+                            {previewGridThumbs.map((photo) => {
+                              const tUrl = buildCloudinaryImageUrl(photo.secureUrl, {
+                                width: 320,
+                                height: 220,
+                                crop: 'fill',
+                              });
+                              return (
+                                <div
+                                  key={photo.id}
+                                  style={{ backgroundColor: editTheme.surface }}
+                                  className="rounded-lg overflow-hidden border border-black/10 aspect-[4/3]"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={tUrl}
+                                    alt=""
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Preset Palettes Grid */}
+                    <div className="space-y-2.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        Signature Studio Presets
+                      </p>
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {ALBUM_THEME_PRESETS.map((preset) => {
+                          const isSelected = editTheme.preset === preset.id;
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => {
+                                setThemeHistory((prev) => [...prev.slice(-14), editTheme]);
+                                setEditTheme({
+                                  preset: preset.id,
+                                  bg: preset.bg,
+                                  surface: preset.surface,
+                                  text: preset.text,
+                                  accent: preset.accent,
+                                  isDark: preset.isDark,
+                                  fontStyle: preset.fontStyle,
+                                });
+                                setGeneratedThemeName(preset.name);
+                              }}
+                              className={cn(
+                                'text-left rounded-xl border p-3.5 transition-all cursor-pointer space-y-2',
+                                isSelected
+                                  ? 'border-indigo-600 ring-2 ring-indigo-600/20 bg-indigo-50/30'
+                                  : 'border-slate-200 bg-white hover:border-slate-300',
+                              )}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-slate-900">
+                                  {preset.name}
+                                </span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {[preset.bg, preset.surface, preset.accent].map((hex, i) => (
+                                    <span
+                                      key={i}
+                                      style={{ backgroundColor: hex }}
+                                      className="h-4 w-4 rounded-full border border-slate-300/80 shadow-2xs"
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-slate-500">{preset.tagline}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Custom Fine-Tuning Color Pickers + Typography */}
+                    <div className="grid sm:grid-cols-2 gap-4 pt-1">
+                      {(
+                        [
+                          { key: 'bg', label: 'Page Background Color' },
+                          { key: 'surface', label: 'Hero & Card Surface Color' },
+                          { key: 'text', label: 'Heading & Text Color' },
+                          { key: 'accent', label: 'Primary Accent & Buttons' },
+                        ] as const
+                      ).map((field) => (
+                        <div
+                          key={field.key}
+                          className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 flex items-center justify-between gap-3"
+                        >
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-800">
+                              {field.label}
+                            </label>
+                            <span className="font-mono-code text-[11px] text-slate-500">
+                              {editTheme[field.key]}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={editTheme[field.key]}
+                              onChange={(e) => {
+                                setGeneratedThemeName('Custom');
+                                setEditTheme((prev) => ({
+                                  ...prev,
+                                  preset: 'custom',
+                                  [field.key]: e.target.value.toUpperCase(),
+                                }));
+                              }}
+                              className="h-8 w-10 rounded-lg border border-slate-200 cursor-pointer bg-white p-0.5"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                        <p className="text-xs font-semibold text-slate-800">Heading Font Style</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(
+                            [
+                              { id: 'serif', label: 'Editorial Serif' },
+                              { id: 'sans', label: 'Modern Sans' },
+                            ] as { id: AlbumFontStyle; label: string }[]
+                          ).map((fontOpt) => (
+                            <button
+                              key={fontOpt.id}
+                              type="button"
+                              onClick={() =>
+                                setEditTheme((prev) => ({ ...prev, fontStyle: fontOpt.id }))
+                              }
+                              className={cn(
+                                'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                                editTheme.fontStyle === fontOpt.id
+                                  ? 'border-slate-900 bg-slate-900 text-white'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
+                              )}
+                            >
+                              {fontOpt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                        <p className="text-xs font-semibold text-slate-800">
+                          Default Brightness Mode
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { val: false, label: '☀ Daylight' },
+                            { val: true, label: '☾ Dark Cinema' },
+                          ].map((modeOpt) => (
+                            <button
+                              key={String(modeOpt.val)}
+                              type="button"
+                              onClick={() =>
+                                setEditTheme((prev) => ({
+                                  ...prev,
+                                  preset: 'custom',
+                                  isDark: modeOpt.val,
+                                }))
+                              }
+                              className={cn(
+                                'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                                editTheme.isDark === modeOpt.val
+                                  ? 'border-slate-900 bg-slate-900 text-white'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
+                              )}
+                            >
+                              {modeOpt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                      <span className="text-xs text-slate-500">
+                        {hasUnsavedTheme
+                          ? 'Previewing unsaved theme — click Save Theme Settings to publish this look.'
+                          : 'Saved theme is currently active on the client album.'}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={handleSaveThemeSettings}
+                        className={cn(
+                          'rounded-xl px-5 py-2 text-xs font-semibold text-white transition-colors cursor-pointer',
+                          hasUnsavedTheme
+                            ? 'bg-emerald-600 hover:bg-emerald-700 shadow-sm'
+                            : 'bg-indigo-600 hover:bg-indigo-700',
+                        )}
+                      >
+                        {isPending ? 'Saving Theme...' : 'Save Theme Settings ✓'}
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={handleSaveThemeSettings}
-                      className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 cursor-pointer"
-                    >
-                      {isPending ? 'Saving Theme...' : 'Save Theme Settings'}
-                    </button>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </>
           )}
         </div>
       </div>
+
+      {/* Full-Screen Live Digital Album Theme Preview Modal */}
+      {showFullThemePreview && selectedEvent && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex flex-col bg-slate-950/90 overflow-hidden"
+        >
+          <div className="shrink-0 border-b border-white/15 bg-slate-900 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-white">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="rounded-full bg-amber-300 px-2.5 py-0.5 text-[10px] font-bold uppercase text-slate-950">
+                Theme Preview
+              </span>
+              <span className="text-xs font-medium truncate">
+                {generatedThemeName || editTheme.preset} • {selectedEvent.title}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleAutoGenerateTheme}
+                className="rounded-xl bg-indigo-500 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-600 cursor-pointer"
+              >
+                ✨ Try Another Theme
+              </button>
+              {themeHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleUndoGeneratedTheme}
+                  className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 cursor-pointer"
+                >
+                  ← Previous
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleSaveThemeSettings}
+                className="rounded-xl bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 cursor-pointer"
+              >
+                {isPending ? 'Saving...' : 'Save This Theme ✓'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFullThemePreview(false)}
+                className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            <PortfolioEventPageClient
+              key={`${selectedEvent.id}-${JSON.stringify(editTheme)}`}
+              event={{
+                ...selectedEvent,
+                description: serializeAlbumDescriptionWithTheme(editDescription, editTheme),
+              }}
+              branding={PREVIEW_ALBUM_BRANDING}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Live Preview Modal */}
       {previewEvent && (

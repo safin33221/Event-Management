@@ -10,7 +10,9 @@ interface AlbumSlugPageProps {
   params: Promise<{ slug: string }>;
 }
 
-async function DigitalAlbumContent({ slug }: { slug: string }) {
+async function DigitalAlbumContent({ params }: AlbumSlugPageProps) {
+  const { slug } = await params;
+
   const [brandRes, eventRes] = await Promise.all([
     getPublicBranding(),
     getPublicPortfolioEventBySlug(slug),
@@ -25,8 +27,7 @@ async function DigitalAlbumContent({ slug }: { slug: string }) {
   return <PortfolioEventPageClient event={eventRes.data} branding={branding} />;
 }
 
-export default async function AlbumSlugPage({ params }: AlbumSlugPageProps) {
-  const { slug } = await params;
+export default function AlbumSlugPage({ params }: AlbumSlugPageProps) {
   return (
     <Suspense
       fallback={
@@ -35,7 +36,7 @@ export default async function AlbumSlugPage({ params }: AlbumSlugPageProps) {
         </div>
       }
     >
-      <DigitalAlbumContent slug={slug} />
+      <DigitalAlbumContent params={params} />
     </Suspense>
   );
 }
