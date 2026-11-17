@@ -4,6 +4,7 @@ import { verifyAccessToken } from '@/lib/jwtHandler';
 import type { UserRole } from '@/types/event-management';
 
 const ADMIN_ROLES = new Set<UserRole>(['OWNER', 'COORDINATOR', 'ACCOUNTANT']);
+const QUOTE_ROLES = new Set<UserRole>(['OWNER', 'COORDINATOR']);
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 function getSafeCallbackUrl(raw: string | null): string | null {
@@ -26,6 +27,9 @@ function canRoleAccessPath(role: UserRole, pathname: string): boolean {
   }
   if (pathname.startsWith('/api/bookings/') && pathname.endsWith('/invoice.pdf')) {
     return ADMIN_ROLES.has(role);
+  }
+  if (pathname.startsWith('/api/quotes/') && pathname.endsWith('/invoice.pdf')) {
+    return QUOTE_ROLES.has(role);
   }
   return true;
 }

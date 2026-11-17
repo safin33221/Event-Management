@@ -40,10 +40,11 @@ export function isJwtExpired(token: string): boolean {
   return payload.exp * 1000 <= Date.now();
 }
 
+let warnedMissingSecret = false;
+
 /**
  * Validates JWT structure, required claims (`sub`, `role`, `exp`), and expiration.
- * When `secret` (AUTH_SECRET) is provided, also verifies the HS256 HMAC signature
- * in constant time before trusting token claims.
+ * Fails closed in production if `AUTH_SECRET` (<16 chars) is missing.
  */
 export function verifyAccessToken(
   token: string,
@@ -55,9 +56,10 @@ export function verifyAccessToken(
   const [headerB64, bodyB64, sigB64] = parts;
   if (!headerB64 || !bodyB64 || !sigB64) return null;
 
-  if (secret && secret.trim().length > 0) {
+  const trimmedSecret = secret?.trim() ?? '';
+  if (trimmedSecret.length >= 16) {
     try {
-      const expectedSig = createHmac('sha256', secret.trim())
+      const expectedSig = createHmac('sha256', trimmedSecret)
         .update(`${headerB64}.${bodyB64}`)
         .digest();
       const actualSig = Buffer.from(sigB64, 'base64url');
@@ -67,6 +69,13 @@ export function verifyAccessToken(
     } catch {
       return null;
     }
+  } else if (process.env.NODE_ENV === 'production') {
+    return null;
+  } else if (!warnedMissingSecret) {
+    warnedMissingSecret = true;
+    console.warn(
+      '[auth] AUTH_SECRET is not configured in frontend environment; set AUTH_SECRET (>=16 chars) for strict edge JWT signature verification.',
+    );
   }
 
   const payload = decodeJwtPayload(token);

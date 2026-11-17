@@ -137,3 +137,10 @@ export async function getCalendarSubscription(): Promise<ActionResult<CalendarSu
   const res = await serverFetch.get('/calendar/subscription');
   return parseApiResponse<CalendarSubscriptionInfo>(res);
 }
+
+export async function rotateCalendarSubscription(): Promise<
+  ActionResult<CalendarSubscriptionInfo>
+> {
+  const res = await serverFetch.post('/calendar/subscription/rotate');
+  return parseApiResponse<CalendarSubscriptionInfo>(res);
+}

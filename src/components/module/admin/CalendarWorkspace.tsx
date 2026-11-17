@@ -20,6 +20,7 @@ import {
   getCalendar,
   getCalendarSubscription,
   rescheduleSession,
+  rotateCalendarSubscription,
 } from '@/service/schedule/schedule.service';
 import { cn, formatDateTimeInTz } from '@/lib/utils';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -344,6 +345,22 @@ export function CalendarWorkspace({
     } catch {
       setFeedback({ type: 'err', text: 'Clipboard permission denied; please copy URL manually.' });
     }
+  };
+
+  const handleRotateFeedUrl = () => {
+    startTransition(async () => {
+      const res = await rotateCalendarSubscription();
+      if (!res.ok || !res.data) {
+        setFeedback({ type: 'err', text: res.message || 'Failed to rotate calendar feed URL' });
+        return;
+      }
+      setSubscriptionInfo(res.data);
+      setCopiedFeedUrl(false);
+      setFeedback({
+        type: 'ok',
+        text: 'Calendar subscription link rotated. Previous link has been revoked.',
+      });
+    });
   };
 
   const handleAddResource = (e: React.FormEvent) => {
@@ -820,6 +837,15 @@ export function CalendarWorkspace({
                     className="shrink-0 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                   >
                     {copiedFeedUrl ? 'Copied!' : 'Copy URL'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={handleRotateFeedUrl}
+                    className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                    title="Revoke current feed link and issue a new one"
+                  >
+                    ↻ Rotate
                   </button>
                 </div>
               </div>

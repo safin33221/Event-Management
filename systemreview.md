@@ -175,3 +175,29 @@ All commands below were executed directly against the current workspace on **202
 3. **Incremental Refactoring:**
    - Split `BookingsWorkspace.tsx` (3,497 lines) and `CatalogService` (1,415 lines) into focused feature modules as features grow.
    - Move Calendar feed signing key to a rotatable per-studio token.
+
+---
+
+## 7. Fixes & Hardening Implemented (2026-11-18)
+
+Following the initial audit above, the actionable security, build, type-safety, and cleanup items have been implemented and verified:
+
+| Area | Fix Applied | Location |
+| :--- | :--- | :--- |
+| **Rate Limiting & Brute-Force Protection** | Added zero-dependency `RateLimitGuard` + `@RateLimit(...)` (`429` + `Retry-After`) on `POST /auth/login` (`12 req/min/IP`) and `POST /public/inquiries` (`10 req/min/IP`), registered globally via `APP_GUARD`. | [rate-limit.guard.ts](file:///d:/Projects/Event_Management/event-management-server/src/common/guards/rate-limit.guard.ts), [rate-limit.guard.spec.ts](file:///d:/Projects/Event_Management/event-management-server/src/common/guards/rate-limit.guard.spec.ts), [app.module.ts](file:///d:/Projects/Event_Management/event-management-server/src/app.module.ts) |
+| **HTTP Security Headers & CORS** | Disabled `x-powered-by`, added `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `X-DNS-Prefetch-Control`, and configured `CORS_ORIGINS` (`enableCors`). | [app.setup.ts](file:///d:/Projects/Event_Management/event-management-server/src/app.setup.ts) |
+| **Fail-Closed Frontend JWT Verification** | `verifyAccessToken()` now fails closed (`null`) in `production` if `AUTH_SECRET` (`>= 16` chars) is absent, with a one-time warning in development. | [jwtHandler.ts](file:///d:/Projects/Event_Management/event-management/src/lib/jwtHandler.ts) |
+| **Edge Proxy Role Alignment** | Restricted `/api/quotes/*/invoice.pdf` in `canRoleAccessPath()` to `OWNER` and `COORDINATOR`, matching `QuotesController`. | [proxy.ts](file:///d:/Projects/Event_Management/event-management/src/proxy.ts) |
+| **Rotatable Calendar Feed Token** | Added per-studio `calendarFeedKey` in `StudioSettings.operationalPolicies`, `POST /calendar/subscription/rotate`, and `↻ Rotate` button in Calendar Sync UI. | [ical.ts](file:///d:/Projects/Event_Management/event-management-server/src/modules/schedule/ical.ts), [schedule.service.ts](file:///d:/Projects/Event_Management/event-management-server/src/modules/schedule/schedule.service.ts), [CalendarWorkspace.tsx](file:///d:/Projects/Event_Management/event-management/src/components/module/admin/CalendarWorkspace.tsx) |
+| **Backend Build & Strict Typecheck** | Switched backend `build` script to `tsc -p tsconfig.build.json`, added `typecheck`, and fixed the 3 mock typing errors in `portfolio-showcase.spec.ts`. | [package.json](file:///d:/Projects/Event_Management/event-management-server/package.json), [portfolio-showcase.spec.ts](file:///d:/Projects/Event_Management/event-management-server/src/modules/catalog/portfolio-showcase.spec.ts) |
+| **Offline-Resilient Frontend Build** | Replaced network-dependent `next/font/google` calls in layouts with local/editorial CSS font stacks (`--font-sans`, `--font-mono`, `--font-album-serif`). | [layout.tsx](file:///d:/Projects/Event_Management/event-management/src/app/layout.tsx), [globals.css](file:///d:/Projects/Event_Management/event-management/src/app/globals.css) |
+| **Config & Dead-Code Cleanup** | Removed hardcoded `@nestjs/observe` placeholder keys (`enabled` flag gated on env), removed default local DB credential fallback outside `test` in `PrismaService`, and deleted unused `sendOtp.ts` / `verifyOtp.ts` stubs. | [app.module.ts](file:///d:/Projects/Event_Management/event-management-server/src/app.module.ts), [prisma.service.ts](file:///d:/Projects/Event_Management/event-management-server/src/prisma/prisma.service.ts) |
+
+### Post-Fix Verification Results
+- **Backend Vitest (`npm test`):** `14` test files / `41` tests passed.
+- **Backend Typecheck (`npm run typecheck`) & Build (`npm run build`):** `0` errors.
+- **Backend Lint (`npm run lint`):** `0` errors, `0` warnings (`115` files).
+- **Frontend `tsc --noEmit`, `eslint`, & `next build`:** All passed cleanly (`23/23` Next.js static/partial routes built).
+
+> **Remaining Long-Term Refactoring Item:** Breaking up `BookingsWorkspace.tsx` (`3,497` lines) and `catalog.service.ts` (`1,415` lines) into smaller feature files remains an optional architectural improvement for future maintainability.
+
