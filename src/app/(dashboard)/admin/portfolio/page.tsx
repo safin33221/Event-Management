@@ -1,47 +1,65 @@
 import React, { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getMe } from '@/service/auth';
+import { listBookings } from '@/service/bookings/bookings.service';
 import {
   listAdminPortfolioEvents,
   listEventTypes,
+  listGalleryMedia,
 } from '@/service/catalog/catalog.service';
 import { PortfolioEventManager } from '@/components/module/admin/PortfolioEventManager';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
 
-async function AdminPortfolioContent() {
+interface AdminPortfolioPageProps {
+  searchParams?: Promise<{ eventId?: string }>;
+}
+
+async function AdminPortfolioContent({ searchParams }: AdminPortfolioPageProps) {
   const session = await getMe();
   if (!session) redirect('/login');
   if (session.role === 'STAFF' || session.role === 'ACCOUNTANT') redirect('/admin');
 
-  const [eventsRes, etRes] = await Promise.all([
+  const resolvedSearch = searchParams ? await searchParams : {};
+
+  const [eventsRes, etRes, galleryRes, bookingsRes] = await Promise.all([
     listAdminPortfolioEvents(),
     listEventTypes(),
+    listGalleryMedia(),
+    listBookings({ status: 'COMPLETED' }),
   ]);
+
+  const portfolioEvents = (eventsRes.ok && eventsRes.data ? eventsRes.data.data : []).filter(
+    (ev) => ev.slug !== 'studio-media-gallery',
+  );
+  const completedBookings = bookingsRes.ok && bookingsRes.data ? bookingsRes.data.data : [];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-          Portfolio Showcase Events
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          Client Digital Portfolios
         </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Create standalone event showcases, upload photos and highlight videos directly to
-          Cloudinary, choose cover images, preview, and publish.
+        <p className="text-xs text-muted-foreground font-medium mt-1">
+          Create a dedicated, shareable portfolio (/portfolio/...) for any COMPLETED event
+          booking—auto-filled from booking details with zero duplicate entry.
         </p>
       </div>
 
       <PortfolioEventManager
-        initialEvents={eventsRes.ok && eventsRes.data ? eventsRes.data.data : []}
+        initialEvents={portfolioEvents}
         eventTypes={etRes.ok && etRes.data ? etRes.data : []}
+        galleryMedia={galleryRes.ok && galleryRes.data ? galleryRes.data.data : []}
+        completedBookings={completedBookings}
+        initialSelectedEventId={resolvedSearch.eventId}
       />
     </div>
   );
 }
 
-export default function AdminPortfolioPage() {
+export default function AdminPortfolioPage({ searchParams }: AdminPortfolioPageProps) {
   return (
-    <Suspense fallback={<PageSkeleton label="Loading portfolio showcase manager..." />}>
-      <AdminPortfolioContent />
+    <Suspense fallback={<PageSkeleton label="Loading client digital portfolios..." />}>
+      <AdminPortfolioContent searchParams={searchParams} />
     </Suspense>
   );
 }

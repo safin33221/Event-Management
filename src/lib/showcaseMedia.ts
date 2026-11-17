@@ -148,7 +148,7 @@ export function buildCloudinaryVideoPosterUrl(videoUrl: string, width = 960): st
   }
   const cleanUrl = videoUrl.replace(/\/upload\/[^/]*f_auto,q_auto[^/]*\//, '/upload/');
   return cleanUrl
-    .replace('/upload/', `/upload/so_auto,f_jpg,q_auto,c_limit,w_${width}/`)
+    .replace('/upload/', `/upload/so_auto,f_jpg,q_auto:best,c_limit,w_${width}/`)
     .replace(/\.[a-z0-9]+(\?.*)?$/i, '.jpg');
 }
 

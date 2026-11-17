@@ -15,6 +15,7 @@ import {
   Inquiry,
   PaymentEntry,
   PaymentMethod,
+  PortfolioShowcaseEvent,
   Quote,
   Resource,
   ResourceType,
@@ -34,6 +35,10 @@ import {
   confirmBooking,
   getBooking,
 } from '@/service/bookings/bookings.service';
+import {
+  createPortfolioEventFromBooking,
+  getPortfolioEventByBooking,
+} from '@/service/catalog/catalog.service';
 import {
   getBookingLedger,
   recordPayment,
@@ -94,6 +99,7 @@ interface BookingsWorkspaceProps {
     summary: BookingLedgerSummary;
     entries: PaymentEntry[];
   } | null;
+  initialBookingPortfolio?: PortfolioShowcaseEvent | null;
   isDetailPage?: boolean;
   initialDetailSection?: BookingDetailSection;
   initialInquiryIdForQuote?: string;
@@ -132,6 +138,7 @@ export function BookingsWorkspace({
   initialSelectedBookingId,
   initialSelectedBooking = null,
   initialLedger = null,
+  initialBookingPortfolio = null,
   isDetailPage = false,
   initialDetailSection = 'payments',
   initialInquiryIdForQuote,
@@ -170,6 +177,9 @@ export function BookingsWorkspace({
     summary: BookingLedgerSummary;
     entries: PaymentEntry[];
   } | null>(initialLedger);
+  const [bookingPortfolio, setBookingPortfolio] = useState<PortfolioShowcaseEvent | null>(
+    initialBookingPortfolio,
+  );
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(
     initialLoadError ? { type: 'err', text: initialLoadError } : null,
   );
@@ -307,7 +317,11 @@ export function BookingsWorkspace({
 
   const openBookingDetail = (bookingId: string, resetScheduleForm = true) => {
     startTransition(async () => {
-      const [bRes, lRes] = await Promise.all([getBooking(bookingId), getBookingLedger(bookingId)]);
+      const [bRes, lRes, pRes] = await Promise.all([
+        getBooking(bookingId),
+        getBookingLedger(bookingId),
+        getPortfolioEventByBooking(bookingId),
+      ]);
       if (bRes.ok && bRes.data) {
         setSelectedBooking(bRes.data);
         setBookings((prev) =>
@@ -319,6 +333,9 @@ export function BookingsWorkspace({
       }
       if (lRes.ok && lRes.data) {
         setLedger(lRes.data);
+      }
+      if (pRes.ok && pRes.data) {
+        setBookingPortfolio(pRes.data.event);
       }
     });
   };
@@ -713,6 +730,25 @@ export function BookingsWorkspace({
       setBookingCancelReason('');
       openBookingDetail(selectedBooking.id);
       notify('ok', `Booking ${selectedBooking.reference} cancelled and reserved crew released`);
+    });
+  };
+
+  const handleCreateBookingPortfolio = () => {
+    if (!selectedBooking) return;
+    startTransition(async () => {
+      const res = await createPortfolioEventFromBooking(selectedBooking.id);
+      if (!res.ok || !res.data) {
+        notify('err', res.message || 'Could not create digital portfolio for this booking.');
+        return;
+      }
+      setBookingPortfolio(res.data.event);
+      notify(
+        'ok',
+        res.data.created
+          ? `Digital Portfolio created for "${res.data.event.title}". Opening album editor...`
+          : `Digital Portfolio already exists for ${selectedBooking.reference}. Opening editor...`,
+      );
+      router.push(`/admin/portfolio?eventId=${encodeURIComponent(res.data.event.id)}`);
     });
   };
 
@@ -1844,6 +1880,25 @@ export function BookingsWorkspace({
                   Mark Completed
                 </button>
               )}
+              {selectedBooking.status === 'COMPLETED' &&
+                (bookingPortfolio ? (
+                  <Link
+                    href={`/admin/portfolio?eventId=${encodeURIComponent(bookingPortfolio.id)}`}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+                  >
+                    <span>Open Digital Portfolio →</span>
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={handleCreateBookingPortfolio}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+                  >
+                    <PlusIcon className="w-3.5 h-3.5" />
+                    <span>{isPending ? 'Creating...' : 'Create Digital Portfolio'}</span>
+                  </button>
+                ))}
               {selectedBooking.status !== 'CANCELLED' &&
                 selectedBooking.status !== 'COMPLETED' && (
                   <button
@@ -1885,6 +1940,69 @@ export function BookingsWorkspace({
                 </p>
               </div>
             </div>
+
+            {selectedBooking.status === 'COMPLETED' && (
+              <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-900">
+                      Client Digital Portfolio
+                    </span>
+                    {bookingPortfolio ? (
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase',
+                          bookingPortfolio.status === 'PUBLISHED'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-800',
+                        )}
+                      >
+                        {bookingPortfolio.status}
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                        Not Created
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    {bookingPortfolio
+                      ? `Shareable album linked to ${selectedBooking.reference} (/portfolio/${bookingPortfolio.slug}) • ${bookingPortfolio.counts?.photos ?? 0} photos, ${bookingPortfolio.counts?.videos ?? 0} videos.`
+                      : 'Event completed! Generate a Digital Portfolio album in one click using this booking’s saved title, date, category, and venue—no duplicate entry.'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {bookingPortfolio ? (
+                    <>
+                      {bookingPortfolio.status === 'PUBLISHED' && (
+                        <Link
+                          href={`/portfolio/${bookingPortfolio.slug}`}
+                          target="_blank"
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          View Live ↗
+                        </Link>
+                      )}
+                      <Link
+                        href={`/admin/portfolio?eventId=${encodeURIComponent(bookingPortfolio.id)}`}
+                        className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                      >
+                        Open Album Editor →
+                      </Link>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={handleCreateBookingPortfolio}
+                      className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                    >
+                      {isPending ? 'Creating Album...' : '+ Create Digital Portfolio'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {showCancelBooking && (
               <form

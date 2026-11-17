@@ -523,3 +523,31 @@ export async function deleteGalleryMedia(
   }
   return result;
 }
+
+export async function getPortfolioEventByBooking(
+  bookingId: string,
+): Promise<ActionResult<{ event: PortfolioShowcaseEvent | null }>> {
+  const res = await serverFetch.get(
+    `/catalog/portfolio-events/by-booking/${encodeURIComponent(bookingId)}`,
+  );
+  return parseApiResponse<{ event: PortfolioShowcaseEvent | null }>(res);
+}
+
+export async function createPortfolioEventFromBooking(
+  bookingId: string,
+): Promise<ActionResult<{ event: PortfolioShowcaseEvent; created: boolean }>> {
+  const res = await serverFetch.post(
+    `/catalog/portfolio-events/from-booking/${encodeURIComponent(bookingId)}`,
+    {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    },
+  );
+  const result = await parseApiResponse<{ event: PortfolioShowcaseEvent; created: boolean }>(res);
+  if (result.ok) {
+    revalidatePortfolioPaths(result.data?.event?.slug);
+    revalidatePath(`/admin/bookings/${bookingId}`);
+    revalidatePath('/admin/bookings');
+  }
+  return result;
+}

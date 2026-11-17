@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
 import {
+  Booking,
   EventType,
   PortfolioEventStatus,
   PortfolioMediaItem,
@@ -11,6 +13,7 @@ import {
 import {
   archivePortfolioEvent,
   createPortfolioEvent,
+  createPortfolioEventFromBooking,
   getAdminPortfolioEvent,
   publishPortfolioEvent,
   registerPortfolioMedia,
@@ -81,22 +84,38 @@ function detectFileFormat(file: File): {
 interface PortfolioEventManagerProps {
   initialEvents: PortfolioShowcaseEvent[];
   eventTypes: EventType[];
+  galleryMedia?: PortfolioMediaItem[];
+  completedBookings?: Booking[];
+  initialSelectedEventId?: string;
   mode?: 'portfolio' | 'gallery';
 }
 
 export function PortfolioEventManager({
   initialEvents,
   eventTypes,
+  galleryMedia = [],
+  completedBookings = [],
+  initialSelectedEventId,
   mode = 'portfolio',
 }: PortfolioEventManagerProps) {
   const isGalleryMode = mode === 'gallery';
-  const [events, setEvents] = useState<PortfolioShowcaseEvent[]>(initialEvents);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(
-    initialEvents[0]?.id ?? null,
-  );
+  const filteredInitialEvents = initialEvents.filter((e) => e.slug !== 'studio-media-gallery');
+  const [events, setEvents] = useState<PortfolioShowcaseEvent[]>(filteredInitialEvents);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(() => {
+    if (
+      initialSelectedEventId &&
+      filteredInitialEvents.some((e) => e.id === initialSelectedEventId)
+    ) {
+      return initialSelectedEventId;
+    }
+    return filteredInitialEvents[0]?.id ?? null;
+  });
+  const [selectedCompletedBookingId, setSelectedCompletedBookingId] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | PortfolioEventStatus>('ALL');
-  const [showCreateForm, setShowCreateForm] = useState(initialEvents.length === 0);
+  const [showCreateForm, setShowCreateForm] = useState(filteredInitialEvents.length === 0);
   const [previewEvent, setPreviewEvent] = useState<PortfolioShowcaseEvent | null>(null);
+  const [showGalleryPicker, setShowGalleryPicker] = useState(false);
+  const [copiedLink, setCopiedLink] = useState<'url' | 'msg' | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -132,6 +151,49 @@ export function PortfolioEventManager({
 
   const notify = (type: 'ok' | 'err', text: string) => setFeedback({ type, text });
 
+  const copyPortfolioShare = async (slug: string, kind: 'url' | 'msg', title: string) => {
+    const url =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/portfolio/${slug}`
+        : `/portfolio/${slug}`;
+    const text =
+      kind === 'url'
+        ? url
+        : `Hi! Your Digital Event Portfolio for "${title}" is ready to view and share:\n${url}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedLink(kind);
+      setTimeout(() => setCopiedLink(null), 2000);
+    } catch {
+      notify('err', 'Could not copy to clipboard.');
+    }
+  };
+
+  const handleAttachFromGallery = (item: PortfolioMediaItem) => {
+    if (!selectedEvent) return;
+    startTransition(async () => {
+      const res = await registerPortfolioMedia(selectedEvent.id, {
+        assetId: item.assetId,
+        publicId: item.publicId,
+        resourceType: item.resourceType,
+        format: item.format,
+        secureUrl: item.secureUrl,
+        bytes: item.bytes,
+        width: item.width ?? undefined,
+        height: item.height ?? undefined,
+        durationSeconds: item.durationSeconds ?? undefined,
+        caption: item.caption ?? undefined,
+        altText: item.altText ?? undefined,
+      });
+      if (!res.ok) {
+        notify('err', res.message || 'Could not attach media from Gallery.');
+        return;
+      }
+      await refreshEventInList(selectedEvent.id);
+      notify('ok', 'Added media from Studio Gallery to this portfolio.');
+    });
+  };
+
   const selectEventForEditing = (ev: PortfolioShowcaseEvent) => {
     setSelectedEventId(ev.id);
     setEditTitle(ev.title);
@@ -150,6 +212,43 @@ export function PortfolioEventManager({
         prev.map((item) => (item.id === eventId ? res.data! : item)),
       );
     }
+  };
+
+  const findPortfolioForBooking = (booking: Booking): PortfolioShowcaseEvent | undefined => {
+    const refSuffix = booking.reference.trim().toLowerCase();
+    return events.find((ev) => ev.slug === refSuffix || ev.slug.endsWith(`-${refSuffix}`));
+  };
+
+  const bookingsAvailableForPortfolio = completedBookings.filter(
+    (b) => !findPortfolioForBooking(b),
+  );
+
+  const handleCreateFromCompletedBooking = (bookingId: string) => {
+    if (!bookingId) {
+      notify('err', 'Please select a completed booking event first.');
+      return;
+    }
+    startTransition(async () => {
+      const res = await createPortfolioEventFromBooking(bookingId);
+      if (!res.ok || !res.data) {
+        notify('err', res.message || 'Failed to create digital portfolio for this booking.');
+        return;
+      }
+      const created = res.data.event;
+      setEvents((prev) =>
+        prev.some((ev) => ev.id === created.id)
+          ? prev.map((ev) => (ev.id === created.id ? created : ev))
+          : [created, ...prev],
+      );
+      selectEventForEditing(created);
+      setSelectedCompletedBookingId('');
+      notify(
+        'ok',
+        res.data.created
+          ? `Digital portfolio created from booking "${created.title}". Now upload photos or pick from Studio Gallery.`
+          : `Opened existing digital portfolio for "${created.title}" (duplicate prevented).`,
+      );
+    });
   };
 
   const handleCreateDraft = (e: React.FormEvent) => {
@@ -590,13 +689,126 @@ export function PortfolioEventManager({
               ? 'Close Form'
               : isGalleryMode
                 ? 'New Gallery Album'
-                : 'Create Event'}
+                : 'Create From Completed Event'}
           </span>
         </button>
       </div>
 
-      {/* Create Showcase Event Draft Card */}
-      {showCreateForm && (
+      {/* Create Portfolio From Completed Booking (Portfolio Mode) OR Free-Form Album (Gallery Mode) */}
+      {showCreateForm && !isGalleryMode && (
+        <div className="atelier-card p-6 space-y-4 border-indigo-200 bg-indigo-50/20">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 pb-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Create Digital Portfolio From Completed Event
+              </h3>
+              <p className="text-xs text-slate-500">
+                Only bookings marked <strong className="text-slate-700">COMPLETED</strong> can have
+                a Client Digital Portfolio. Event title, date, category, and venue auto-fill with
+                no duplicate records.
+              </p>
+            </div>
+            <Link
+              href="/admin/bookings"
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+            >
+              Manage Bookings →
+            </Link>
+          </div>
+
+          {completedBookings.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 text-center space-y-2">
+              <p className="text-xs font-semibold text-slate-800">
+                No completed event bookings available yet
+              </p>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Open a confirmed booking in{' '}
+                <Link href="/admin/bookings" className="text-indigo-600 underline font-medium">
+                  Bookings
+                </Link>{' '}
+                and click <strong>Mark Completed</strong> when the event wraps—then create its
+                Digital Portfolio directly from there or select it here.
+              </p>
+            </div>
+          ) : bookingsAvailableForPortfolio.length === 0 ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-emerald-900">
+                  Every completed booking ({completedBookings.length}) already has a Digital
+                  Portfolio
+                </p>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  Select an existing portfolio from the left sidebar to upload media, set a cover,
+                  or share the client link.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateForm(false)}
+                className="rounded-xl border border-emerald-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex-1 min-w-[260px]">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Select Completed Event Booking ({bookingsAvailableForPortfolio.length} ready)
+                  </label>
+                  <select
+                    value={selectedCompletedBookingId}
+                    onChange={(e) => setSelectedCompletedBookingId(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Choose a completed booking...</option>
+                    {bookingsAvailableForPortfolio.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.reference} — {b.eventTitle} ({b.clientName}
+                        {b.eventDate ? ` • ${formatLocalDate(b.eventDate)}` : ''})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  disabled={isPending || !selectedCompletedBookingId}
+                  onClick={() => handleCreateFromCompletedBooking(selectedCompletedBookingId)}
+                  className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isPending ? 'Creating Portfolio...' : '+ Create Portfolio From Booking'}
+                </button>
+              </div>
+
+              {selectedCompletedBookingId &&
+                (() => {
+                  const picked = bookingsAvailableForPortfolio.find(
+                    (b) => b.id === selectedCompletedBookingId,
+                  );
+                  if (!picked) return null;
+                  return (
+                    <div className="rounded-xl border border-indigo-200 bg-white px-4 py-3 text-xs text-slate-600 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="font-mono-code font-semibold text-indigo-700">
+                          {picked.reference}
+                        </span>{' '}
+                        • <strong className="text-slate-900">{picked.eventTitle}</strong> • Client:{' '}
+                        {picked.clientName}
+                        {picked.eventType ? ` • ${picked.eventType.name}` : ''}
+                      </div>
+                      <span className="text-[11px] text-slate-500">
+                        Auto-fills title, date, category &amp; venue
+                      </span>
+                    </div>
+                  );
+                })()}
+            </div>
+          )}
+        </div>
+      )}
+
+      {showCreateForm && isGalleryMode && (
         <form
           onSubmit={handleCreateDraft}
           className="atelier-card p-6 space-y-4 border-indigo-200 bg-indigo-50/20"
@@ -733,8 +945,10 @@ export function PortfolioEventManager({
         <div className="lg:col-span-4 space-y-3">
           {filteredEvents.length === 0 ? (
             <div className="atelier-card p-6 text-center text-xs text-slate-500">
-              No showcase events in this filter. Click &ldquo;Create Event&rdquo; above to start a
-              draft.
+              No client portfolios in this filter.{' '}
+              {isGalleryMode
+                ? 'Click "New Gallery Album" above to start a draft.'
+                : 'Complete a booking event and click "Create From Completed Event" above.'}
             </div>
           ) : (
             filteredEvents.map((ev) => {
@@ -892,11 +1106,52 @@ export function PortfolioEventManager({
 
                 {!hasReadyCoverImage && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-900">
-                    <strong>Publish Requirement:</strong> Upload and select at least one{' '}
-                    <strong>READY cover image</strong> below before publishing this event to the
-                    public portfolio.
+                    <strong>Publish Requirement:</strong> Upload or pick at least one{' '}
+                    <strong>READY cover image</strong> below before publishing this client
+                    portfolio link.
                   </div>
                 )}
+
+                {/* Shareable Client Digital Portfolio Link Box */}
+                <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700">
+                      Client Digital Portfolio Link
+                    </p>
+                    <p className="font-mono-code text-xs text-slate-800 truncate mt-0.5">
+                      /portfolio/{selectedEvent.slug}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void copyPortfolioShare(selectedEvent.slug, 'url', selectedEvent.title)
+                      }
+                      className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100/60 transition-colors cursor-pointer"
+                    >
+                      {copiedLink === 'url' ? 'Copied Link ✓' : 'Copy Link'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void copyPortfolioShare(selectedEvent.slug, 'msg', selectedEvent.title)
+                      }
+                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer"
+                    >
+                      {copiedLink === 'msg' ? 'Copied Message ✓' : 'Copy WhatsApp Text'}
+                    </button>
+                    {selectedEvent.status === 'PUBLISHED' && (
+                      <Link
+                        href={`/portfolio/${selectedEvent.slug}`}
+                        target="_blank"
+                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+                      >
+                        Open Page ↗
+                      </Link>
+                    )}
+                  </div>
+                </div>
 
                 {/* Editable Event Metadata Form (shown in portfolio mode) */}
                 {!isGalleryMode && (
@@ -991,16 +1246,25 @@ export function PortfolioEventManager({
               {/* Direct Browser-to-Cloudinary Drag-and-Drop Uploader */}
               {selectedEvent.status !== 'ARCHIVED' && (
                 <div className="atelier-card p-5 space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h3 className="text-sm font-bold text-slate-900">
                         Upload Photos &amp; Highlight Videos (Direct to Cloudinary)
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Select or drag &amp; drop multiple photos and videos. Each file uploads
-                        independently—if one fails, completed files stay saved.
+                        Drag &amp; drop files for this client portfolio, or pick already-uploaded
+                        media from your Gallery.
                       </p>
                     </div>
+                    {galleryMedia.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowGalleryPicker(true)}
+                        className="rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+                      >
+                        + Pick From Gallery ({galleryMedia.length})
+                      </button>
+                    )}
                   </div>
 
                   <div
@@ -1342,6 +1606,89 @@ export function PortfolioEventManager({
           isPreview
           onClose={() => setPreviewEvent(null)}
         />
+      )}
+
+      {/* Pick From Studio Gallery Modal */}
+      {showGalleryPicker && selectedEvent && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowGalleryPicker(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs"
+        >
+          <div className="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+            <div className="shrink-0 flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Pick Photos &amp; Videos From Studio Gallery
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Click any item to add it to &ldquo;{selectedEvent.title}&rdquo;.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGalleryPicker(false)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                ✕ Done
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {galleryMedia.map((gm) => {
+                const alreadyAdded = (selectedEvent.media || []).some(
+                  (m) => m.publicId === gm.publicId,
+                );
+                const thumbUrl =
+                  gm.resourceType === 'VIDEO'
+                    ? gm.deliveryUrls?.posterUrl || buildCloudinaryVideoPosterUrl(gm.secureUrl, 320)
+                    : gm.deliveryUrls?.thumbnailUrl ||
+                      buildCloudinaryImageUrl(gm.secureUrl, {
+                        width: 320,
+                        height: 240,
+                        crop: 'fill',
+                      });
+                return (
+                  <button
+                    key={gm.id}
+                    type="button"
+                    disabled={alreadyAdded || isPending}
+                    onClick={() => handleAttachFromGallery(gm)}
+                    className={cn(
+                      'group relative rounded-xl border overflow-hidden text-left transition-all',
+                      alreadyAdded
+                        ? 'border-emerald-300 bg-emerald-50/40 opacity-75 cursor-default'
+                        : 'border-slate-200 hover:border-indigo-400 cursor-pointer',
+                    )}
+                  >
+                    <div className="aspect-[4/3] bg-slate-100 overflow-hidden relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+                      <span className="absolute top-1.5 left-1.5 rounded-full bg-slate-950/75 px-2 py-0.5 text-[10px] font-semibold text-white">
+                        {gm.resourceType === 'VIDEO' ? '▶ Video' : 'Photo'}
+                      </span>
+                    </div>
+                    <div className="p-2 flex items-center justify-between gap-1 text-[11px]">
+                      <span className="truncate font-medium text-slate-800">
+                        {gm.caption || gm.format.toUpperCase()}
+                      </span>
+                      <span
+                        className={cn(
+                          'shrink-0 font-semibold',
+                          alreadyAdded ? 'text-emerald-700' : 'text-indigo-600',
+                        )}
+                      >
+                        {alreadyAdded ? 'Added ✓' : '+ Add'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

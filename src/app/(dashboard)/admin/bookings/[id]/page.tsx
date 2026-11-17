@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { getMe } from '@/service/auth';
 import { getAgencySettings, listAgencyMembers } from '@/service/agency/agency.service';
 import { getBooking } from '@/service/bookings/bookings.service';
+import { getPortfolioEventByBooking } from '@/service/catalog/catalog.service';
 import { getBookingLedger } from '@/service/payments/payments.service';
 import { listResources } from '@/service/schedule/schedule.service';
 import {
@@ -32,13 +33,15 @@ async function AdminBookingDetailContent({ params, searchParams }: AdminBookingD
       ? resolvedSearch.section
       : 'payments';
 
-  const [bookingRes, ledgerRes, settingsRes, resourcesRes, membersRes] = await Promise.all([
-    getBooking(id),
-    getBookingLedger(id),
-    getAgencySettings(),
-    listResources(),
-    listAgencyMembers(),
-  ]);
+  const [bookingRes, ledgerRes, settingsRes, resourcesRes, membersRes, portfolioRes] =
+    await Promise.all([
+      getBooking(id),
+      getBookingLedger(id),
+      getAgencySettings(),
+      listResources(),
+      listAgencyMembers(),
+      getPortfolioEventByBooking(id),
+    ]);
 
   if (!bookingRes.ok || !bookingRes.data) {
     return (
@@ -74,6 +77,7 @@ async function AdminBookingDetailContent({ params, searchParams }: AdminBookingD
       initialSelectedBookingId={bookingRes.data.id}
       initialSelectedBooking={bookingRes.data}
       initialLedger={ledgerRes.ok && ledgerRes.data ? ledgerRes.data : null}
+      initialBookingPortfolio={portfolioRes.ok && portfolioRes.data ? portfolioRes.data.event : null}
       isDetailPage
       initialDetailSection={initialSection}
     />
