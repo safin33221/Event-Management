@@ -10,6 +10,7 @@ import {
   Booking,
   BookingLedgerSummary,
   Deliverable,
+  DeliverableStatus,
   EventSession,
   EventType,
   Inquiry,
@@ -47,8 +48,11 @@ import {
 import {
   createAssignment,
   createDeliverable,
+  deleteDeliverable,
   deliverDeliverable,
+  syncBookingDeliverablesFromQuote,
   updateAssignment,
+  updateDeliverable,
 } from '@/service/operations/operations.service';
 import {
   cancelSession,
@@ -154,7 +158,9 @@ export function BookingsWorkspace({
     useState<BookingDetailSection>(initialDetailSection);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>(
+    resolvedMode === 'inquiries' ? 'NEW' : 'ALL',
+  );
 
   const [showInquiryForm, setShowInquiryForm] = useState(
     resolvedMode === 'inquiries' && initialOpenCreateModal,
@@ -170,6 +176,11 @@ export function BookingsWorkspace({
     setInquiries(initialInquiries);
   }
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
+  const [prevInitialQuotes, setPrevInitialQuotes] = useState<Quote[]>(initialQuotes);
+  if (initialQuotes !== prevInitialQuotes) {
+    setPrevInitialQuotes(initialQuotes);
+    setQuotes(initialQuotes);
+  }
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [resources, setResources] = useState<Resource[]>(initialResources);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(initialSelectedBooking);
@@ -215,9 +226,12 @@ export function BookingsWorkspace({
   const [quoteEventTitle, setQuoteEventTitle] = useState(prefilledInquiry?.eventTitle || '');
   const [quoteClientName, setQuoteClientName] = useState(prefilledInquiry?.clientName || '');
   const [quoteClientPhone, setQuoteClientPhone] = useState(prefilledInquiry?.clientPhone || '');
+  const [quoteClientEmail, setQuoteClientEmail] = useState(prefilledInquiry?.clientEmail || '');
   const [quoteDate, setQuoteDate] = useState(
     prefilledInquiry?.requestedDate ? prefilledInquiry.requestedDate.slice(0, 10) : '',
   );
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [lastCreatedQuote, setLastCreatedQuote] = useState<Quote | null>(null);
   const [quoteItems, setQuoteItems] = useState<QuoteItemDraft[]>(() => {
     if (prefilledInquiryPkg) {
       if (prefilledInquiryPkg.items && prefilledInquiryPkg.items.length > 0) {
@@ -226,7 +240,7 @@ export function BookingsWorkspace({
           serviceItemId: item.serviceItemId || undefined,
           description: item.description,
           quantity: String(item.quantity),
-          unitPriceTk: String(Math.round(item.unitPricePoisha / 100)),
+          unitPriceTk: String(Math.max(1, Math.round(item.unitPricePoisha / 100))),
         }));
       }
       return [
@@ -234,7 +248,11 @@ export function BookingsWorkspace({
           packageId: prefilledInquiryPkg.id,
           description: prefilledInquiryPkg.name,
           quantity: '1',
-          unitPriceTk: String(Math.round(prefilledInquiryPkg.basePricePoisha / 100)),
+          unitPriceTk: String(
+            prefilledInquiryPkg.basePricePoisha > 0
+              ? Math.round(prefilledInquiryPkg.basePricePoisha / 100)
+              : 50000,
+          ),
         },
       ];
     }
@@ -251,6 +269,65 @@ export function BookingsWorkspace({
     'Advance locks the event date & crew. Remaining balance due before final gallery/album delivery.',
   );
   const [acceptChannelMap, setAcceptChannelMap] = useState<Record<string, AcceptanceChannel>>({});
+
+  const [prevInquiryIdForQuote, setPrevInquiryIdForQuote] = useState<string | undefined>(
+    initialInquiryIdForQuote,
+  );
+  if (initialInquiryIdForQuote !== prevInquiryIdForQuote) {
+    setPrevInquiryIdForQuote(initialInquiryIdForQuote);
+    if (resolvedMode === 'quotes' && initialInquiryIdForQuote) {
+      const targetInq = initialInquiries.find((i) => i.id === initialInquiryIdForQuote);
+      if (targetInq) {
+        const targetPkg = targetInq.packageId
+          ? packages.find((p) => p.id === targetInq.packageId)
+          : undefined;
+        setEditingQuoteId(null);
+        setQuoteError(null);
+        setQuoteInquiryId(targetInq.id);
+        setQuoteEventTypeId(targetInq.eventTypeId || targetPkg?.eventTypeId || '');
+        setQuotePackageId(targetInq.packageId || '');
+        setQuoteEventTitle(targetInq.eventTitle);
+        setQuoteClientName(targetInq.clientName);
+        setQuoteClientPhone(targetInq.clientPhone);
+        setQuoteClientEmail(targetInq.clientEmail || '');
+        setQuoteDate(targetInq.requestedDate ? targetInq.requestedDate.slice(0, 10) : '');
+        if (targetPkg?.items && targetPkg.items.length > 0) {
+          setQuoteItems(
+            targetPkg.items.map((item) => ({
+              packageId: targetPkg.id,
+              serviceItemId: item.serviceItemId || undefined,
+              description: item.description,
+              quantity: String(item.quantity),
+              unitPriceTk: String(Math.max(1, Math.round(item.unitPricePoisha / 100))),
+            })),
+          );
+        } else if (targetPkg) {
+          setQuoteItems([
+            {
+              packageId: targetPkg.id,
+              description: targetPkg.name,
+              quantity: '1',
+              unitPriceTk: String(
+                targetPkg.basePricePoisha > 0
+                  ? Math.round(targetPkg.basePricePoisha / 100)
+                  : 50000,
+              ),
+            },
+          ]);
+        } else {
+          setQuoteItems([
+            {
+              description: targetInq.eventTitle || 'Full Event Coverage',
+              quantity: '1',
+              unitPriceTk: '50000',
+            },
+          ]);
+        }
+        setQuoteDiscountTk('0');
+        setShowQuoteForm(true);
+      }
+    }
+  }
 
   // Payment entry state
   const [payAmountTk, setPayAmountTk] = useState('10000');
@@ -414,7 +491,7 @@ export function BookingsWorkspace({
       setInqPhone('');
       setInqEmail('');
       setInqNotes('');
-      setStatusFilter('ALL');
+      setStatusFilter(resolvedMode === 'inquiries' ? 'NEW' : 'ALL');
       setSearchQuery('');
       setShowInquiryForm(false);
       notify('ok', `Saved inquiry ${res.data.reference}`);
@@ -422,8 +499,67 @@ export function BookingsWorkspace({
     });
   };
 
+  const openQuoteBuilder = (inq?: Inquiry) => {
+    setEditingQuoteId(null);
+    setQuoteError(null);
+    setQuoteDiscountTk('0');
+    if (inq) {
+      const pkg = inq.packageId ? packages.find((p) => p.id === inq.packageId) : undefined;
+      setQuoteInquiryId(inq.id);
+      setQuoteEventTypeId(inq.eventTypeId || pkg?.eventTypeId || '');
+      setQuotePackageId(inq.packageId || '');
+      setQuoteEventTitle(inq.eventTitle);
+      setQuoteClientName(inq.clientName);
+      setQuoteClientPhone(inq.clientPhone);
+      setQuoteClientEmail(inq.clientEmail || '');
+      setQuoteDate(inq.requestedDate ? inq.requestedDate.slice(0, 10) : '');
+      if (pkg?.items && pkg.items.length > 0) {
+        setQuoteItems(
+          pkg.items.map((item) => ({
+            packageId: pkg.id,
+            serviceItemId: item.serviceItemId || undefined,
+            description: item.description,
+            quantity: String(item.quantity),
+            unitPriceTk: String(Math.max(1, Math.round(item.unitPricePoisha / 100))),
+          })),
+        );
+      } else if (pkg) {
+        setQuoteItems([
+          {
+            packageId: pkg.id,
+            description: pkg.name,
+            quantity: '1',
+            unitPriceTk: String(
+              pkg.basePricePoisha > 0 ? Math.round(pkg.basePricePoisha / 100) : 50000,
+            ),
+          },
+        ]);
+      } else {
+        setQuoteItems([
+          {
+            description: inq.eventTitle || 'Full Event Coverage',
+            quantity: '1',
+            unitPriceTk: '50000',
+          },
+        ]);
+      }
+    } else {
+      setQuoteInquiryId('');
+      setQuoteEventTypeId('');
+      setQuotePackageId('');
+      setQuoteEventTitle('');
+      setQuoteClientName('');
+      setQuoteClientPhone('');
+      setQuoteClientEmail('');
+      setQuoteDate('');
+      setQuoteItems([{ description: '', quantity: '1', unitPriceTk: '50000' }]);
+    }
+    setShowQuoteForm(true);
+  };
+
   const startReviseQuote = (q: Quote) => {
     const latest = q.versions?.[0] || q.currentVersion;
+    setQuoteError(null);
     setEditingQuoteId(q.id);
     setQuoteInquiryId(q.inquiryId || '');
     setQuoteEventTypeId(q.eventTypeId || '');
@@ -431,6 +567,7 @@ export function BookingsWorkspace({
     setQuoteEventTitle(q.eventTitle);
     setQuoteClientName(q.clientName);
     setQuoteClientPhone(q.clientPhone);
+    setQuoteClientEmail('');
     setQuoteDate(q.requestedDate ? q.requestedDate.slice(0, 10) : '');
     if (latest?.items && latest.items.length > 0) {
       setQuoteItems(
@@ -458,6 +595,17 @@ export function BookingsWorkspace({
 
   const handleSaveQuote = (e: React.FormEvent) => {
     e.preventDefault();
+    setQuoteError(null);
+
+    if (!editingQuoteId) {
+      if (!quoteEventTitle.trim() || !quoteClientName.trim() || !quoteClientPhone.trim()) {
+        const msg = 'Event title, client name, and client phone are required.';
+        setQuoteError(msg);
+        notify('err', msg);
+        return;
+      }
+    }
+
     const parsedItems = quoteItems
       .filter((item) => item.description.trim())
       .map((item) => ({
@@ -465,14 +613,41 @@ export function BookingsWorkspace({
         serviceItemId: item.serviceItemId || undefined,
         description: item.description.trim(),
         quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
-        unitPricePoisha: Math.round((Number(item.unitPriceTk) || 0) * 100),
+        unitPricePoisha: Math.max(0, Math.round((Number(item.unitPriceTk) || 0) * 100)),
       }));
 
     if (parsedItems.length === 0) {
-      notify('err', 'Add at least one line item with a description');
+      const msg = 'Add at least one line item with a description.';
+      setQuoteError(msg);
+      notify('err', msg);
       return;
     }
+
+    const subtotalPoisha = parsedItems.reduce(
+      (sum, item) => sum + item.quantity * item.unitPricePoisha,
+      0,
+    );
     const discountPoisha = Math.max(0, Math.round((Number(quoteDiscountTk) || 0) * 100));
+
+    if (subtotalPoisha <= 0) {
+      const msg = 'Quote subtotal must be greater than Tk 0. Enter a valid price above 0.';
+      setQuoteError(msg);
+      notify('err', msg);
+      return;
+    }
+    if (discountPoisha >= subtotalPoisha) {
+      const msg = 'Discount cannot equal or exceed the quote subtotal.';
+      setQuoteError(msg);
+      notify('err', msg);
+      return;
+    }
+
+    const cleanDate =
+      quoteDate && /^\d{4}-\d{2}-\d{2}$/.test(quoteDate.trim()) ? quoteDate.trim() : undefined;
+    const cleanEmail =
+      quoteClientEmail.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(quoteClientEmail.trim())
+        ? quoteClientEmail.trim()
+        : undefined;
 
     startTransition(async () => {
       if (editingQuoteId) {
@@ -482,14 +657,17 @@ export function BookingsWorkspace({
           terms: quoteTerms.trim() || undefined,
         });
         if (!res.ok || !res.data) {
-          notify('err', res.message || 'Failed to revise quote');
+          const msg = res.message || 'Failed to revise quote. Please review your entries.';
+          setQuoteError(msg);
+          notify('err', msg);
           return;
         }
-        setQuotes(
-          quotes.map((q) =>
+        setQuotes((prev) =>
+          prev.map((q) =>
             q.id === editingQuoteId
               ? {
                   ...q,
+                  status: 'DRAFT',
                   currentVersionId: res.data!.id,
                   currentVersion: res.data!,
                   versions: [res.data!, ...(q.versions || [])],
@@ -497,36 +675,45 @@ export function BookingsWorkspace({
               : q,
           ),
         );
+        setQuoteError(null);
         setEditingQuoteId(null);
         setShowQuoteForm(false);
         notify('ok', `Quote revised to v${res.data.versionNumber}`);
+        router.refresh();
         return;
       }
 
       const res = await createQuote({
         inquiryId: quoteInquiryId || undefined,
         eventTypeId: quoteEventTypeId || undefined,
-        eventTitle: quoteEventTitle,
-        requestedDate: quoteDate || undefined,
-        clientName: quoteClientName,
-        clientPhone: quoteClientPhone,
+        eventTitle: quoteEventTitle.trim(),
+        requestedDate: cleanDate,
+        clientName: quoteClientName.trim(),
+        clientPhone: quoteClientPhone.trim(),
+        clientEmail: cleanEmail,
         items: parsedItems,
         discountPoisha,
         terms: quoteTerms.trim() || undefined,
       });
       if (!res.ok || !res.data) {
-        notify('err', res.message || 'Failed to create quote');
+        const msg = res.message || 'Failed to create quote. Check backend connection or inquiry status.';
+        setQuoteError(msg);
+        notify('err', msg);
         return;
       }
-      setQuotes([res.data, ...quotes]);
+      const createdQuote = res.data;
+      setQuotes((prev) => [createdQuote, ...prev]);
       if (quoteInquiryId) {
-        setInquiries(
-          inquiries.map((i) => (i.id === quoteInquiryId ? { ...i, status: 'QUOTED' } : i)),
+        setInquiries((prev) =>
+          prev.map((i) => (i.id === quoteInquiryId ? { ...i, status: 'QUOTED' } : i)),
         );
       }
+      setLastCreatedQuote(createdQuote);
+      setQuoteError(null);
       setQuoteInquiryId('');
       setShowQuoteForm(false);
-      notify('ok', `Created quote ${res.data.reference}`);
+      notify('ok', `Created quote ${createdQuote.reference}`);
+      router.refresh();
     });
   };
 
@@ -935,6 +1122,79 @@ export function BookingsWorkspace({
     });
   };
 
+  const handleQuickAddDeliverable = (label: string) => {
+    if (!selectedBooking || !label.trim()) return;
+    startTransition(async () => {
+      const baseMs = selectedBooking.eventDate
+        ? new Date(selectedBooking.eventDate).getTime()
+        : Date.now();
+      const defaultDueIso = new Date(baseMs + 14 * 86_400_000).toISOString();
+      const res = await createDeliverable(selectedBooking.id, {
+        label: label.trim(),
+        dueAt: delivDueDate
+          ? new Date(`${delivDueDate}T18:00:00+06:00`).toISOString()
+          : defaultDueIso,
+      });
+      if (!res.ok) {
+        notify('err', res.message || 'Failed to add deliverable');
+        return;
+      }
+      openBookingDetail(selectedBooking.id, false);
+      notify('ok', `"${label.trim()}" added to deliverables.`);
+    });
+  };
+
+  const handleSyncDeliverablesFromQuote = () => {
+    if (!selectedBooking) return;
+    startTransition(async () => {
+      const res = await syncBookingDeliverablesFromQuote(selectedBooking.id);
+      if (!res.ok || !res.data) {
+        notify('err', res.message || 'Failed to sync deliverables from quote');
+        return;
+      }
+      openBookingDetail(selectedBooking.id, false);
+      notify(
+        'ok',
+        res.data.createdCount > 0
+          ? `Synced ${res.data.createdCount} deliverable${res.data.createdCount > 1 ? 's' : ''} from the quote.`
+          : 'All quote items are already listed in deliverables.',
+      );
+    });
+  };
+
+  const handleUpdateDeliverableField = (
+    d: Deliverable,
+    patch: {
+      assigneeUserId?: string | null;
+      dueAt?: string | null;
+      reviewStatus?: DeliverableStatus;
+    },
+  ) => {
+    if (!selectedBooking) return;
+    startTransition(async () => {
+      const res = await updateDeliverable(d.id, patch);
+      if (!res.ok) {
+        notify('err', res.message || 'Failed to update deliverable');
+        return;
+      }
+      openBookingDetail(selectedBooking.id, false);
+      notify('ok', `Updated "${d.label}".`);
+    });
+  };
+
+  const handleDeleteDeliverable = (d: Deliverable) => {
+    if (!selectedBooking) return;
+    startTransition(async () => {
+      const res = await deleteDeliverable(d.id);
+      if (!res.ok) {
+        notify('err', res.message || 'Failed to remove deliverable');
+        return;
+      }
+      openBookingDetail(selectedBooking.id, false);
+      notify('ok', `Removed "${d.label}".`);
+    });
+  };
+
   const handleDeliverItem = (d: Deliverable, url?: string) => {
     if (!selectedBooking) return;
     startTransition(async () => {
@@ -953,17 +1213,31 @@ export function BookingsWorkspace({
   };
 
   const q = searchQuery.trim().toLowerCase();
+  const openInquiries = inquiries.filter(
+    (i) => i.status !== 'CONVERTED' && i.status !== 'CLOSED',
+  );
+  const newInquiriesCount = inquiries.filter((i) => i.status === 'NEW').length;
+  const quotedInquiriesCount = inquiries.filter((i) => i.status === 'QUOTED').length;
   const filteredInquiries = inquiries.filter(
     (i) =>
-      (statusFilter === 'ALL' || i.status === statusFilter) &&
+      (statusFilter === 'ALL'
+        ? i.status !== 'CONVERTED' && i.status !== 'CLOSED'
+        : i.status === statusFilter) &&
       (!q ||
         i.eventTitle.toLowerCase().includes(q) ||
         i.clientName.toLowerCase().includes(q) ||
         i.reference.toLowerCase().includes(q)),
   );
+  const openQuotes = quotes.filter(
+    (item) => item.status !== 'ACCEPTED' && item.status !== 'SUPERSEDED',
+  );
+  const draftQuotesCount = quotes.filter((item) => item.status === 'DRAFT').length;
+  const sentQuotesCount = quotes.filter((item) => item.status === 'SENT').length;
   const filteredQuotes = quotes.filter(
     (item) =>
-      (statusFilter === 'ALL' || item.status === statusFilter) &&
+      (statusFilter === 'ALL'
+        ? item.status !== 'ACCEPTED' && item.status !== 'SUPERSEDED'
+        : item.status === statusFilter) &&
       (!q ||
         item.eventTitle.toLowerCase().includes(q) ||
         item.clientName.toLowerCase().includes(q) ||
@@ -1036,23 +1310,54 @@ export function BookingsWorkspace({
               />
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              {(['ALL', 'NEW', 'QUOTED', 'CONVERTED'] as const).map((st) => (
+              {(
+                [
+                  { id: 'NEW', label: `NEW (${newInquiriesCount})` },
+                  { id: 'QUOTED', label: `QUOTED (${quotedInquiriesCount})` },
+                  { id: 'ALL', label: `All Open (${openInquiries.length})` },
+                ] as const
+              ).map((tab) => (
                 <button
-                  key={st}
+                  key={tab.id}
                   type="button"
-                  onClick={() => setStatusFilter(st)}
+                  onClick={() => setStatusFilter(tab.id)}
                   className={cn(
-                    'rounded-lg px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200',
-                    statusFilter === st
+                    'rounded-lg px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200 cursor-pointer',
+                    statusFilter === tab.id
                       ? 'bg-slate-900 text-white shadow-xs'
                       : 'text-slate-600 hover:bg-slate-100',
                   )}
                 >
-                  {st === 'ALL' ? `All (${inquiries.length})` : st}
+                  {tab.label}
                 </button>
               ))}
             </div>
           </div>
+
+          {lastCreatedQuote && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <span className="font-medium text-indigo-950">
+                Quote <strong className="font-mono-code">{lastCreatedQuote.reference}</strong>{' '}
+                created for <strong>{lastCreatedQuote.eventTitle}</strong>. Ready to send or accept
+                as a booking!
+              </span>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <a
+                  href={`/api/quotes/${encodeURIComponent(lastCreatedQuote.id)}/invoice.pdf`}
+                  download
+                  className="rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                >
+                  PDF Invoice ↓
+                </a>
+                <Link
+                  href="/admin/quotes"
+                  className="rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+                >
+                  Open in Price Quotes →
+                </Link>
+              </div>
+            </div>
+          )}
 
           <div className="atelier-card p-6">
             {filteredInquiries.length === 0 ? (
@@ -1069,8 +1374,8 @@ export function BookingsWorkspace({
                     key={inq.id}
                     className="py-3.5 flex flex-wrap items-center justify-between gap-3"
                   >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono-code text-xs font-semibold text-slate-500">
                           {inq.reference}
                         </span>
@@ -1081,29 +1386,50 @@ export function BookingsWorkspace({
                         {inq.clientName} ({inq.clientPhone}) • Requested Date:{' '}
                         {formatLocalDate(inq.requestedDate)}
                       </p>
+                      {inq.notes && (
+                        <p className="text-xs text-slate-400 mt-0.5 truncate max-w-2xl">
+                          Notes: {inq.notes}
+                        </p>
+                      )}
                     </div>
-                    {inq.status === 'CONVERTED' ? (
-                      <Link
-                        href="/admin/bookings"
-                        className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors"
-                      >
-                        Converted • View Bookings →
-                      </Link>
-                    ) : inq.status === 'QUOTED' ? (
-                      <Link
-                        href="/admin/quotes"
-                        className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        Quoted • View Quotes →
-                      </Link>
-                    ) : (
-                      <Link
-                        href={`/admin/quotes?inquiryId=${encodeURIComponent(inq.id)}`}
-                        className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors"
-                      >
-                        Create Quote →
-                      </Link>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {inq.status === 'CONVERTED' ? (
+                        <Link
+                          href="/admin/bookings"
+                          className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors"
+                        >
+                          Converted • View Bookings →
+                        </Link>
+                      ) : inq.status === 'QUOTED' ? (
+                        <>
+                          <Link
+                            href="/admin/quotes"
+                            className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            View Quotes →
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => openQuoteBuilder(inq)}
+                            className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                          >
+                            + New Quote
+                          </button>
+                        </>
+                      ) : inq.status === 'CLOSED' ? (
+                        <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                          Closed
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openQuoteBuilder(inq)}
+                          className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          Create Quote →
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1289,11 +1615,8 @@ export function BookingsWorkspace({
             </div>
             <button
               type="button"
-              onClick={() => {
-                setEditingQuoteId(null);
-                setShowQuoteForm(true);
-              }}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 transition-all duration-200"
+              onClick={() => openQuoteBuilder()}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 transition-all duration-200 cursor-pointer"
             >
               <PlusIcon className="w-4 h-4" />
               <span>Create Price Quote</span>
@@ -1313,19 +1636,25 @@ export function BookingsWorkspace({
               />
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              {(['ALL', 'DRAFT', 'SENT', 'ACCEPTED'] as const).map((st) => (
+              {(
+                [
+                  { id: 'ALL', label: `All Open (${openQuotes.length})` },
+                  { id: 'DRAFT', label: `DRAFT (${draftQuotesCount})` },
+                  { id: 'SENT', label: `SENT (${sentQuotesCount})` },
+                ] as const
+              ).map((tab) => (
                 <button
-                  key={st}
+                  key={tab.id}
                   type="button"
-                  onClick={() => setStatusFilter(st)}
+                  onClick={() => setStatusFilter(tab.id)}
                   className={cn(
-                    'rounded-lg px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200',
-                    statusFilter === st
+                    'rounded-lg px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200 cursor-pointer',
+                    statusFilter === tab.id
                       ? 'bg-slate-900 text-white shadow-xs'
                       : 'text-slate-600 hover:bg-slate-100',
                   )}
                 >
-                  {st === 'ALL' ? `All (${quotes.length})` : st}
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -1373,10 +1702,17 @@ export function BookingsWorkspace({
 
                       <div className="flex flex-wrap items-center gap-2">
                         {latest && (
-                          <span className="font-mono-code text-sm font-bold text-slate-900 tabular-nums mr-2">
+                          <span className="font-mono-code text-sm font-bold text-slate-900 tabular-nums mr-1">
                             {formatPoisha(latest.totalPoisha, item.currency)}
                           </span>
                         )}
+                        <a
+                          href={`/api/quotes/${encodeURIComponent(item.id)}/invoice.pdf`}
+                          download
+                          className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                        >
+                          PDF Invoice ↓
+                        </a>
                         {item.status !== 'ACCEPTED' && (
                           <>
                             <button
@@ -1430,36 +1766,94 @@ export function BookingsWorkspace({
               </div>
             )}
           </div>
+        </div>
+      )}
 
-          {/* Quote Builder / Revision Modal */}
-          {showQuoteForm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs overflow-y-auto">
-              <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-5 my-8">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900">
-                      {editingQuoteId ? 'Revise Quote (New Version)' : 'Create Price Quote'}
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      {editingQuoteId
-                        ? 'Creates an immutable new quote version while preserving prior versions.'
-                        : 'Select a package preset or customize itemized services below.'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowQuoteForm(false);
-                      setEditingQuoteId(null);
-                    }}
-                    className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100"
-                  >
-                    ✕
-                  </button>
+      {/* Quote Builder / Revision Modal (Accessible from BOTH Inquiries & Quotes!) */}
+      {showQuoteForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-5 my-8 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  {editingQuoteId ? 'Revise Quote (New Version)' : 'Create Price Quote'}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  {editingQuoteId
+                    ? 'Creates an immutable new quote version while preserving prior versions.'
+                    : 'Auto-filled details ready — customize line items or load a package preset below.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQuoteForm(false);
+                  setEditingQuoteId(null);
+                  setQuoteError(null);
+                }}
+                className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuote} className="space-y-4">
+              {quoteError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-800">
+                  {quoteError}
                 </div>
+              )}
 
-                <form onSubmit={handleSaveQuote} className="space-y-4">
-                  {!editingQuoteId && (
+              {!editingQuoteId && (() => {
+                const quotableInquiries = inquiries.filter(
+                  (i) => i.status !== 'CONVERTED' && i.status !== 'CLOSED',
+                );
+                const activeLinkedInq = quoteInquiryId
+                  ? inquiries.find((i) => i.id === quoteInquiryId)
+                  : undefined;
+
+                return (
+                  <>
+                    {quotableInquiries.length > 0 && (
+                      <div className="rounded-xl border border-indigo-200/70 bg-indigo-50/40 p-3 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700">
+                            Linked Client Inquiry
+                          </label>
+                          {activeLinkedInq && (
+                            <span className="font-mono-code text-[11px] font-semibold text-indigo-800">
+                              {activeLinkedInq.reference}
+                            </span>
+                          )}
+                        </div>
+                        <select
+                          value={quoteInquiryId}
+                          onChange={(e) => {
+                            const pickedId = e.target.value;
+                            if (!pickedId) {
+                              setQuoteInquiryId('');
+                              return;
+                            }
+                            const found = inquiries.find((i) => i.id === pickedId);
+                            if (found) openQuoteBuilder(found);
+                          }}
+                          className={inputClass}
+                        >
+                          <option value="">Standalone quote (not linked to inquiry)</option>
+                          {quotableInquiries.map((inq) => (
+                            <option key={inq.id} value={inq.id}>
+                              {inq.reference} — {inq.eventTitle} ({inq.clientName} • {inq.status})
+                            </option>
+                          ))}
+                        </select>
+                        {activeLinkedInq?.notes && (
+                          <p className="text-[11px] text-slate-600 pt-0.5">
+                            Client notes: {activeLinkedInq.notes}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     <div className="grid sm:grid-cols-2 gap-3">
                       <div className="sm:col-span-2">
                         <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -1499,6 +1893,29 @@ export function BookingsWorkspace({
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Client Email (optional)
+                        </label>
+                        <input
+                          type="email"
+                          value={quoteClientEmail}
+                          onChange={(e) => setQuoteClientEmail(e.target.value)}
+                          placeholder="client@example.com"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Requested Date
+                        </label>
+                        <input
+                          type="date"
+                          value={quoteDate}
+                          onChange={(e) => setQuoteDate(e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
                           Event Category
                         </label>
                         <select
@@ -1516,17 +1933,6 @@ export function BookingsWorkspace({
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 mb-1">
-                          Requested Date
-                        </label>
-                        <input
-                          type="date"
-                          value={quoteDate}
-                          onChange={(e) => setQuoteDate(e.target.value)}
-                          className={inputClass}
-                        />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">
                           Load Package Preset
                         </label>
                         <select
@@ -1543,7 +1949,9 @@ export function BookingsWorkspace({
                         </select>
                       </div>
                     </div>
-                  )}
+                  </>
+                );
+              })()}
 
                   {/* Line Items Builder */}
                   <div className="space-y-2">
@@ -1675,6 +2083,7 @@ export function BookingsWorkspace({
                         onClick={() => {
                           setShowQuoteForm(false);
                           setEditingQuoteId(null);
+                          setQuoteError(null);
                         }}
                         className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600"
                       >
@@ -1683,9 +2092,13 @@ export function BookingsWorkspace({
                       <button
                         type="submit"
                         disabled={isPending}
-                        className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                        className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60 cursor-pointer"
                       >
-                        {editingQuoteId ? 'Save Revised Version' : 'Save Quote'}
+                        {isPending
+                          ? 'Saving...'
+                          : editingQuoteId
+                            ? 'Save Revised Version'
+                            : 'Save Quote'}
                       </button>
                     </div>
                   </div>
@@ -1693,8 +2106,6 @@ export function BookingsWorkspace({
               </div>
             </div>
           )}
-        </div>
-      )}
 
       {/* =====================================================================
           MODE 3: DEDICATED BOOKINGS LIST ROUTE (/admin/bookings)
@@ -2037,7 +2448,7 @@ export function BookingsWorkspace({
               >
                 <span>
                   {ledger.summary.isAdvanceMet
-                    ? 'Required advance deposit verified — click "Confirm & Auto-Setup" above to lock dates and generate deliverables & tasks.'
+                    ? 'Required advance deposit verified — click "Confirm & Auto-Setup" above to lock dates and generate crew tasks.'
                     : `Advance Policy: ${formatPoisha(ledger.summary.requiredAdvancePoisha, ledger.summary.currency)} required • Verified so far: ${formatPoisha(ledger.summary.verifiedReceiptsPoisha, ledger.summary.currency)}`}
                 </span>
               </div>
@@ -2692,128 +3103,287 @@ export function BookingsWorkspace({
           )}
 
           {/* SECTION 3: DELIVERABLES & FILES */}
-          {detailSection === 'deliverables' && (
-            <div className="atelier-card p-6 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">
-                    Deliverables &amp; Client Files ({selectedBooking.deliverables?.length ?? 0})
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Track galleries, films, and albums independently without affecting booking dues.
-                  </p>
+          {detailSection === 'deliverables' && (() => {
+            const currentDeliverables = selectedBooking.deliverables ?? [];
+            const canEditDeliverables =
+              selectedBooking.status !== 'CANCELLED' &&
+              selectedBooking.status !== 'COMPLETED';
+            const normalizeDelivKey = (text: string) =>
+              text.trim().replace(/^\d+\s*[x×]\s*/i, '').toLowerCase();
+            const existingKeys = new Set(currentDeliverables.map((d) => normalizeDelivKey(d.label)));
+            const quoteItems = selectedBooking.acceptedQuoteVersion?.items ?? [];
+            const unsyncedQuoteCount = quoteItems.filter(
+              (item) =>
+                item.description.trim() && !existingKeys.has(normalizeDelivKey(item.description)),
+            ).length;
+            const quickPresets = [
+              'Edited Photos',
+              'Highlight Film',
+              'Full Documentary Video',
+              'Printed Album',
+              'Online Gallery',
+            ].filter((preset) => !existingKeys.has(normalizeDelivKey(preset)));
+            const portfolioAlbumSlug = bookingPortfolio?.slug ?? null;
+
+            return (
+              <div className="atelier-card p-6 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      Deliverables &amp; Client Files ({currentDeliverables.length})
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Auto-populated from your Quote items — update status, dates, or mark delivered in 1 click without re-typing.
+                    </p>
+                  </div>
+                  {canEditDeliverables && (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={handleSyncDeliverablesFromQuote}
+                      className={cn(
+                        'rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors',
+                        unsyncedQuoteCount > 0
+                          ? 'border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                      )}
+                    >
+                      ↻ Sync Quote Items
+                      {unsyncedQuoteCount > 0 ? ` (${unsyncedQuoteCount} new)` : ''}
+                    </button>
+                  )}
                 </div>
-                {selectedBooking.status !== 'CANCELLED' &&
-                  selectedBooking.status !== 'COMPLETED' && (
+
+                {canEditDeliverables && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2.5">
+                    {quickPresets.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mr-1">
+                          1-Click Add:
+                        </span>
+                        {quickPresets.map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            disabled={isPending}
+                            onClick={() => handleQuickAddDeliverable(preset)}
+                            className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                          >
+                            + {preset}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <form onSubmit={handleAddDeliverable} className="flex flex-wrap gap-2">
                       <input
                         required
                         value={delivLabel}
                         onChange={(e) => setDelivLabel(e.target.value)}
-                        placeholder="e.g. Photo Gallery, Album"
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs"
+                        placeholder="Custom deliverable item (optional)"
+                        className="flex-1 min-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs"
                       />
                       <input
                         type="date"
                         value={delivDueDate}
                         onChange={(e) => setDelivDueDate(e.target.value)}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-mono-code"
+                        className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-mono-code"
                       />
                       <button
                         type="submit"
                         disabled={isPending}
-                        className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                        className="rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
                       >
-                        + Add Deliverable
+                        + Add Custom
                       </button>
                     </form>
-                  )}
-              </div>
+                  </div>
+                )}
 
-              {!selectedBooking.deliverables || selectedBooking.deliverables.length === 0 ? (
-                <p className="text-xs text-slate-500 py-6 text-center">
-                  No deliverables added yet. Confirming a booking with Deliverable Rules or adding
-                  above creates them here.
-                </p>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {selectedBooking.deliverables.map((d) => {
-                    const isOverdue =
-                      d.reviewStatus !== 'DELIVERED' &&
-                      Boolean(d.dueAt && new Date(d.dueAt).getTime() < renderNowMs);
-                    return (
-                      <div key={d.id} className="py-3.5 space-y-2 text-xs">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-semibold text-sm text-slate-900">{d.label}</p>
-                              {isOverdue && (
-                                <span className="rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-xs font-semibold text-rose-700">
-                                  Overdue
-                                </span>
-                              )}
+                {currentDeliverables.length === 0 ? (
+                  <div className="py-8 text-center space-y-3">
+                    <p className="text-xs text-slate-500">
+                      No deliverables listed yet. Click &ldquo;Sync Quote Items&rdquo; or use a 1-click preset above.
+                    </p>
+                    {canEditDeliverables && (
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={handleSyncDeliverablesFromQuote}
+                        className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                      >
+                        ↻ Sync Deliverables from Quote
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {currentDeliverables.map((d) => {
+                      const isOverdue =
+                        d.reviewStatus !== 'DELIVERED' &&
+                        Boolean(d.dueAt && new Date(d.dueAt).getTime() < renderNowMs);
+                      const dueInputValue = d.dueAt ? String(d.dueAt).slice(0, 10) : '';
+                      return (
+                        <div key={d.id} className="py-3.5 space-y-2.5 text-xs">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-semibold text-sm text-slate-900">{d.label}</p>
+                                <StatusBadge status={d.reviewStatus} />
+                                {isOverdue && (
+                                  <span className="rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                                    Overdue
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-slate-500">
+                                {d.dueAt ? `Due ${formatLocalDate(d.dueAt)}` : 'No deadline set'}
+                                {d.assigneeName ? ` • Assigned: ${d.assigneeName}` : ''}
+                                {d.deliveredAt ? ` • Delivered ${formatLocalDate(d.deliveredAt)}` : ''}
+                                {d.deliveryUrl && (
+                                  <>
+                                    {' • '}
+                                    <a
+                                      href={d.deliveryUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-indigo-600 underline font-medium"
+                                    >
+                                      Open Link ↗
+                                    </a>
+                                  </>
+                                )}
+                              </p>
                             </div>
-                            <p className="text-slate-500 mt-0.5">
-                              {d.dueAt ? `Due ${formatLocalDate(d.dueAt)}` : 'No deadline set'}
-                              {d.deliveredAt ? ` • Delivered ${formatLocalDate(d.deliveredAt)}` : ''}
-                              {d.deliveryUrl && (
-                                <>
-                                  {' • '}
-                                  <a
-                                    href={d.deliveryUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-indigo-600 underline"
+
+                            {canEditDeliverables && d.reviewStatus !== 'DELIVERED' && (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <select
+                                  aria-label={`Status for ${d.label}`}
+                                  disabled={isPending}
+                                  value={d.reviewStatus}
+                                  onChange={(e) =>
+                                    handleUpdateDeliverableField(d, {
+                                      reviewStatus: e.target.value as DeliverableStatus,
+                                    })
+                                  }
+                                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700"
+                                >
+                                  <option value="PENDING">Pending</option>
+                                  <option value="IN_PROGRESS">In Progress</option>
+                                  <option value="IN_REVIEW">In Review</option>
+                                  <option value="CHANGES_REQUESTED">Changes Req.</option>
+                                  <option value="APPROVED">Approved</option>
+                                </select>
+
+                                <input
+                                  aria-label={`Due date for ${d.label}`}
+                                  type="date"
+                                  disabled={isPending}
+                                  value={dueInputValue}
+                                  onChange={(e) =>
+                                    handleUpdateDeliverableField(d, {
+                                      dueAt: e.target.value
+                                        ? new Date(`${e.target.value}T18:00:00+06:00`).toISOString()
+                                        : null,
+                                    })
+                                  }
+                                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-mono-code text-slate-700"
+                                />
+
+                                {members.length > 0 && (
+                                  <select
+                                    aria-label={`Assignee for ${d.label}`}
+                                    disabled={isPending}
+                                    value={d.assigneeUserId ?? ''}
+                                    onChange={(e) =>
+                                      handleUpdateDeliverableField(d, {
+                                        assigneeUserId: e.target.value || null,
+                                      })
+                                    }
+                                    className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 max-w-[130px]"
                                   >
-                                    Open Link ↗
-                                  </a>
-                                </>
-                              )}
-                            </p>
+                                    <option value="">Unassigned</option>
+                                    {members.map((m) => (
+                                      <option key={m.id} value={m.id}>
+                                        {m.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => handleDeliverItem(d)}
+                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                                >
+                                  ✓ Mark Delivered
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => {
+                                    setDeliveringId(deliveringId === d.id ? null : d.id);
+                                    setDeliveryUrlInput(d.deliveryUrl || '');
+                                  }}
+                                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                  {deliveringId === d.id ? 'Close' : '+ Link'}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  title="Remove item"
+                                  disabled={isPending}
+                                  onClick={() => handleDeleteDeliverable(d)}
+                                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <StatusBadge status={d.reviewStatus} />
-                            {d.reviewStatus !== 'DELIVERED' && (
+
+                          {deliveringId === d.id && (
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 flex flex-wrap items-center gap-2">
+                              <input
+                                value={deliveryUrlInput}
+                                onChange={(e) => setDeliveryUrlInput(e.target.value)}
+                                placeholder="Optional cloud gallery / Google Drive URL"
+                                className="flex-1 min-w-[200px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
+                              />
+                              {portfolioAlbumSlug && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setDeliveryUrlInput(
+                                      `${window.location.origin}/album/${portfolioAlbumSlug}`,
+                                    )
+                                  }
+                                  className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100"
+                                >
+                                  Use Client Album Link
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 disabled={isPending}
-                                onClick={() => {
-                                  setDeliveringId(deliveringId === d.id ? null : d.id);
-                                  setDeliveryUrlInput(d.deliveryUrl || '');
-                                }}
-                                className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800"
+                                onClick={() => handleDeliverItem(d, deliveryUrlInput)}
+                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                               >
-                                {deliveringId === d.id ? 'Close' : 'Deliver'}
+                                Save Link &amp; Deliver
                               </button>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
-
-                        {deliveringId === d.id && (
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 flex flex-wrap gap-2">
-                            <input
-                              value={deliveryUrlInput}
-                              onChange={(e) => setDeliveryUrlInput(e.target.value)}
-                              placeholder="Optional cloud gallery / Google Drive URL"
-                              className="flex-1 min-w-[200px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
-                            />
-                            <button
-                              type="button"
-                              disabled={isPending}
-                              onClick={() => handleDeliverItem(d, deliveryUrlInput)}
-                              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                            >
-                              Confirm Delivered
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* SECTION 4: CREW TASKS */}
           {detailSection === 'tasks' && (

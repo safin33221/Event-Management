@@ -72,13 +72,43 @@ export async function createDeliverable(
 
 export async function updateDeliverable(
   deliverableId: string,
-  payload: { reviewStatus?: DeliverableStatus; notes?: string },
+  payload: {
+    assigneeUserId?: string | null;
+    dueAt?: string | null;
+    reviewStatus?: DeliverableStatus;
+    notes?: string;
+  },
 ): Promise<ActionResult<Deliverable>> {
   const res = await serverFetch.patch(`/deliverables/${encodeURIComponent(deliverableId)}`, {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   const result = await parseApiResponse<Deliverable>(res);
+  if (result.ok) {
+    revalidatePath('/admin/bookings');
+    revalidatePath('/staff');
+  }
+  return result;
+}
+
+export async function syncBookingDeliverablesFromQuote(
+  bookingId: string,
+): Promise<ActionResult<{ createdCount: number; deliverables: Deliverable[] }>> {
+  const res = await serverFetch.post(
+    `/bookings/${encodeURIComponent(bookingId)}/deliverables/sync-quote`,
+  );
+  const result = await parseApiResponse<{ createdCount: number; deliverables: Deliverable[] }>(res);
+  if (result.ok) {
+    revalidatePath('/admin/bookings');
+  }
+  return result;
+}
+
+export async function deleteDeliverable(
+  deliverableId: string,
+): Promise<ActionResult<{ deleted: boolean; id: string }>> {
+  const res = await serverFetch.delete(`/deliverables/${encodeURIComponent(deliverableId)}`);
+  const result = await parseApiResponse<{ deleted: boolean; id: string }>(res);
   if (result.ok) {
     revalidatePath('/admin/bookings');
     revalidatePath('/staff');

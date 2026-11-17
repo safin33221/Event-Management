@@ -11,6 +11,13 @@ import {
 } from '@/types/event-management';
 import { ActionResult, parseApiResponse } from '../shared/apiResult';
 
+function revalidateQuotePaths() {
+  revalidatePath('/admin/quotes');
+  revalidatePath('/admin/inquiries');
+  revalidatePath('/admin/bookings');
+  revalidatePath('/admin');
+}
+
 export async function listQuotes(): Promise<ActionResult<PaginatedResponse<Quote>>> {
   const res = await serverFetch.get('/quotes?limit=50');
   return parseApiResponse<PaginatedResponse<Quote>>(res);
@@ -39,7 +46,7 @@ export async function createQuote(payload: {
     body: JSON.stringify(payload),
   });
   const result = await parseApiResponse<Quote>(res);
-  if (result.ok) revalidatePath('/admin/bookings');
+  if (result.ok) revalidateQuotePaths();
   return result;
 }
 
@@ -62,7 +69,7 @@ export async function createQuoteVersion(
     body: JSON.stringify(payload),
   });
   const result = await parseApiResponse<QuoteVersion>(res);
-  if (result.ok) revalidatePath('/admin/bookings');
+  if (result.ok) revalidateQuotePaths();
   return result;
 }
 
@@ -72,10 +79,7 @@ export async function sendQuote(quoteId: string): Promise<ActionResult<Quote>> {
     body: JSON.stringify({}),
   });
   const result = await parseApiResponse<Quote>(res);
-  if (result.ok) {
-    revalidatePath('/admin/bookings');
-    revalidatePath('/admin');
-  }
+  if (result.ok) revalidateQuotePaths();
   return result;
 }
 
@@ -97,8 +101,7 @@ export async function acceptQuote(
     booking: Booking;
   }>(res);
   if (result.ok) {
-    revalidatePath('/admin/bookings');
-    revalidatePath('/admin');
+    revalidateQuotePaths();
   }
   return result;
 }
