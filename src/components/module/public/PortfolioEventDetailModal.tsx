@@ -10,6 +10,7 @@ import {
 } from '@/lib/showcaseMedia';
 import { parseAlbumDescriptionAndTheme } from '@/lib/albumTheme';
 import { cn, formatLocalDate } from '@/lib/utils';
+import { AdaptiveVideoPlayer } from './AdaptiveVideoPlayer';
 import { LazyViewportImage } from './LazyViewportImage';
 
 interface PortfolioEventDetailModalProps {
@@ -225,48 +226,20 @@ export function PortfolioEventDetailModal({
                       key={video.id}
                       className="rounded-2xl border border-slate-200 bg-slate-950 overflow-hidden flex flex-col shadow-xs"
                     >
-                      <div className="aspect-video w-full relative bg-slate-900">
-                        {isPlaying ? (
-                          <video
-                            src={streamUrl}
-                            poster={posterUrl || undefined}
-                            controls
-                            autoPlay
-                            playsInline
-                            preload="metadata"
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPlayingVideoIds((prev) => ({ ...prev, [video.id]: true }))
-                            }
-                            aria-label={`Play video: ${video.caption || event.title}`}
-                            className="group relative w-full h-full flex items-center justify-center cursor-pointer overflow-hidden"
-                          >
-                            {posterUrl ? (
-                              <LazyViewportImage
-                                src={posterUrl}
-                                alt={video.altText || video.caption || `${event.title} video poster`}
-                                containerClassName="w-full h-full bg-slate-900"
-                                className="w-full h-full object-cover opacity-90 transition-transform duration-300 group-hover:scale-105"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-slate-900" />
-                            )}
-                            <span className="absolute inset-0 bg-slate-950/30 group-hover:bg-slate-950/15 transition-colors" />
-                            <span className="relative z-10 flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-xs font-bold text-slate-900 shadow-xl transition-transform duration-200 group-hover:scale-105">
-                              <span>▶ Play Highlight</span>
-                              {video.durationSeconds ? (
-                                <span className="font-mono-code text-slate-500">
-                                  ({Math.round(video.durationSeconds)}s)
-                                </span>
-                              ) : null}
-                            </span>
-                          </button>
-                        )}
-                      </div>
+                      <AdaptiveVideoPlayer
+                        src={streamUrl}
+                        posterUrl={posterUrl}
+                        title={video.caption || event.title}
+                        durationSeconds={video.durationSeconds}
+                        width={video.width}
+                        height={video.height}
+                        variant="card"
+                        isPlaying={isPlaying}
+                        onPlay={() =>
+                          setPlayingVideoIds((prev) => ({ ...prev, [video.id]: true }))
+                        }
+                        playLabel="Play Highlight"
+                      />
                       {video.caption && (
                         <div className="px-4 py-2.5 bg-white text-xs text-slate-700 font-medium">
                           {video.caption}

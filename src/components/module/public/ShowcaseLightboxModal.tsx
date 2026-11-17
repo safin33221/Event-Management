@@ -85,7 +85,7 @@ export function ShowcaseLightboxModal({ item, onClose }: ShowcaseLightboxModalPr
                   type="button"
                   onClick={() => setIsPlayingVideo(true)}
                   aria-label={`Play video: ${item.title}`}
-                  className="group relative w-full h-full flex items-center justify-center cursor-pointer overflow-hidden"
+                  className="group relative block w-full h-full cursor-pointer overflow-hidden"
                 >
                   {posterUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -94,14 +94,16 @@ export function ShowcaseLightboxModal({ item, onClose }: ShowcaseLightboxModalPr
                       alt={item.title}
                       loading="lazy"
                       decoding="async"
-                      className="w-full h-full object-cover opacity-90 transition-transform duration-300 group-hover:scale-105"
+                      className="absolute inset-0 w-full h-full object-cover opacity-90 transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="w-full h-full bg-slate-900" />
+                    <div className="absolute inset-0 bg-slate-900" />
                   )}
                   <span className="absolute inset-0 bg-slate-950/35 group-hover:bg-slate-950/20 transition-colors" />
-                  <span className="relative z-10 flex items-center gap-2 rounded-full bg-white/95 px-5 py-3 text-sm font-bold text-slate-900 shadow-2xl transition-transform duration-200 group-hover:scale-105">
-                    <span>▶ Play Video Film</span>
+                  <span className="absolute inset-0 z-10 flex items-center justify-center p-4">
+                    <span className="flex items-center gap-2 rounded-full bg-white/95 px-5 py-3 text-sm font-bold text-slate-900 shadow-2xl transition-transform duration-200 group-hover:scale-105">
+                      <span>▶ Play Video Film</span>
+                    </span>
                   </span>
                 </button>
               ) : media.embedUrl ? (

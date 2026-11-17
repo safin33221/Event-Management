@@ -10,6 +10,7 @@ import {
 import { buildCloudinaryVideoPosterUrl } from '@/lib/showcaseMedia';
 import { parseAlbumDescriptionAndTheme } from '@/lib/albumTheme';
 import { cn } from '@/lib/utils';
+import { AdaptiveVideoPlayer } from './AdaptiveVideoPlayer';
 import { isNextOptimizableUrl, LazyAlbumImage } from './LazyAlbumImage';
 
 interface PortfolioEventPageClientProps {
@@ -23,14 +24,6 @@ const INITIAL_PHOTO_BATCH = 9;
 const PHOTO_BATCH_STEP = 9;
 const SHIMMER_BLUR_DATA_URL =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjEwIiBmaWxsPSIjZTdlMmRhIi8+PC9zdmc+';
-
-function formatFilmDuration(seconds?: number | null): string | null {
-  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return null;
-  const total = Math.round(seconds);
-  const mins = Math.floor(total / 60);
-  const secs = total % 60;
-  return `${mins}:${String(secs).padStart(2, '0')}`;
-}
 
 export function PortfolioEventPageClient({
   event,
@@ -597,7 +590,6 @@ export function PortfolioEventPageClient({
                 featuredFilm.deliveryUrls?.posterUrl ||
                 coverMasterUrl;
               const streamUrl = featuredFilm.deliveryUrls?.fullUrl || featuredFilm.secureUrl;
-              const formattedDuration = formatFilmDuration(featuredFilm.durationSeconds);
 
               return (
                 <div
@@ -608,58 +600,21 @@ export function PortfolioEventPageClient({
                       : 'bg-stone-950 border border-stone-800 shadow-[0_30px_80px_-20px_rgba(24,24,27,0.35)]',
                   )}
                 >
-                  <div className="aspect-video w-full relative overflow-hidden rounded-xl bg-black">
-                    {isPlaying ? (
-                      <video
-                        src={streamUrl}
-                        poster={posterUrl || undefined}
-                        controls
-                        autoPlay
-                        playsInline
-                        preload="metadata"
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPlayingVideoIds((prev) => ({ ...prev, [featuredFilm.id]: true }))
-                        }
-                        aria-label={`Play cinematic film: ${featuredFilm.caption || event.title}`}
-                        className="group relative w-full h-full flex items-center justify-center cursor-pointer overflow-hidden"
-                      >
-                        {posterUrl ? (
-                          <LazyAlbumImage
-                            src={posterUrl}
-                            alt={
-                              featuredFilm.altText ||
-                              featuredFilm.caption ||
-                              `${event.title} cinematic poster`
-                            }
-                            quality={92}
-                            darkSurface
-                            aspectRatio="16 / 9"
-                            sizes="(max-width: 1200px) 100vw, 1152px"
-                            className="object-cover opacity-90 group-hover:scale-[1.03]"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-stone-900" />
-                        )}
-
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/30 transition-opacity group-hover:opacity-90" />
-
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3">
-                          <span className="flex h-20 w-20 items-center justify-center rounded-full border border-white/50 bg-white/15 backdrop-blur-md text-white shadow-2xl transition-all duration-300 group-hover:scale-110 group-hover:bg-white group-hover:text-stone-950">
-                            <span className="ml-1 text-2xl">▶</span>
-                          </span>
-                          <span className="rounded-full bg-black/60 backdrop-blur-md border border-white/20 px-4 py-1.5 text-xs font-semibold tracking-wider uppercase text-white">
-                            Play Full Cinematic Film
-                            {formattedDuration ? ` • ${formattedDuration}` : ''}
-                          </span>
-                        </div>
-                      </button>
-                    )}
-                  </div>
+                  <AdaptiveVideoPlayer
+                    src={streamUrl}
+                    posterUrl={posterUrl}
+                    title={featuredFilm.caption || event.title}
+                    durationSeconds={featuredFilm.durationSeconds}
+                    width={featuredFilm.width}
+                    height={featuredFilm.height}
+                    variant="featured"
+                    isPlaying={isPlaying}
+                    onPlay={() =>
+                      setPlayingVideoIds((prev) => ({ ...prev, [featuredFilm.id]: true }))
+                    }
+                    playLabel="Play Full Cinematic Film"
+                    className="rounded-xl"
+                  />
                 </div>
               );
             })()}
@@ -673,7 +628,6 @@ export function PortfolioEventPageClient({
                     video.deliveryUrls?.posterUrl ||
                     coverMasterUrl;
                   const streamUrl = video.deliveryUrls?.fullUrl || video.secureUrl;
-                  const formattedDuration = formatFilmDuration(video.durationSeconds);
 
                   return (
                     <div
@@ -685,52 +639,19 @@ export function PortfolioEventPageClient({
                           : 'border-stone-200 bg-white shadow-sm',
                       )}
                     >
-                      <div className="aspect-video w-full relative bg-black">
-                        {isPlaying ? (
-                          <video
-                            src={streamUrl}
-                            poster={posterUrl || undefined}
-                            controls
-                            autoPlay
-                            playsInline
-                            preload="metadata"
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPlayingVideoIds((prev) => ({ ...prev, [video.id]: true }))
-                            }
-                            className="group relative w-full h-full flex items-center justify-center cursor-pointer overflow-hidden"
-                          >
-                            {posterUrl ? (
-                              <LazyAlbumImage
-                                src={posterUrl}
-                                alt={video.altText || video.caption || `${event.title} reel`}
-                                quality={90}
-                                darkSurface
-                                aspectRatio="16 / 9"
-                                sizes="(max-width: 640px) 100vw, 560px"
-                                className="object-cover opacity-90 group-hover:scale-105"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-stone-900" />
-                            )}
-                            <span className="absolute inset-0 bg-black/25 group-hover:bg-black/15" />
-                            <span className="absolute inset-0 z-10 flex items-center justify-center">
-                              <span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/40 bg-black/55 backdrop-blur-md text-white transition-transform group-hover:scale-110">
-                                <span className="ml-0.5 text-base">▶</span>
-                              </span>
-                            </span>
-                            {formattedDuration && (
-                              <span className="absolute bottom-3 right-3 z-10 rounded-full bg-black/70 px-2.5 py-0.5 font-mono-code text-[11px] text-white">
-                                {formattedDuration}
-                              </span>
-                            )}
-                          </button>
-                        )}
-                      </div>
+                      <AdaptiveVideoPlayer
+                        src={streamUrl}
+                        posterUrl={posterUrl}
+                        title={video.caption || `${event.title} reel`}
+                        durationSeconds={video.durationSeconds}
+                        width={video.width}
+                        height={video.height}
+                        variant="card"
+                        isPlaying={isPlaying}
+                        onPlay={() =>
+                          setPlayingVideoIds((prev) => ({ ...prev, [video.id]: true }))
+                        }
+                      />
                       <div
                         className={cn(
                           'px-4 py-3 flex items-center justify-between gap-3 text-xs border-t',

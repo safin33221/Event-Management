@@ -21,6 +21,7 @@ import {
 import { parseAlbumDescriptionAndTheme } from '@/lib/albumTheme';
 import { cn, formatLocalDate } from '@/lib/utils';
 import { ArrowRightIcon, CalendarIcon, CameraIcon, SearchIcon } from '@/components/shared/Icons';
+import { AdaptiveVideoPlayer } from './AdaptiveVideoPlayer';
 import { LazyViewportImage } from './LazyViewportImage';
 import { PortfolioEventDetailModal } from './PortfolioEventDetailModal';
 import { ShowcaseLightboxModal } from './ShowcaseLightboxModal';
@@ -358,49 +359,20 @@ export function PublicPortfolioShowcase({
                       key={media.id}
                       className="group atelier-card atelier-card-hover overflow-hidden flex flex-col bg-slate-950 border-slate-200"
                     >
-                      <div className="aspect-[4/3] w-full relative bg-slate-900 overflow-hidden">
-                        {isPlaying ? (
-                          <video
-                            src={streamUrl}
-                            poster={thumbUrl || undefined}
-                            controls
-                            autoPlay
-                            playsInline
-                            preload="metadata"
-                            className="w-full h-full object-contain bg-black"
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPlayingVideoIds((prev) => ({ ...prev, [media.id]: true }))
-                            }
-                            aria-label={`Play highlight video: ${media.caption || branding.displayName}`}
-                            className="w-full h-full relative flex items-center justify-center cursor-pointer overflow-hidden"
-                          >
-                            {thumbUrl ? (
-                              <LazyViewportImage
-                                src={thumbUrl}
-                                alt={media.altText || media.caption || 'Highlight video poster'}
-                                containerClassName="h-full w-full bg-slate-900"
-                                className="h-full w-full object-cover opacity-90 transition-transform duration-500 group-hover:scale-105"
-                              />
-                            ) : (
-                              <div className="h-full w-full bg-slate-900" />
-                            )}
-                            <span className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-transparent" />
-                            <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-slate-950/80 backdrop-blur-xs px-3 py-1 text-[11px] font-semibold text-white">
-                              🎬 Highlight Video
-                              {media.durationSeconds
-                                ? ` • ${Math.round(media.durationSeconds)}s`
-                                : ''}
-                            </span>
-                            <span className="relative z-10 flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-xs font-bold text-slate-900 shadow-xl transition-transform duration-200 group-hover:scale-110">
-                              <span>▶ Play Film</span>
-                            </span>
-                          </button>
-                        )}
-                      </div>
+                      <AdaptiveVideoPlayer
+                        src={streamUrl}
+                        posterUrl={thumbUrl}
+                        title={media.caption || branding.displayName}
+                        durationSeconds={media.durationSeconds}
+                        width={media.width}
+                        height={media.height}
+                        variant="card"
+                        isPlaying={isPlaying}
+                        onPlay={() =>
+                          setPlayingVideoIds((prev) => ({ ...prev, [media.id]: true }))
+                        }
+                        playLabel="Play Film"
+                      />
 
                       <div className="px-4 py-3 bg-white flex items-center justify-between gap-2">
                         <p className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
