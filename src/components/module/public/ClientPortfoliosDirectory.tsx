@@ -1,0 +1,250 @@
+'use client';
+
+import React, { useMemo, useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { EventType, PortfolioShowcaseEvent, PublicBranding } from '@/types/event-management';
+import { parseAlbumDescriptionAndTheme } from '@/lib/albumTheme';
+import { isNextOptimizableUrl } from './LazyAlbumImage';
+import { ArrowRightIcon, CameraIcon, SearchIcon } from '@/components/shared/Icons';
+import { cn } from '@/lib/utils';
+
+interface ClientPortfoliosDirectoryProps {
+  branding: PublicBranding;
+  events: PortfolioShowcaseEvent[];
+  eventTypes: EventType[];
+}
+
+export function ClientPortfoliosDirectory({
+  branding,
+  events,
+  eventTypes,
+}: ClientPortfoliosDirectoryProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedEventTypeId, setSelectedEventTypeId] = useState<string>('ALL');
+  const [filmOnly, setFilmOnly] = useState(false);
+
+  const clientAlbums = useMemo(
+    () => events.filter((ev) => ev.slug !== 'studio-media-gallery'),
+    [events],
+  );
+
+  const usedEventTypes = useMemo(() => {
+    const ids = new Set(clientAlbums.map((ev) => ev.eventTypeId).filter(Boolean));
+    return eventTypes.filter((et) => ids.has(et.id));
+  }, [clientAlbums, eventTypes]);
+
+  const filteredAlbums = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return clientAlbums.filter((ev) => {
+      if (selectedEventTypeId !== 'ALL' && ev.eventTypeId !== selectedEventTypeId) {
+        return false;
+      }
+      if (filmOnly && (ev.counts?.videos ?? 0) === 0) {
+        return false;
+      }
+      if (q) {
+        const cleanDesc = parseAlbumDescriptionAndTheme(ev.description).cleanDescription;
+        const matches =
+          ev.title.toLowerCase().includes(q) ||
+          (ev.eventType?.name || '').toLowerCase().includes(q) ||
+          cleanDesc.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [clientAlbums, selectedEventTypeId, filmOnly, searchQuery]);
+
+  const accent = branding.themeTokens.accentColor || '#4F46E5';
+
+  return (
+    <main className="flex-1 bg-slate-50">
+      {/* Directory Header */}
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-2 max-w-2xl">
+              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-700">
+                <CameraIcon className="w-3.5 h-3.5" />
+                <span>Client Digital Portfolios</span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900">
+                All Client Event Albums
+              </h1>
+              <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
+                Explore bespoke digital albums and cinematic highlight films crafted by{' '}
+                <span className="font-semibold text-slate-800">{branding.displayName}</span>.
+              </p>
+            </div>
+
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              ← Back to Home
+            </Link>
+          </div>
+
+          {/* Search & Category Filters */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSelectedEventTypeId('ALL')}
+                className={cn(
+                  'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                  selectedEventTypeId === 'ALL'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                )}
+              >
+                All Albums ({clientAlbums.length})
+              </button>
+              {usedEventTypes.map((et) => (
+                <button
+                  key={et.id}
+                  type="button"
+                  onClick={() => setSelectedEventTypeId(et.id)}
+                  className={cn(
+                    'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                    selectedEventTypeId === et.id
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                  )}
+                >
+                  {et.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setFilmOnly((v) => !v)}
+                className={cn(
+                  'rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                  filmOnly
+                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                )}
+              >
+                ▶ With Cinematic Film
+              </button>
+            </div>
+
+            <div className="relative w-full md:w-64">
+              <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search client albums..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-8 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Albums Grid */}
+      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 space-y-10">
+        {filteredAlbums.length === 0 ? (
+          <div className="atelier-card p-12 text-center bg-white space-y-2">
+            <p className="text-base font-bold text-slate-900">No matching client albums found</p>
+            <p className="text-xs text-slate-500">
+              Try clearing your search filter or check back soon for newly published albums.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredAlbums.map((ev) => {
+              const coverItem =
+                ev.coverMedia ||
+                (ev.media || []).find((m) => m.resourceType === 'IMAGE' && m.status === 'READY') ||
+                null;
+              const coverSrc = coverItem?.secureUrl || '';
+              const photoCount = ev.counts?.photos ?? 0;
+              const videoCount = ev.counts?.videos ?? 0;
+              const { theme } = parseAlbumDescriptionAndTheme(ev.description);
+
+              return (
+                <Link
+                  key={ev.id}
+                  href={`/album/${ev.slug}`}
+                  className="group atelier-card atelier-card-hover overflow-hidden flex flex-col justify-between bg-white"
+                >
+                  <div>
+                    <div className="relative aspect-[4/3] w-full bg-slate-100 overflow-hidden">
+                      {coverSrc ? (
+                        <Image
+                          src={coverSrc}
+                          alt={coverItem?.altText || ev.title}
+                          fill
+                          quality={90}
+                          unoptimized={!isNextOptimizableUrl(coverSrc)}
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 384px"
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-slate-900 text-slate-400 text-xs font-medium">
+                          Digital Album
+                        </div>
+                      )}
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+
+                      <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-950/75 backdrop-blur-xs px-3 py-1 text-[11px] font-semibold text-white">
+                          {photoCount} Photos{videoCount > 0 ? ` • ${videoCount} Film` : ''}
+                        </span>
+                        <span
+                          style={{ backgroundColor: theme.accent }}
+                          title="Album custom accent theme"
+                          className="h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-5 space-y-2">
+                      {ev.eventType && (
+                        <span className="inline-block rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-700">
+                          {ev.eventType.name}
+                        </span>
+                      )}
+                      <h2 className="text-lg font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2">
+                        {ev.title}
+                      </h2>
+                    </div>
+                  </div>
+
+                  <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between text-xs font-semibold text-slate-700 group-hover:text-indigo-600">
+                    <span>Open Digital Album</span>
+                    <ArrowRightIcon className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Bottom CTA */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center space-y-3">
+          <h2 className="text-xl font-bold text-slate-900">
+            Want a custom Digital Album for your upcoming event?
+          </h2>
+          <p className="text-sm text-slate-600 max-w-lg mx-auto">
+            Every completed booking includes an optional bespoke, high-resolution Digital Photo
+            &amp; Cinematic Film Album tailored to your theme.
+          </p>
+          <div className="pt-1">
+            <Link
+              href="/#inquire"
+              style={{ backgroundColor: accent }}
+              className="inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
+            >
+              <span>Request a Date &amp; Quote</span>
+              <ArrowRightIcon className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}

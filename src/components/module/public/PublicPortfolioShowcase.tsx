@@ -18,6 +18,7 @@ import {
   buildCloudinaryVideoPosterUrl,
   parseShowcaseMedia,
 } from '@/lib/showcaseMedia';
+import { parseAlbumDescriptionAndTheme } from '@/lib/albumTheme';
 import { cn, formatLocalDate } from '@/lib/utils';
 import { ArrowRightIcon, CalendarIcon, CameraIcon, SearchIcon } from '@/components/shared/Icons';
 import { LazyViewportImage } from './LazyViewportImage';
@@ -508,9 +509,9 @@ export function PublicPortfolioShowcase({
                         <h3 className="text-lg font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
                           {ev.title}
                         </h3>
-                        {ev.description && (
+                        {parseAlbumDescriptionAndTheme(ev.description).cleanDescription && (
                           <p className="mt-1 text-xs sm:text-sm text-slate-600 line-clamp-2">
-                            {ev.description}
+                            {parseAlbumDescriptionAndTheme(ev.description).cleanDescription}
                           </p>
                         )}
                       </div>

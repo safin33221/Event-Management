@@ -8,6 +8,7 @@ import {
   buildCloudinarySrcSet,
   buildCloudinaryVideoPosterUrl,
 } from '@/lib/showcaseMedia';
+import { parseAlbumDescriptionAndTheme } from '@/lib/albumTheme';
 import { cn, formatLocalDate } from '@/lib/utils';
 import { LazyViewportImage } from './LazyViewportImage';
 
@@ -66,6 +67,8 @@ export function PortfolioEventDetailModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPhoto, selectedPhotoIndex, photos.length]);
+
+  const cleanDescription = parseAlbumDescriptionAndTheme(event.description).cleanDescription;
 
   const coverUrl =
     event.coverMedia?.deliveryUrls?.coverUrl ||
@@ -153,17 +156,17 @@ export function PortfolioEventDetailModal({
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent flex flex-col justify-end p-5 sm:p-6 text-white">
                 <h3 className="text-xl sm:text-2xl font-bold">{event.title}</h3>
-                {event.description && (
+                {cleanDescription && (
                   <p className="text-xs sm:text-sm text-white/85 mt-1 max-w-2xl leading-relaxed">
-                    {event.description}
+                    {cleanDescription}
                   </p>
                 )}
               </div>
             </div>
           )}
 
-          {!coverUrl && event.description && (
-            <p className="text-sm text-slate-600 leading-relaxed">{event.description}</p>
+          {!coverUrl && cleanDescription && (
+            <p className="text-sm text-slate-600 leading-relaxed">{cleanDescription}</p>
           )}
 
           {/* Media Filter Bar inside Modal */}

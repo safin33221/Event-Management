@@ -41,34 +41,34 @@ export function Navbar({ branding }: NavbarProps) {
         </Link>
 
         <nav className="hidden md:flex items-center gap-1 rounded-full bg-slate-100/80 p-1 text-sm font-medium text-slate-600">
-          <a
-            href="#packages"
+          <Link
+            href="/#packages"
             className="rounded-full px-4 py-1.5 hover:bg-white hover:text-slate-900 hover:shadow-xs transition-all"
           >
             Packages
-          </a>
-          <a
-            href="#portfolio"
+          </Link>
+          <Link
+            href="/portfolio"
             className="rounded-full px-4 py-1.5 hover:bg-white hover:text-slate-900 hover:shadow-xs transition-all"
           >
-            Past Events
-          </a>
-          <a
-            href="#inquire"
+            Client Portfolios
+          </Link>
+          <Link
+            href="/#inquire"
             className="rounded-full px-4 py-1.5 hover:bg-white hover:text-slate-900 hover:shadow-xs transition-all"
           >
             Ask for Quote
-          </a>
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2.5">
-          <a
-            href="#inquire"
+          <Link
+            href="/#inquire"
             className="inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
             style={{ backgroundColor: accent }}
           >
             Book Now
-          </a>
+          </Link>
           <Link
             href="/login"
             className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-colors"

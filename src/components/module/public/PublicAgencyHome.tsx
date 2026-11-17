@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import {
   EventType,
   PortfolioItem,
@@ -8,10 +10,13 @@ import {
   PublicBranding,
   StudioPackage,
 } from '@/types/event-management';
+import { parseAlbumDescriptionAndTheme } from '@/lib/albumTheme';
+import { isNextOptimizableUrl } from './LazyAlbumImage';
 import { formatPoisha } from '@/lib/utils';
 import {
   ArrowRightIcon,
   CalendarIcon,
+  CameraIcon,
   CheckCircleIcon,
   SparklesIcon,
 } from '@/components/shared/Icons';
@@ -40,6 +45,28 @@ export function PublicAgencyHome({
   const [selectedPackageId, setSelectedPackageId] = useState<string>(initialPackageId);
   const primary = branding.themeTokens.primaryColor || '#0F172A';
   const accent = branding.themeTokens.accentColor || '#4F46E5';
+
+  const allClientPortfolios = useMemo(() => {
+    return [...portfolioEvents]
+      .filter((ev) => ev.slug !== 'studio-media-gallery')
+      .sort((a, b) => {
+        const scoreA =
+          (a.coverMedia ? 1000 : 0) +
+          (a.counts?.videos ?? 0) * 15 +
+          (a.counts?.photos ?? 0) * 2;
+        const scoreB =
+          (b.coverMedia ? 1000 : 0) +
+          (b.counts?.videos ?? 0) * 15 +
+          (b.counts?.photos ?? 0) * 2;
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+      });
+  }, [portfolioEvents]);
+
+  const bestThreePortfolios = useMemo(
+    () => allClientPortfolios.slice(0, 3),
+    [allClientPortfolios],
+  );
 
   const handleSelectPackage = (id: string) => {
     setSelectedPackageId(id);
@@ -99,10 +126,10 @@ export function PublicAgencyHome({
                   See Packages
                 </a>
                 <a
-                  href="#portfolio"
+                  href="#featured-portfolios"
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-colors"
                 >
-                  Explore Gallery
+                  Client Portfolios
                 </a>
               </div>
             </div>
@@ -161,6 +188,116 @@ export function PublicAgencyHome({
           </div>
         </div>
       </section>
+
+      {/* Highlighted Best 3 Client Portfolios Section */}
+      {bestThreePortfolios.length > 0 && (
+        <section
+          id="featured-portfolios"
+          className="border-b border-slate-800 bg-slate-950 text-white scroll-mt-16"
+        >
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 space-y-10">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-amber-200">
+                  <CameraIcon className="w-3.5 h-3.5" />
+                  <span>Featured Client Portfolios</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white">
+                  Signature Digital Albums &amp; Films
+                </h2>
+                <p className="text-sm text-slate-300 max-w-xl">
+                  Handpicked client celebrations delivered as custom-themed Digital Albums with
+                  high-resolution photography and cinematic highlight films.
+                </p>
+              </div>
+
+              <Link
+                href="/portfolio"
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-950 hover:bg-slate-100 transition-colors shrink-0 shadow-sm"
+              >
+                <span>See All Client Portfolios ({allClientPortfolios.length})</span>
+                <ArrowRightIcon className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {bestThreePortfolios.map((ev, index) => {
+                const coverItem =
+                  ev.coverMedia ||
+                  (ev.media || []).find((m) => m.resourceType === 'IMAGE' && m.status === 'READY') ||
+                  null;
+                const coverSrc = coverItem?.secureUrl || '';
+                const photoCount = ev.counts?.photos ?? 0;
+                const videoCount = ev.counts?.videos ?? 0;
+                const { theme } = parseAlbumDescriptionAndTheme(ev.description);
+
+                return (
+                  <Link
+                    key={ev.id}
+                    href={`/album/${ev.slug}`}
+                    className="group rounded-2xl border border-white/12 bg-slate-900/90 overflow-hidden flex flex-col justify-between transition-all duration-300 hover:border-white/30 hover:-translate-y-1 hover:shadow-2xl"
+                  >
+                    <div>
+                      <div className="relative aspect-[4/3] w-full bg-slate-800 overflow-hidden">
+                        {coverSrc ? (
+                          <Image
+                            src={coverSrc}
+                            alt={coverItem?.altText || ev.title}
+                            fill
+                            quality={90}
+                            unoptimized={!isNextOptimizableUrl(coverSrc)}
+                            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 384px"
+                            className="object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-xs text-slate-400">
+                            Digital Album
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+
+                        <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-black/65 backdrop-blur-xs px-3 py-1 text-[11px] font-semibold text-white">
+                            {photoCount} Photos{videoCount > 0 ? ` • ${videoCount} Film` : ''}
+                          </span>
+                          <span className="rounded-full bg-amber-300/95 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-950">
+                            #{index + 1} Featured
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-5 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          {ev.eventType ? (
+                            <span className="inline-block rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200">
+                              {ev.eventType.name}
+                            </span>
+                          ) : (
+                            <span />
+                          )}
+                          <span
+                            style={{ backgroundColor: theme.accent }}
+                            title="Custom album accent color"
+                            className="h-3 w-3 rounded-full border border-white/60 shrink-0"
+                          />
+                        </div>
+                        <h3 className="text-lg font-bold tracking-tight text-white group-hover:text-amber-200 transition-colors line-clamp-2">
+                          {ev.title}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="px-5 py-3.5 border-t border-white/10 bg-white/[0.03] flex items-center justify-between text-xs font-semibold text-slate-200 group-hover:text-amber-200">
+                      <span>Open Digital Album</span>
+                      <ArrowRightIcon className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Packages & Collections */}
       <section id="packages" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 scroll-mt-16">
