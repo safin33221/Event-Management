@@ -28,6 +28,15 @@ import {
   buildCloudinaryImageUrl,
   buildCloudinaryVideoPosterUrl,
 } from '@/lib/showcaseMedia';
+import {
+  ALBUM_THEME_PRESETS,
+  AlbumFontStyle,
+  AlbumThemeConfig,
+  DEFAULT_ALBUM_THEME,
+  parseAlbumDescriptionAndTheme,
+  serializeAlbumDescriptionWithTheme,
+  shortenTitleToSlug,
+} from '@/lib/albumTheme';
 import { cn, formatLocalDate } from '@/lib/utils';
 import { PlusIcon } from '@/components/shared/Icons';
 import { PortfolioEventDetailModal } from '../public/PortfolioEventDetailModal';
@@ -115,6 +124,10 @@ export function PortfolioEventManager({
   const [showCreateForm, setShowCreateForm] = useState(filteredInitialEvents.length === 0);
   const [previewEvent, setPreviewEvent] = useState<PortfolioShowcaseEvent | null>(null);
   const [showGalleryPicker, setShowGalleryPicker] = useState(false);
+  const [galleryPickerType, setGalleryPickerType] = useState<'ALL' | 'IMAGE' | 'VIDEO'>('ALL');
+  const [activeEditorTab, setActiveEditorTab] = useState<
+    'photos' | 'videos' | 'profile' | 'theme'
+  >('photos');
   const [copiedLink, setCopiedLink] = useState<'url' | 'msg' | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -128,8 +141,9 @@ export function PortfolioEventManager({
   const [newEventTypeId, setNewEventTypeId] = useState('');
   const [newDescription, setNewDescription] = useState('');
 
-  // Edit active event metadata state
+  // Edit active event metadata & theme state
   const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
+  const initialParsed = parseAlbumDescriptionAndTheme(selectedEvent?.description);
   const [editTitle, setEditTitle] = useState(selectedEvent?.title || '');
   const [editSlug, setEditSlug] = useState(selectedEvent?.slug || '');
   const [editDate, setEditDate] = useState(
@@ -137,7 +151,8 @@ export function PortfolioEventManager({
   );
   const [editLocation, setEditLocation] = useState(selectedEvent?.location || '');
   const [editEventTypeId, setEditEventTypeId] = useState(selectedEvent?.eventTypeId || '');
-  const [editDescription, setEditDescription] = useState(selectedEvent?.description || '');
+  const [editDescription, setEditDescription] = useState(initialParsed.cleanDescription);
+  const [editTheme, setEditTheme] = useState<AlbumThemeConfig>(initialParsed.theme);
 
   // Per-file upload queue (keyed by eventId)
   const [uploadQueues, setUploadQueues] = useState<Record<string, UploadQueueItem[]>>({});
@@ -195,13 +210,15 @@ export function PortfolioEventManager({
   };
 
   const selectEventForEditing = (ev: PortfolioShowcaseEvent) => {
+    const parsed = parseAlbumDescriptionAndTheme(ev.description);
     setSelectedEventId(ev.id);
     setEditTitle(ev.title);
     setEditSlug(ev.slug);
     setEditDate(ev.eventDate ? ev.eventDate.slice(0, 10) : '');
     setEditLocation(ev.location || '');
     setEditEventTypeId(ev.eventTypeId || '');
-    setEditDescription(ev.description || '');
+    setEditDescription(parsed.cleanDescription);
+    setEditTheme(parsed.theme);
     setShowCreateForm(false);
   };
 
@@ -297,20 +314,38 @@ export function PortfolioEventManager({
     if (!selectedEvent) return;
 
     startTransition(async () => {
+      const serializedDescription = serializeAlbumDescriptionWithTheme(editDescription, editTheme);
       const res = await updatePortfolioEvent(selectedEvent.id, {
         title: editTitle.trim(),
         slug: editSlug.trim().toLowerCase(),
         eventDate: editDate || undefined,
         location: editLocation.trim() || undefined,
         eventTypeId: editEventTypeId || undefined,
-        description: editDescription.trim() || undefined,
+        description: serializedDescription || undefined,
       });
       if (!res.ok || !res.data) {
-        notify('err', res.message || 'Failed to update event details.');
+        notify('err', res.message || 'Failed to update profile info.');
         return;
       }
       setEvents((prev) => prev.map((ev) => (ev.id === res.data!.id ? res.data! : ev)));
-      notify('ok', 'Showcase event details saved.');
+      notify('ok', 'Album profile info & slug saved.');
+    });
+  };
+
+  const handleSaveThemeSettings = () => {
+    if (!selectedEvent) return;
+
+    startTransition(async () => {
+      const serializedDescription = serializeAlbumDescriptionWithTheme(editDescription, editTheme);
+      const res = await updatePortfolioEvent(selectedEvent.id, {
+        description: serializedDescription,
+      });
+      if (!res.ok || !res.data) {
+        notify('err', res.message || 'Failed to save album theme.');
+        return;
+      }
+      setEvents((prev) => prev.map((ev) => (ev.id === res.data!.id ? res.data! : ev)));
+      notify('ok', 'Custom theme settings saved for this digital album.');
     });
   };
 
@@ -548,16 +583,29 @@ export function PortfolioEventManager({
     });
   };
 
-  const handleMoveMediaOrder = (index: number, direction: -1 | 1) => {
+  const handleMoveMediaOrder = (
+    mediaId: string,
+    direction: -1 | 1,
+    scopeType?: PortfolioMediaType,
+  ) => {
     if (!selectedEvent) return;
-    const list = [...(selectedEvent.media || [])];
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= list.length) return;
+    const fullList = [...(selectedEvent.media || [])];
+    const scopedList = scopeType
+      ? fullList.filter((m) => m.resourceType === scopeType)
+      : fullList;
+    const scopeIdx = scopedList.findIndex((m) => m.id === mediaId);
+    const targetScopeIdx = scopeIdx + direction;
+    if (scopeIdx === -1 || targetScopeIdx < 0 || targetScopeIdx >= scopedList.length) return;
 
-    const swapped = [...list];
-    const temp = swapped[index];
-    swapped[index] = swapped[targetIndex];
-    swapped[targetIndex] = temp;
+    const neighborId = scopedList[targetScopeIdx].id;
+    const fullIdxA = fullList.findIndex((m) => m.id === mediaId);
+    const fullIdxB = fullList.findIndex((m) => m.id === neighborId);
+    if (fullIdxA === -1 || fullIdxB === -1) return;
+
+    const swapped = [...fullList];
+    const temp = swapped[fullIdxA];
+    swapped[fullIdxA] = swapped[fullIdxB];
+    swapped[fullIdxB] = temp;
 
     startTransition(async () => {
       const res = await reorderPortfolioMedia(
@@ -629,6 +677,12 @@ export function PortfolioEventManager({
   );
 
   const activeQueue = selectedEvent ? uploadQueues[selectedEvent.id] || [] : [];
+  const selectedPhotos = (selectedEvent?.media || []).filter((m) => m.resourceType === 'IMAGE');
+  const selectedVideos = (selectedEvent?.media || []).filter((m) => m.resourceType === 'VIDEO');
+  const galleryFilteredMedia =
+    galleryPickerType === 'ALL'
+      ? galleryMedia
+      : galleryMedia.filter((gm) => gm.resourceType === galleryPickerType);
   const hasReadyCoverImage = Boolean(
     selectedEvent &&
       ((selectedEvent.coverMedia &&
@@ -1118,14 +1172,15 @@ export function PortfolioEventManager({
                   </div>
                 )}
 
-                {/* Shareable Client Digital Portfolio Link Box */}
+                {/* Shareable Client Digital Album Link Box */}
                 <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700">
-                      Client Digital Album Link (Also works via /a/{selectedEvent.slug})
+                      Client Digital Album Link
                     </p>
-                    <p className="font-mono-code text-xs text-slate-800 truncate mt-0.5">
-                      /album/{selectedEvent.slug}
+                    <p className="font-mono-code text-xs text-slate-800 break-all mt-0.5">
+                      /album/{selectedEvent.slug}{' '}
+                      <span className="text-slate-400">(/a/{selectedEvent.slug})</span>
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1159,13 +1214,473 @@ export function PortfolioEventManager({
                   </div>
                 </div>
 
-                {/* Editable Event Metadata Form (shown in portfolio mode) */}
+                {/* 4-Category Navigation Bar (Portfolio Mode) */}
                 {!isGalleryMode && (
-                  <form onSubmit={handleSaveEventMetadata} className="space-y-3">
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div>
+                  <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
+                    {(
+                      [
+                        { id: 'photos', label: `Photos (${selectedPhotos.length})` },
+                        { id: 'videos', label: `Video / Film (${selectedVideos.length})` },
+                        { id: 'profile', label: 'Profile Info' },
+                        { id: 'theme', label: 'Theme Settings' },
+                      ] as const
+                    ).map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveEditorTab(tab.id)}
+                        className={cn(
+                          'rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer',
+                          activeEditorTab === tab.id
+                            ? 'bg-slate-900 text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900',
+                        )}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Helper Block: Direct Cloudinary Uploader + Media List (Used in Photos Tab, Video Tab, or Gallery Mode) */}
+              {(isGalleryMode ||
+                activeEditorTab === 'photos' ||
+                activeEditorTab === 'videos') &&
+                (() => {
+                  const scopeType: PortfolioMediaType | undefined = isGalleryMode
+                    ? undefined
+                    : activeEditorTab === 'videos'
+                      ? 'VIDEO'
+                      : 'IMAGE';
+                  const items =
+                    scopeType === 'VIDEO'
+                      ? selectedVideos
+                      : scopeType === 'IMAGE'
+                        ? selectedPhotos
+                        : selectedEvent.media || [];
+                  const scopedQueue = scopeType
+                    ? activeQueue.filter((q) => q.resourceType === scopeType)
+                    : activeQueue;
+                  const galleryMatchesCount = scopeType
+                    ? galleryMedia.filter((gm) => gm.resourceType === scopeType).length
+                    : galleryMedia.length;
+                  const acceptAttr =
+                    scopeType === 'IMAGE'
+                      ? 'image/jpeg,image/png,image/webp,image/avif,image/heic'
+                      : scopeType === 'VIDEO'
+                        ? 'video/mp4,video/webm,video/quicktime'
+                        : 'image/jpeg,image/png,image/webp,image/avif,image/heic,video/mp4,video/webm,video/quicktime';
+
+                  return (
+                    <>
+                      {selectedEvent.status !== 'ARCHIVED' && (
+                        <div className="atelier-card p-5 space-y-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <h3 className="text-sm font-bold text-slate-900">
+                                {scopeType === 'VIDEO'
+                                  ? 'Upload Cinematic Highlight Film (Direct to Cloudinary)'
+                                  : scopeType === 'IMAGE'
+                                    ? 'Upload Event Photos (Direct to Cloudinary)'
+                                    : 'Upload Photos & Highlight Videos (Direct to Cloudinary)'}
+                              </h3>
+                              <p className="text-xs text-slate-500">
+                                {scopeType === 'VIDEO'
+                                  ? 'Your first video becomes the full-width Featured Cinema Showcase on the client album.'
+                                  : 'Drag & drop files for this client album, or pick already-uploaded media from your Studio Gallery.'}
+                              </p>
+                            </div>
+                            {galleryMatchesCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGalleryPickerType(scopeType || 'ALL');
+                                  setShowGalleryPicker(true);
+                                }}
+                                className="rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+                              >
+                                + Pick{' '}
+                                {scopeType === 'VIDEO'
+                                  ? 'Films'
+                                  : scopeType === 'IMAGE'
+                                    ? 'Photos'
+                                    : 'From'}{' '}
+                                Gallery ({galleryMatchesCount})
+                              </button>
+                            )}
+                          </div>
+
+                          <div
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setIsDraggingOver(true);
+                            }}
+                            onDragLeave={() => setIsDraggingOver(false)}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setIsDraggingOver(false);
+                              if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                enqueueFilesForUpload(e.dataTransfer.files);
+                              }
+                            }}
+                            onClick={() => fileInputRef.current?.click()}
+                            className={cn(
+                              'rounded-2xl border-2 border-dashed p-6 text-center cursor-pointer transition-colors',
+                              isDraggingOver
+                                ? 'border-indigo-600 bg-indigo-50/70'
+                                : 'border-slate-300 bg-slate-50/60 hover:border-indigo-400 hover:bg-slate-50',
+                            )}
+                          >
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              multiple
+                              accept={acceptAttr}
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files.length > 0) {
+                                  enqueueFilesForUpload(e.target.files);
+                                  e.target.value = '';
+                                }
+                              }}
+                              className="hidden"
+                            />
+                            <p className="text-sm font-semibold text-slate-800">
+                              Drag &amp; drop{' '}
+                              {scopeType === 'VIDEO'
+                                ? 'cinematic highlight videos'
+                                : scopeType === 'IMAGE'
+                                  ? 'high-resolution photos'
+                                  : 'photos and highlight videos'}{' '}
+                              here, or <span className="text-indigo-600 underline">browse files</span>
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {scopeType === 'VIDEO'
+                                ? 'Supported: MP4, WebM, MOV (up to 100 MB)'
+                                : scopeType === 'IMAGE'
+                                  ? 'Supported: JPG, PNG, WebP, AVIF, HEIC (up to 15 MB)'
+                                  : 'Supported: JPG, PNG, WebP, AVIF, HEIC (up to 15 MB) • MP4, WebM, MOV (up to 100 MB)'}
+                            </p>
+                          </div>
+
+                          {scopedQueue.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                  Upload Queue ({scopedQueue.length})
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setUploadQueues((prev) => ({
+                                      ...prev,
+                                      [selectedEvent.id]: (prev[selectedEvent.id] || []).filter(
+                                        (q) => q.state !== 'DONE',
+                                      ),
+                                    }))
+                                  }
+                                  className="text-xs text-slate-500 hover:text-slate-800 underline"
+                                >
+                                  Clear completed
+                                </button>
+                              </div>
+
+                              {scopedQueue.map((item) => (
+                                <div
+                                  key={item.localId}
+                                  className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 text-xs"
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="min-w-0 flex items-center gap-2">
+                                      <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono-code text-[10px] font-bold">
+                                        {item.resourceType}
+                                      </span>
+                                      <span className="font-semibold text-slate-900 truncate">
+                                        {item.file.name}
+                                      </span>
+                                      <span className="text-slate-400 font-mono-code">
+                                        ({(item.file.size / (1024 * 1024)).toFixed(1)} MB)
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={cn(
+                                          'font-semibold',
+                                          item.state === 'DONE'
+                                            ? 'text-emerald-700'
+                                            : item.state === 'FAILED'
+                                              ? 'text-rose-700'
+                                              : 'text-indigo-700',
+                                        )}
+                                      >
+                                        {item.state === 'DONE'
+                                          ? 'READY ✓'
+                                          : item.state === 'FAILED'
+                                            ? 'FAILED'
+                                            : `${item.state} (${item.progress}%)`}
+                                      </span>
+
+                                      {item.state === 'FAILED' && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            void processSingleUpload(selectedEvent.id, item)
+                                          }
+                                          className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+                                        >
+                                          Retry Upload
+                                        </button>
+                                      )}
+
+                                      <button
+                                        type="button"
+                                        onClick={() => removeQueueItem(selectedEvent.id, item.localId)}
+                                        className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                                    <div
+                                      className={cn(
+                                        'h-full transition-all duration-200',
+                                        item.state === 'FAILED'
+                                          ? 'bg-rose-500'
+                                          : item.state === 'DONE'
+                                            ? 'bg-emerald-500'
+                                            : 'bg-indigo-600',
+                                      )}
+                                      style={{ width: `${item.progress}%` }}
+                                    />
+                                  </div>
+
+                                  {item.errorMessage && (
+                                    <p className="text-rose-600 font-medium">{item.errorMessage}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="atelier-card p-5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-900">
+                              {scopeType === 'VIDEO'
+                                ? `Album Cinematic Films (${items.length})`
+                                : scopeType === 'IMAGE'
+                                  ? `Album Photographs (${items.length})`
+                                  : `Album Media Items (${items.length})`}
+                            </h3>
+                            <p className="text-xs text-slate-500">
+                              {scopeType === 'VIDEO'
+                                ? 'First film is highlighted full-width in the Digital Album cinema showcase.'
+                                : 'Choose the cover photograph, edit captions & alt text, and reorder or remove.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {items.length === 0 ? (
+                          <p className="text-xs text-slate-500 py-8 text-center">
+                            {scopeType === 'VIDEO'
+                              ? 'No videos in this album yet. Upload a cinematic film or pick one from Studio Gallery.'
+                              : 'No photos in this album yet. Drag & drop photos above or pick from Studio Gallery.'}
+                          </p>
+                        ) : (
+                          <div className="divide-y divide-slate-100">
+                            {items.map((m, idx) => {
+                              const isCover = selectedEvent.coverMediaId === m.id;
+                              const editState = mediaEdits[m.id] ?? {
+                                caption: m.caption || '',
+                                altText: m.altText || '',
+                              };
+                              const thumbUrl =
+                                m.resourceType === 'VIDEO'
+                                  ? m.deliveryUrls?.posterUrl ||
+                                    buildCloudinaryVideoPosterUrl(m.secureUrl, 480)
+                                  : m.deliveryUrls?.thumbnailUrl ||
+                                    buildCloudinaryImageUrl(m.secureUrl, {
+                                      width: 320,
+                                      height: 240,
+                                      crop: 'fill',
+                                    });
+
+                              return (
+                                <div key={m.id} className="py-4 flex flex-col sm:flex-row gap-4">
+                                  <div className="w-full sm:w-40 h-28 shrink-0 rounded-xl bg-slate-900 overflow-hidden relative border border-slate-200">
+                                    {thumbUrl ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={thumbUrl}
+                                        alt={m.altText || m.caption || selectedEvent.title}
+                                        loading="lazy"
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
+                                        {m.resourceType}
+                                      </div>
+                                    )}
+                                    <span className="absolute top-2 left-2 rounded-md bg-slate-950/80 px-2 py-0.5 text-[10px] font-mono-code font-bold text-white">
+                                      #{idx + 1} • {m.resourceType}
+                                    </span>
+                                    {isCover && (
+                                      <span className="absolute bottom-2 left-2 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                                        ★ Cover Photo
+                                      </span>
+                                    )}
+                                    {m.resourceType === 'VIDEO' && idx === 0 && (
+                                      <span className="absolute bottom-2 left-2 rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                                        ★ Featured Film
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex-1 space-y-2.5">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                                        <span
+                                          className={cn(
+                                            'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase',
+                                            m.status === 'READY'
+                                              ? 'bg-emerald-100 text-emerald-800'
+                                              : m.status === 'FAILED'
+                                                ? 'bg-rose-100 text-rose-800'
+                                                : 'bg-amber-100 text-amber-800',
+                                          )}
+                                        >
+                                          {m.status}
+                                        </span>
+                                        <span className="font-mono-code text-slate-500">
+                                          {m.format.toUpperCase()}
+                                          {m.width && m.height ? ` • ${m.width}×${m.height}` : ''}
+                                          {m.durationSeconds
+                                            ? ` • ${Math.round(m.durationSeconds)}s`
+                                            : ''}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {m.resourceType === 'IMAGE' &&
+                                          m.status === 'READY' &&
+                                          !isCover && (
+                                            <button
+                                              type="button"
+                                              disabled={isPending}
+                                              onClick={() => handleSetCoverImage(m)}
+                                              className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                                            >
+                                              Set as Cover
+                                            </button>
+                                          )}
+
+                                        {m.status === 'FAILED' && (
+                                          <button
+                                            type="button"
+                                            disabled={isPending}
+                                            onClick={() => handleRetryFailedStoredMedia(m)}
+                                            className="rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700"
+                                          >
+                                            Retry Processing
+                                          </button>
+                                        )}
+
+                                        <button
+                                          type="button"
+                                          disabled={isPending || idx === 0}
+                                          onClick={() => handleMoveMediaOrder(m.id, -1, scopeType)}
+                                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-35"
+                                          title="Move earlier"
+                                        >
+                                          ↑
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={isPending || idx === items.length - 1}
+                                          onClick={() => handleMoveMediaOrder(m.id, 1, scopeType)}
+                                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-35"
+                                          title="Move later"
+                                        >
+                                          ↓
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={isPending}
+                                          onClick={() => handleDeleteMedia(m.id)}
+                                          className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="grid sm:grid-cols-12 gap-2 items-center">
+                                      <input
+                                        value={editState.caption}
+                                        onChange={(e) =>
+                                          setMediaEdits((prev) => ({
+                                            ...prev,
+                                            [m.id]: { ...editState, caption: e.target.value },
+                                          }))
+                                        }
+                                        placeholder={
+                                          m.resourceType === 'VIDEO'
+                                            ? 'Film title / caption'
+                                            : 'Caption (shown in lightbox)'
+                                        }
+                                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs sm:col-span-5"
+                                      />
+                                      <input
+                                        value={editState.altText}
+                                        onChange={(e) =>
+                                          setMediaEdits((prev) => ({
+                                            ...prev,
+                                            [m.id]: { ...editState, altText: e.target.value },
+                                          }))
+                                        }
+                                        placeholder="Alt text (accessibility & SEO)"
+                                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs sm:col-span-5"
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={isPending}
+                                        onClick={() => handleSaveMediaDetails(m)}
+                                        className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 sm:col-span-2"
+                                      >
+                                        Save Text
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+
+              {/* Category 3: Profile Info Tab */}
+              {!isGalleryMode && activeEditorTab === 'profile' && (
+                <form onSubmit={handleSaveEventMetadata} className="atelier-card p-5 space-y-4">
+                  <div className="border-b border-slate-100 pb-3">
+                    <h3 className="text-sm font-bold text-slate-900">Album Profile Info</h3>
+                    <p className="text-xs text-slate-500">
+                      Customize the album title and short share URL. Internal notes are never shown
+                      on the client Digital Album page.
+                    </p>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    <div className="sm:col-span-2 lg:col-span-1">
                       <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
-                        Title
+                        Album Title
                       </label>
                       <input
                         required
@@ -1174,10 +1689,22 @@ export function PortfolioEventManager({
                         className={inputClass}
                       />
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
-                        Slug
-                      </label>
+                    <div className="sm:col-span-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-semibold uppercase text-slate-500">
+                          Short URL Slug (/album/...)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const shortened = shortenTitleToSlug(editTitle || editSlug);
+                            if (shortened) setEditSlug(shortened);
+                          }}
+                          className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                        >
+                          Auto-Shorten URL
+                        </button>
+                      </div>
                       <input
                         required
                         value={editSlug}
@@ -1187,7 +1714,7 @@ export function PortfolioEventManager({
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
-                        Event Date
+                        Event Date (Admin Ref)
                       </label>
                       <input
                         type="date"
@@ -1198,7 +1725,7 @@ export function PortfolioEventManager({
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
-                        Category
+                        Category (Admin Ref)
                       </label>
                       <select
                         value={editEventTypeId}
@@ -1213,9 +1740,9 @@ export function PortfolioEventManager({
                         ))}
                       </select>
                     </div>
-                    <div className="sm:col-span-2">
+                    <div>
                       <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
-                        Venue / Location
+                        Venue / Location (Admin Ref)
                       </label>
                       <input
                         value={editLocation}
@@ -1226,7 +1753,7 @@ export function PortfolioEventManager({
                     </div>
                     <div className="sm:col-span-2 lg:col-span-3">
                       <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
-                        Description
+                        Internal Admin Notes
                       </label>
                       <textarea
                         rows={2}
@@ -1240,366 +1767,241 @@ export function PortfolioEventManager({
                     <button
                       type="submit"
                       disabled={isPending}
-                      className="rounded-xl bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                      className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-semibold text-white hover:bg-slate-800"
                     >
-                      Save Event Info
+                      Save Profile Info
                     </button>
                   </div>
                 </form>
-                )}
-              </div>
-
-              {/* Direct Browser-to-Cloudinary Drag-and-Drop Uploader */}
-              {selectedEvent.status !== 'ARCHIVED' && (
-                <div className="atelier-card p-5 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900">
-                        Upload Photos &amp; Highlight Videos (Direct to Cloudinary)
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Drag &amp; drop files for this client portfolio, or pick already-uploaded
-                        media from your Gallery.
-                      </p>
-                    </div>
-                    {galleryMedia.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowGalleryPicker(true)}
-                        className="rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
-                      >
-                        + Pick From Gallery ({galleryMedia.length})
-                      </button>
-                    )}
-                  </div>
-
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setIsDraggingOver(true);
-                    }}
-                    onDragLeave={() => setIsDraggingOver(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setIsDraggingOver(false);
-                      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                        enqueueFilesForUpload(e.dataTransfer.files);
-                      }
-                    }}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={cn(
-                      'rounded-2xl border-2 border-dashed p-6 text-center cursor-pointer transition-colors',
-                      isDraggingOver
-                        ? 'border-indigo-600 bg-indigo-50/70'
-                        : 'border-slate-300 bg-slate-50/60 hover:border-indigo-400 hover:bg-slate-50',
-                    )}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept="image/jpeg,image/png,image/webp,image/avif,image/heic,video/mp4,video/webm,video/quicktime"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files.length > 0) {
-                          enqueueFilesForUpload(e.target.files);
-                          e.target.value = '';
-                        }
-                      }}
-                      className="hidden"
-                    />
-                    <p className="text-sm font-semibold text-slate-800">
-                      Drag &amp; drop event photos and highlight videos here, or{' '}
-                      <span className="text-indigo-600 underline">browse files</span>
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Supported: JPG, PNG, WebP, AVIF, HEIC (up to 15 MB) • MP4, WebM, MOV (up to
-                      100 MB)
-                    </p>
-                  </div>
-
-                  {/* Per-File Upload Progress, Failure & Retry Queue */}
-                  {activeQueue.length > 0 && (
-                    <div className="space-y-2 pt-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                          Upload Queue ({activeQueue.length})
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setUploadQueues((prev) => ({
-                              ...prev,
-                              [selectedEvent.id]: (prev[selectedEvent.id] || []).filter(
-                                (q) => q.state !== 'DONE',
-                              ),
-                            }))
-                          }
-                          className="text-xs text-slate-500 hover:text-slate-800 underline"
-                        >
-                          Clear completed
-                        </button>
-                      </div>
-
-                      {activeQueue.map((item) => (
-                        <div
-                          key={item.localId}
-                          className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 text-xs"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="min-w-0 flex items-center gap-2">
-                              <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono-code text-[10px] font-bold">
-                                {item.resourceType}
-                              </span>
-                              <span className="font-semibold text-slate-900 truncate">
-                                {item.file.name}
-                              </span>
-                              <span className="text-slate-400 font-mono-code">
-                                ({(item.file.size / (1024 * 1024)).toFixed(1)} MB)
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={cn(
-                                  'font-semibold',
-                                  item.state === 'DONE'
-                                    ? 'text-emerald-700'
-                                    : item.state === 'FAILED'
-                                      ? 'text-rose-700'
-                                      : 'text-indigo-700',
-                                )}
-                              >
-                                {item.state === 'DONE'
-                                  ? 'READY ✓'
-                                  : item.state === 'FAILED'
-                                    ? 'FAILED'
-                                    : `${item.state} (${item.progress}%)`}
-                              </span>
-
-                              {item.state === 'FAILED' && (
-                                <button
-                                  type="button"
-                                  onClick={() => void processSingleUpload(selectedEvent.id, item)}
-                                  className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
-                                >
-                                  Retry Upload
-                                </button>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => removeQueueItem(selectedEvent.id, item.localId)}
-                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              className={cn(
-                                'h-full transition-all duration-200',
-                                item.state === 'FAILED'
-                                  ? 'bg-rose-500'
-                                  : item.state === 'DONE'
-                                    ? 'bg-emerald-500'
-                                    : 'bg-indigo-600',
-                              )}
-                              style={{ width: `${item.progress}%` }}
-                            />
-                          </div>
-
-                          {item.errorMessage && (
-                            <p className="text-rose-600 font-medium">{item.errorMessage}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               )}
 
-              {/* Curated Gallery & Video Highlights List (Cover Selection, Captions, Alt Text, Reorder, Remove) */}
-              <div className="atelier-card p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Event Media Items ({selectedEvent.media?.length ?? 0})
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Choose the cover image, write captions &amp; SEO alt text, and reorder or
-                      remove items.
+              {/* Category 4: Per-Album Theme Settings Tab */}
+              {!isGalleryMode && activeEditorTab === 'theme' && (
+                <div className="atelier-card p-5 space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        Digital Album Theme Settings
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Give this client a unique look—pick a curated color theme or customize
+                        colors and typography just for this album.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditTheme({ ...DEFAULT_ALBUM_THEME })}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                    >
+                      Reset Default
+                    </button>
+                  </div>
+
+                  {/* Preset Palettes Grid */}
+                  <div className="space-y-2.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      Curated Theme Presets
                     </p>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {ALBUM_THEME_PRESETS.map((preset) => {
+                        const isSelected = editTheme.preset === preset.id;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() =>
+                              setEditTheme({
+                                preset: preset.id,
+                                bg: preset.bg,
+                                surface: preset.surface,
+                                text: preset.text,
+                                accent: preset.accent,
+                                isDark: preset.isDark,
+                                fontStyle: preset.fontStyle,
+                              })
+                            }
+                            className={cn(
+                              'text-left rounded-xl border p-3.5 transition-all cursor-pointer space-y-2',
+                              isSelected
+                                ? 'border-indigo-600 ring-2 ring-indigo-600/20 bg-indigo-50/30'
+                                : 'border-slate-200 bg-white hover:border-slate-300',
+                            )}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-bold text-slate-900">
+                                {preset.name}
+                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {[preset.bg, preset.surface, preset.accent].map((hex, i) => (
+                                  <span
+                                    key={i}
+                                    style={{ backgroundColor: hex }}
+                                    className="h-4 w-4 rounded-full border border-slate-300/80 shadow-2xs"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-slate-500">{preset.tagline}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Custom Color Pickers + Typography */}
+                  <div className="grid sm:grid-cols-2 gap-4 pt-1">
+                    {(
+                      [
+                        { key: 'bg', label: 'Page Background Color' },
+                        { key: 'surface', label: 'Hero & Card Surface Color' },
+                        { key: 'text', label: 'Heading & Text Color' },
+                        { key: 'accent', label: 'Primary Accent & Buttons' },
+                      ] as const
+                    ).map((field) => (
+                      <div
+                        key={field.key}
+                        className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 flex items-center justify-between gap-3"
+                      >
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-800">
+                            {field.label}
+                          </label>
+                          <span className="font-mono-code text-[11px] text-slate-500">
+                            {editTheme[field.key]}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={editTheme[field.key]}
+                            onChange={(e) =>
+                              setEditTheme((prev) => ({
+                                ...prev,
+                                preset: 'custom',
+                                [field.key]: e.target.value.toUpperCase(),
+                              }))
+                            }
+                            className="h-8 w-10 rounded-lg border border-slate-200 cursor-pointer bg-white p-0.5"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                      <p className="text-xs font-semibold text-slate-800">Heading Font Style</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(
+                          [
+                            { id: 'serif', label: 'Editorial Serif' },
+                            { id: 'sans', label: 'Modern Sans' },
+                          ] as { id: AlbumFontStyle; label: string }[]
+                        ).map((fontOpt) => (
+                          <button
+                            key={fontOpt.id}
+                            type="button"
+                            onClick={() =>
+                              setEditTheme((prev) => ({ ...prev, fontStyle: fontOpt.id }))
+                            }
+                            className={cn(
+                              'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                              editTheme.fontStyle === fontOpt.id
+                                ? 'border-slate-900 bg-slate-900 text-white'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
+                            )}
+                          >
+                            {fontOpt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                      <p className="text-xs font-semibold text-slate-800">Default Brightness Mode</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { val: false, label: '☀ Daylight' },
+                          { val: true, label: '☾ Dark Cinema' },
+                        ].map((modeOpt) => (
+                          <button
+                            key={String(modeOpt.val)}
+                            type="button"
+                            onClick={() =>
+                              setEditTheme((prev) => ({
+                                ...prev,
+                                preset: 'custom',
+                                isDark: modeOpt.val,
+                              }))
+                            }
+                            className={cn(
+                              'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                              editTheme.isDark === modeOpt.val
+                                ? 'border-slate-900 bg-slate-900 text-white'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
+                            )}
+                          >
+                            {modeOpt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Theme Preview Strip */}
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      Live Client Album Preview
+                    </p>
+                    <div
+                      style={{
+                        backgroundColor: editTheme.bg,
+                        color: editTheme.text,
+                      }}
+                      className="rounded-2xl border border-slate-200 p-5 transition-colors"
+                    >
+                      <div
+                        style={{ backgroundColor: editTheme.surface }}
+                        className="rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 border border-black/10 shadow-xs"
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <p className="text-[10px] uppercase tracking-[0.25em] opacity-65">
+                            Digital Photo &amp; Film Album
+                          </p>
+                          <p
+                            style={{
+                              fontFamily:
+                                editTheme.fontStyle === 'serif'
+                                  ? 'Georgia, serif'
+                                  : 'var(--font-sans), sans-serif',
+                            }}
+                            className="text-lg sm:text-xl font-semibold truncate"
+                          >
+                            {selectedEvent.title}
+                          </p>
+                        </div>
+                        <span
+                          style={{ backgroundColor: editTheme.accent, color: '#FFFFFF' }}
+                          className="rounded-full px-4 py-1.5 text-xs font-semibold shrink-0"
+                        >
+                          ▶ Watch Cinematic Film
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={handleSaveThemeSettings}
+                      className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 cursor-pointer"
+                    >
+                      {isPending ? 'Saving Theme...' : 'Save Theme Settings'}
+                    </button>
                   </div>
                 </div>
-
-                {!selectedEvent.media || selectedEvent.media.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-8 text-center">
-                    No media uploaded to this showcase event yet.
-                  </p>
-                ) : (
-                  <div className="divide-y divide-slate-100">
-                    {selectedEvent.media.map((m, idx) => {
-                      const isCover = selectedEvent.coverMediaId === m.id;
-                      const editState = mediaEdits[m.id] ?? {
-                        caption: m.caption || '',
-                        altText: m.altText || '',
-                      };
-                      const thumbUrl =
-                        m.resourceType === 'VIDEO'
-                          ? m.deliveryUrls?.posterUrl ||
-                            buildCloudinaryVideoPosterUrl(m.secureUrl, 480)
-                          : m.deliveryUrls?.thumbnailUrl ||
-                            buildCloudinaryImageUrl(m.secureUrl, {
-                              width: 320,
-                              height: 240,
-                              crop: 'fill',
-                            });
-
-                      return (
-                        <div key={m.id} className="py-4 flex flex-col sm:flex-row gap-4">
-                          {/* Thumbnail / Poster Preview */}
-                          <div className="w-full sm:w-40 h-28 shrink-0 rounded-xl bg-slate-900 overflow-hidden relative border border-slate-200">
-                            {thumbUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={thumbUrl}
-                                alt={m.altText || m.caption || selectedEvent.title}
-                                loading="lazy"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
-                                {m.resourceType}
-                              </div>
-                            )}
-                            <span className="absolute top-2 left-2 rounded-md bg-slate-950/80 px-2 py-0.5 text-[10px] font-mono-code font-bold text-white">
-                              #{idx + 1} • {m.resourceType}
-                            </span>
-                            {isCover && (
-                              <span className="absolute bottom-2 left-2 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
-                                ★ Cover Image
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Metadata & Controls */}
-                          <div className="flex-1 space-y-2.5">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex flex-wrap items-center gap-2 text-xs">
-                                <span
-                                  className={cn(
-                                    'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase',
-                                    m.status === 'READY'
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : m.status === 'FAILED'
-                                        ? 'bg-rose-100 text-rose-800'
-                                        : 'bg-amber-100 text-amber-800',
-                                  )}
-                                >
-                                  {m.status}
-                                </span>
-                                <span className="font-mono-code text-slate-500">
-                                  {m.format.toUpperCase()}
-                                  {m.width && m.height ? ` • ${m.width}×${m.height}` : ''}
-                                  {m.durationSeconds ? ` • ${Math.round(m.durationSeconds)}s` : ''}
-                                </span>
-                              </div>
-
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                {m.resourceType === 'IMAGE' && m.status === 'READY' && !isCover && (
-                                  <button
-                                    type="button"
-                                    disabled={isPending}
-                                    onClick={() => handleSetCoverImage(m)}
-                                    className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
-                                  >
-                                    Set as Cover
-                                  </button>
-                                )}
-
-                                {m.status === 'FAILED' && (
-                                  <button
-                                    type="button"
-                                    disabled={isPending}
-                                    onClick={() => handleRetryFailedStoredMedia(m)}
-                                    className="rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700"
-                                  >
-                                    Retry Processing
-                                  </button>
-                                )}
-
-                                <button
-                                  type="button"
-                                  disabled={isPending || idx === 0}
-                                  onClick={() => handleMoveMediaOrder(idx, -1)}
-                                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-35"
-                                  title="Move earlier"
-                                >
-                                  ↑
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={
-                                    isPending || idx === (selectedEvent.media?.length ?? 1) - 1
-                                  }
-                                  onClick={() => handleMoveMediaOrder(idx, 1)}
-                                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-35"
-                                  title="Move later"
-                                >
-                                  ↓
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => handleDeleteMedia(m.id)}
-                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="grid sm:grid-cols-12 gap-2 items-center">
-                              <input
-                                value={editState.caption}
-                                onChange={(e) =>
-                                  setMediaEdits((prev) => ({
-                                    ...prev,
-                                    [m.id]: { ...editState, caption: e.target.value },
-                                  }))
-                                }
-                                placeholder="Caption (shown under photo/video)"
-                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs sm:col-span-5"
-                              />
-                              <input
-                                value={editState.altText}
-                                onChange={(e) =>
-                                  setMediaEdits((prev) => ({
-                                    ...prev,
-                                    [m.id]: { ...editState, altText: e.target.value },
-                                  }))
-                                }
-                                placeholder="Image alt text (for accessibility & SEO)"
-                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs sm:col-span-5"
-                              />
-                              <button
-                                type="button"
-                                disabled={isPending}
-                                onClick={() => handleSaveMediaDetails(m)}
-                                className="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 sm:col-span-2"
-                              >
-                                Save Text
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              )}
             </>
           )}
         </div>
@@ -1614,7 +2016,7 @@ export function PortfolioEventManager({
         />
       )}
 
-      {/* Pick From Studio Gallery Modal */}
+      {/* Pick From Studio Gallery Modal (Filtered cleanly by Photos / Video tab) */}
       {showGalleryPicker && selectedEvent && (
         <div
           role="dialog"
@@ -1628,7 +2030,13 @@ export function PortfolioEventManager({
             <div className="shrink-0 flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  Pick Photos &amp; Videos From Studio Gallery
+                  Pick{' '}
+                  {galleryPickerType === 'IMAGE'
+                    ? 'Photos'
+                    : galleryPickerType === 'VIDEO'
+                      ? 'Cinematic Films'
+                      : 'Photos & Videos'}{' '}
+                  From Studio Gallery
                 </h3>
                 <p className="text-xs text-slate-500">
                   Click any item to add it to &ldquo;{selectedEvent.title}&rdquo;.
@@ -1643,7 +2051,7 @@ export function PortfolioEventManager({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {galleryMedia.map((gm) => {
+              {galleryFilteredMedia.map((gm) => {
                 const alreadyAdded = (selectedEvent.media || []).some(
                   (m) => m.publicId === gm.publicId,
                 );

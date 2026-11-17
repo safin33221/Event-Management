@@ -8,6 +8,7 @@ import {
   PublicBranding,
 } from '@/types/event-management';
 import { buildCloudinaryVideoPosterUrl } from '@/lib/showcaseMedia';
+import { parseAlbumDescriptionAndTheme } from '@/lib/albumTheme';
 import { cn } from '@/lib/utils';
 import { isNextOptimizableUrl, LazyAlbumImage } from './LazyAlbumImage';
 
@@ -48,8 +49,30 @@ export function PortfolioEventPageClient({
     [readyMedia],
   );
 
-  // Daylight Museum Ivory (default) vs Cinema Dark mode
-  const [darkGallery, setDarkGallery] = useState(false);
+  const { theme: savedTheme } = useMemo(
+    () => parseAlbumDescriptionAndTheme(event.description),
+    [event.description],
+  );
+
+  // Respects the per-album saved Theme Settings while allowing the client to toggle Daylight/Cinema
+  const [invertViewerTheme, setInvertViewerTheme] = useState(false);
+  const darkGallery = invertViewerTheme ? !savedTheme.isDark : savedTheme.isDark;
+  const activeBg = !invertViewerTheme
+    ? savedTheme.bg
+    : darkGallery
+      ? '#0B0C10'
+      : '#FAF8F5';
+  const activeSurface = !invertViewerTheme
+    ? savedTheme.surface
+    : darkGallery
+      ? '#14151C'
+      : '#FFFFFF';
+  const activeText = !invertViewerTheme
+    ? savedTheme.text
+    : darkGallery
+      ? '#F5F5F4'
+      : '#1C1917';
+  const activeAccent = savedTheme.accent;
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>('all');
   const [visiblePhotoLimit, setVisiblePhotoLimit] = useState(INITIAL_PHOTO_BATCH);
 
@@ -223,7 +246,10 @@ export function PortfolioEventPageClient({
   const coverHeight = coverItem?.height && coverItem.height > 0 ? coverItem.height : 1200;
 
   const albumHeadingStyle = {
-    fontFamily: 'var(--font-album-serif), Georgia, serif',
+    fontFamily:
+      savedTheme.fontStyle === 'sans'
+        ? 'var(--font-sans), system-ui, sans-serif'
+        : 'var(--font-album-serif), Georgia, serif',
   };
 
   const scrollToSection = (id: string) => {
@@ -245,18 +271,15 @@ export function PortfolioEventPageClient({
 
   return (
     <div
-      className={cn(
-        'min-h-screen flex flex-col transition-colors duration-300',
-        darkGallery ? 'bg-[#0b0c10] text-stone-100' : 'bg-[#FAF8F5] text-stone-900',
-      )}
+      style={{ backgroundColor: activeBg, color: activeText }}
+      className="min-h-screen flex flex-col transition-colors duration-300"
     >
       {/* Clean Single-Row Album Top Bar */}
       <header
+        style={{ backgroundColor: `${activeBg}E6` }}
         className={cn(
           'sticky top-0 z-30 border-b backdrop-blur-md transition-colors',
-          darkGallery
-            ? 'border-white/10 bg-[#0b0c10]/85'
-            : 'border-stone-200/80 bg-[#FAF8F5]/90',
+          darkGallery ? 'border-white/10' : 'border-stone-200/80',
         )}
       >
         <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
@@ -287,8 +310,8 @@ export function PortfolioEventPageClient({
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setDarkGallery((v) => !v)}
-              title={darkGallery ? 'Switch to Daylight Ivory' : 'Switch to Cinema Dark'}
+              onClick={() => setInvertViewerTheme((v) => !v)}
+              title={darkGallery ? 'Switch to Daylight Gallery' : 'Switch to Cinema Dark'}
               className={cn(
                 'rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer',
                 darkGallery
@@ -302,12 +325,8 @@ export function PortfolioEventPageClient({
             <button
               type="button"
               onClick={() => void handleCopyAlbumLink()}
-              className={cn(
-                'rounded-full px-4 py-1.5 text-[11px] font-semibold transition-colors cursor-pointer',
-                darkGallery
-                  ? 'bg-stone-100 text-stone-950 hover:bg-white'
-                  : 'bg-stone-900 text-stone-50 hover:bg-stone-800',
-              )}
+              style={{ backgroundColor: activeAccent, color: '#FFFFFF' }}
+              className="rounded-full px-4 py-1.5 text-[11px] font-semibold transition-opacity hover:opacity-90 cursor-pointer"
             >
               {copiedAlbumUrl ? 'Link Copied ✓' : 'Share Album'}
             </button>
@@ -317,9 +336,10 @@ export function PortfolioEventPageClient({
 
       {/* Editorial Album Cover Hero (Single preloaded LCP cover image) */}
       <section
+        style={{ backgroundColor: activeSurface }}
         className={cn(
           'border-b transition-colors',
-          darkGallery ? 'border-white/10 bg-[#101117]' : 'border-stone-200/70 bg-white/60',
+          darkGallery ? 'border-white/10' : 'border-stone-200/70',
         )}
       >
         <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10 sm:py-12">
@@ -327,11 +347,12 @@ export function PortfolioEventPageClient({
             {coverMasterUrl && (
               <div className="lg:col-span-7 flex justify-center">
                 <div
+                  style={{ backgroundColor: activeBg }}
                   className={cn(
                     'inline-flex max-w-full rounded-2xl p-2.5 sm:p-3.5 transition-all overflow-hidden',
                     darkGallery
-                      ? 'bg-[#171820] border border-white/10 shadow-2xl'
-                      : 'bg-white border border-stone-200/90 shadow-[0_24px_60px_-20px_rgba(24,24,27,0.18)]',
+                      ? 'border border-white/10 shadow-2xl'
+                      : 'border border-stone-200/90 shadow-[0_24px_60px_-20px_rgba(24,24,27,0.18)]',
                   )}
                 >
                   <Image
@@ -427,12 +448,8 @@ export function PortfolioEventPageClient({
                   <button
                     type="button"
                     onClick={handleWatchFeaturedFilm}
-                    className={cn(
-                      'rounded-full px-6 py-2.5 text-xs font-semibold tracking-wide transition-all cursor-pointer shadow-sm',
-                      darkGallery
-                        ? 'bg-stone-100 text-stone-950 hover:bg-white'
-                        : 'bg-stone-900 text-white hover:bg-stone-800',
-                    )}
+                    style={{ backgroundColor: activeAccent, color: '#FFFFFF' }}
+                    className="rounded-full px-6 py-2.5 text-xs font-semibold tracking-wide transition-opacity hover:opacity-90 cursor-pointer shadow-sm"
                   >
                     ▶ Watch Cinematic Film
                   </button>
@@ -441,15 +458,18 @@ export function PortfolioEventPageClient({
                   <button
                     type="button"
                     onClick={() => scrollToSection('photo-grid-gallery')}
+                    style={
+                      !featuredFilm
+                        ? { backgroundColor: activeAccent, color: '#FFFFFF' }
+                        : undefined
+                    }
                     className={cn(
                       'rounded-full border px-6 py-2.5 text-xs font-semibold tracking-wide transition-all cursor-pointer',
                       featuredFilm
                         ? darkGallery
                           ? 'border-white/20 bg-white/5 text-stone-100 hover:bg-white/10'
                           : 'border-stone-300 bg-white text-stone-800 hover:bg-stone-50'
-                        : darkGallery
-                          ? 'bg-stone-100 border-stone-100 text-stone-950 hover:bg-white'
-                          : 'bg-stone-900 border-stone-900 text-white hover:bg-stone-800',
+                        : 'border-transparent hover:opacity-90',
                     )}
                   >
                     Browse Photo Grid ↓
@@ -506,12 +526,15 @@ export function PortfolioEventPageClient({
                       setMediaFilter(item.id);
                       setVisiblePhotoLimit(INITIAL_PHOTO_BATCH);
                     }}
+                    style={
+                      mediaFilter === item.id
+                        ? { backgroundColor: activeAccent, color: '#FFFFFF' }
+                        : undefined
+                    }
                     className={cn(
                       'rounded-full px-4 py-1.5 text-xs font-medium transition-colors cursor-pointer',
                       mediaFilter === item.id
-                        ? darkGallery
-                          ? 'bg-stone-100 text-stone-950'
-                          : 'bg-stone-900 text-white'
+                        ? 'shadow-2xs'
                         : darkGallery
                           ? 'text-stone-300 hover:text-white'
                           : 'text-stone-600 hover:text-stone-900',
