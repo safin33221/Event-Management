@@ -208,6 +208,8 @@ function revalidatePortfolioPaths(slug?: string) {
   revalidatePath('/portfolio');
   revalidatePath('/showcase');
   if (slug) {
+    revalidatePath(`/album/${slug}`);
+    revalidatePath(`/a/${slug}`);
     revalidatePath(`/portfolio/${slug}`);
   }
   revalidatePath('/admin/portfolio');

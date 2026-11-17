@@ -216,8 +216,11 @@ export function PortfolioEventPageClient({
   const featuredFilm = videos[0] ?? null;
   const secondaryFilms = videos.slice(1);
 
-  const coverMasterUrl = event.coverMedia?.secureUrl || photos[0]?.secureUrl || '';
-  const coverAltText = event.coverMedia?.altText || event.title;
+  const coverItem = event.coverMedia || photos[0] || null;
+  const coverMasterUrl = coverItem?.secureUrl || '';
+  const coverAltText = coverItem?.altText || event.title;
+  const coverWidth = coverItem?.width && coverItem.width > 0 ? coverItem.width : 1600;
+  const coverHeight = coverItem?.height && coverItem.height > 0 ? coverItem.height : 1200;
 
   const albumHeadingStyle = {
     fontFamily: 'var(--font-album-serif), Georgia, serif',
@@ -322,25 +325,27 @@ export function PortfolioEventPageClient({
         <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10 sm:py-12">
           <div className="grid gap-8 lg:grid-cols-12 items-center">
             {coverMasterUrl && (
-              <div className="lg:col-span-7">
+              <div className="lg:col-span-7 flex justify-center">
                 <div
                   className={cn(
-                    'rounded-2xl p-2.5 sm:p-3.5 transition-all',
+                    'inline-flex max-w-full rounded-2xl p-2.5 sm:p-3.5 transition-all overflow-hidden',
                     darkGallery
                       ? 'bg-[#171820] border border-white/10 shadow-2xl'
                       : 'bg-white border border-stone-200/90 shadow-[0_24px_60px_-20px_rgba(24,24,27,0.18)]',
                   )}
                 >
-                  <LazyAlbumImage
+                  <Image
                     src={coverMasterUrl}
                     alt={coverAltText}
-                    isHero
+                    width={coverWidth}
+                    height={coverHeight}
+                    preload
                     quality={92}
-                    aspectRatio="16 / 10"
-                    darkSurface={darkGallery}
+                    placeholder="blur"
+                    blurDataURL={SHIMMER_BLUR_DATA_URL}
+                    unoptimized={!isNextOptimizableUrl(coverMasterUrl)}
                     sizes="(max-width: 1024px) 100vw, 680px"
-                    containerClassName="rounded-xl"
-                    className="object-cover"
+                    className="w-auto h-auto max-w-full max-h-[460px] sm:max-h-[540px] object-contain rounded-xl block"
                   />
                 </div>
               </div>
@@ -365,7 +370,7 @@ export function PortfolioEventPageClient({
                 </p>
                 <h1
                   style={albumHeadingStyle}
-                  className="text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.06]"
+                  className="text-3xl sm:text-4xl lg:text-[44px] font-semibold tracking-tight leading-[1.08]"
                 >
                   {event.title}
                 </h1>

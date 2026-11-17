@@ -116,7 +116,7 @@ export function PortfolioEventDetailModal({
           <div className="flex items-center gap-2 shrink-0">
             {!isPreview && event.status === 'PUBLISHED' && (
               <Link
-                href={`/portfolio/${event.slug}`}
+                href={`/album/${event.slug}`}
                 className="rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
               >
                 Open Full Page ↗

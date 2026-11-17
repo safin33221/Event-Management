@@ -1967,7 +1967,7 @@ export function BookingsWorkspace({
                   </div>
                   <p className="text-xs text-slate-600">
                     {bookingPortfolio
-                      ? `Shareable album linked to ${selectedBooking.reference} (/portfolio/${bookingPortfolio.slug}) • ${bookingPortfolio.counts?.photos ?? 0} photos, ${bookingPortfolio.counts?.videos ?? 0} videos.`
+                      ? `Shareable digital album linked to ${selectedBooking.reference} (/album/${bookingPortfolio.slug}) • ${bookingPortfolio.counts?.photos ?? 0} photos, ${bookingPortfolio.counts?.videos ?? 0} videos.`
                       : 'Event completed! Generate a Digital Portfolio album in one click using this booking’s saved title, date, category, and venue—no duplicate entry.'}
                   </p>
                 </div>
@@ -1976,7 +1976,7 @@ export function BookingsWorkspace({
                     <>
                       {bookingPortfolio.status === 'PUBLISHED' && (
                         <Link
-                          href={`/portfolio/${bookingPortfolio.slug}`}
+                          href={`/album/${bookingPortfolio.slug}`}
                           target="_blank"
                           className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         >

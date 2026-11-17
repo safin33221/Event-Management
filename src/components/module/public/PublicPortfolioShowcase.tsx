@@ -526,7 +526,7 @@ export function PublicPortfolioShowcase({
                         <ArrowRightIcon className="w-3.5 h-3.5" />
                       </button>
                       <Link
-                        href={`/portfolio/${ev.slug}`}
+                        href={`/album/${ev.slug}`}
                         className="text-xs font-semibold text-slate-500 hover:text-slate-900"
                       >
                         Full Page ↗

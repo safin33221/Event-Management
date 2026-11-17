@@ -154,12 +154,12 @@ export function PortfolioEventManager({
   const copyPortfolioShare = async (slug: string, kind: 'url' | 'msg', title: string) => {
     const url =
       typeof window !== 'undefined'
-        ? `${window.location.origin}/portfolio/${slug}`
-        : `/portfolio/${slug}`;
+        ? `${window.location.origin}/album/${slug}`
+        : `/album/${slug}`;
     const text =
       kind === 'url'
         ? url
-        : `Hi! Your Digital Event Portfolio for "${title}" is ready to view and share:\n${url}`;
+        : `Hi! Your Digital Album for "${title}" is ready to view and share:\n${url}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopiedLink(kind);
@@ -215,8 +215,14 @@ export function PortfolioEventManager({
   };
 
   const findPortfolioForBooking = (booking: Booking): PortfolioShowcaseEvent | undefined => {
-    const refSuffix = booking.reference.trim().toLowerCase();
-    return events.find((ev) => ev.slug === refSuffix || ev.slug.endsWith(`-${refSuffix}`));
+    const refToken = booking.reference.trim();
+    const refSuffix = refToken.toLowerCase();
+    return events.find(
+      (ev) =>
+        ev.description?.includes(`[${refToken}]`) ||
+        ev.slug === refSuffix ||
+        ev.slug.endsWith(`-${refSuffix}`),
+    );
   };
 
   const bookingsAvailableForPortfolio = completedBookings.filter(
@@ -1047,7 +1053,7 @@ export function PortfolioEventManager({
                         {selectedEvent.status}
                       </span>
                       <span className="font-mono-code text-xs text-slate-500">
-                        /portfolio/{selectedEvent.slug}
+                        /album/{selectedEvent.slug}
                       </span>
                     </div>
                     <h2 className="text-lg font-bold text-slate-900 mt-1">
@@ -1116,10 +1122,10 @@ export function PortfolioEventManager({
                 <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700">
-                      Client Digital Portfolio Link
+                      Client Digital Album Link (Also works via /a/{selectedEvent.slug})
                     </p>
                     <p className="font-mono-code text-xs text-slate-800 truncate mt-0.5">
-                      /portfolio/{selectedEvent.slug}
+                      /album/{selectedEvent.slug}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1143,7 +1149,7 @@ export function PortfolioEventManager({
                     </button>
                     {selectedEvent.status === 'PUBLISHED' && (
                       <Link
-                        href={`/portfolio/${selectedEvent.slug}`}
+                        href={`/album/${selectedEvent.slug}`}
                         target="_blank"
                         className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
                       >

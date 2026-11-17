@@ -40,7 +40,7 @@ async function AdminPortfolioContent({ searchParams }: AdminPortfolioPageProps) 
           Client Digital Portfolios
         </h1>
         <p className="text-xs text-muted-foreground font-medium mt-1">
-          Create a dedicated, shareable portfolio (/portfolio/...) for any COMPLETED event
+          Create a short, shareable digital album (/album/...) for any COMPLETED event
           booking—auto-filled from booking details with zero duplicate entry.
         </p>
       </div>
