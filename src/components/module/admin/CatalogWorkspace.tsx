@@ -319,10 +319,10 @@ export function CatalogWorkspace({
         <>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="admin-page-title">
                 Service Packages
               </h1>
-              <p className="text-xs text-muted-foreground font-medium mt-1">
+              <p className="admin-meta mt-1">
                 Configure service packages and event categories. Manage public galleries under Public
                 Showcase.
               </p>
@@ -536,10 +536,10 @@ export function CatalogWorkspace({
         <>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="admin-page-title">
                 Team &amp; Automation
               </h1>
-              <p className="text-xs text-muted-foreground font-medium mt-1">
+              <p className="admin-meta mt-1">
                 Manage studio staff accounts and automatic post-confirmation deliverables &amp; tasks.
               </p>
             </div>
@@ -894,10 +894,10 @@ export function CatalogWorkspace({
       {section === 'settings' && (
         <>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="admin-page-title">
               Branding &amp; Booking Rules
             </h1>
-            <p className="text-xs text-muted-foreground font-medium mt-1">
+            <p className="admin-meta mt-1">
               Configure your white-label studio identity, theme colors, timezone, and advance deposit requirements.
             </p>
           </div>

@@ -35,6 +35,7 @@ import {
   completeBooking,
   confirmBooking,
   getBooking,
+  listBookings,
 } from '@/service/bookings/bookings.service';
 import {
   createPortfolioEventFromBooking,
@@ -65,6 +66,7 @@ import { cn, formatDateTimeInTz, formatLocalDate, formatPoisha } from '@/lib/uti
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { CalendarIcon, PlusIcon, ReceiptIcon, SearchIcon } from '@/components/shared/Icons';
 import { BookingReceiptModal } from './BookingReceiptModal';
+import { BookingQuickDrawer } from './BookingQuickDrawer';
 
 interface StudioMemberOption {
   id: string;
@@ -182,6 +184,12 @@ export function BookingsWorkspace({
     setQuotes(initialQuotes);
   }
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
+  const [prevInitialBookings, setPrevInitialBookings] = useState<Booking[]>(initialBookings);
+  if (initialBookings !== prevInitialBookings) {
+    setPrevInitialBookings(initialBookings);
+    setBookings(initialBookings);
+  }
+  const [quickDrawerBookingId, setQuickDrawerBookingId] = useState<string | null>(null);
   const [resources, setResources] = useState<Resource[]>(initialResources);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(initialSelectedBooking);
   const [ledger, setLedger] = useState<{
@@ -1280,10 +1288,10 @@ export function BookingsWorkspace({
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="admin-page-title">
                 1. Client Inquiries
               </h1>
-              <p className="text-xs text-muted-foreground font-medium mt-1">
+              <p className="admin-meta mt-1">
                 Log phone/walk-in requests or review public storefront inquiries before sending a quote.
               </p>
             </div>
@@ -1359,7 +1367,7 @@ export function BookingsWorkspace({
             </div>
           )}
 
-          <div className="atelier-card p-6">
+          <div className="atelier-card p-4 sm:p-5">
             {filteredInquiries.length === 0 ? (
               <div className="py-10 text-center space-y-2">
                 <p className="text-sm font-semibold text-slate-800">No matching inquiries</p>
@@ -1374,20 +1382,20 @@ export function BookingsWorkspace({
                     key={inq.id}
                     className="py-3.5 flex flex-wrap items-center justify-between gap-3"
                   >
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono-code text-xs font-semibold text-slate-500">
+                        <span className="font-mono-code text-xs font-medium text-slate-500 tabular-nums">
                           {inq.reference}
                         </span>
                         <StatusBadge status={inq.status} />
                       </div>
-                      <p className="font-semibold text-sm text-slate-900 mt-1">{inq.eventTitle}</p>
-                      <p className="text-xs text-slate-500">
+                      <p className="admin-row-title line-clamp-1">{inq.eventTitle}</p>
+                      <p className="admin-meta line-clamp-1 tabular-nums">
                         {inq.clientName} ({inq.clientPhone}) • Requested Date:{' '}
                         {formatLocalDate(inq.requestedDate)}
                       </p>
                       {inq.notes && (
-                        <p className="text-xs text-slate-400 mt-0.5 truncate max-w-2xl">
+                        <p className="admin-meta text-slate-400 line-clamp-1 max-w-2xl">
                           Notes: {inq.notes}
                         </p>
                       )}
@@ -1606,10 +1614,10 @@ export function BookingsWorkspace({
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="admin-page-title">
                 2. Price Quotes
               </h1>
-              <p className="text-xs text-muted-foreground font-medium mt-1">
+              <p className="admin-meta mt-1">
                 Build itemized proposals, revise versions, and accept a quote to create a booking.
               </p>
             </div>
@@ -1660,7 +1668,7 @@ export function BookingsWorkspace({
             </div>
           </div>
 
-          <div className="atelier-card p-6">
+          <div className="atelier-card p-4 sm:p-5">
             {filteredQuotes.length === 0 ? (
               <div className="py-10 text-center space-y-2">
                 <p className="text-sm font-semibold text-slate-800">No quotes found</p>
@@ -1675,24 +1683,22 @@ export function BookingsWorkspace({
                   return (
                     <div
                       key={item.id}
-                      className="py-4 flex flex-wrap items-center justify-between gap-3"
+                      className="py-3.5 flex flex-wrap items-center justify-between gap-3"
                     >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono-code text-xs font-semibold text-slate-500">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono-code text-xs font-medium text-slate-500 tabular-nums">
                             {item.reference}
                           </span>
                           <StatusBadge status={item.status} />
                           {latest && (
-                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-mono-code text-slate-600">
+                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-mono-code text-slate-600 tabular-nums">
                               v{latest.versionNumber}
                             </span>
                           )}
                         </div>
-                        <p className="font-semibold text-sm text-slate-900 mt-1">
-                          {item.eventTitle}
-                        </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="admin-row-title line-clamp-1">{item.eventTitle}</p>
+                        <p className="admin-meta line-clamp-1 tabular-nums">
                           {item.clientName} ({item.clientPhone})
                           {item.requestedDate
                             ? ` • Requested: ${formatLocalDate(item.requestedDate)}`
@@ -1700,9 +1706,9 @@ export function BookingsWorkspace({
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
                         {latest && (
-                          <span className="font-mono-code text-sm font-bold text-slate-900 tabular-nums mr-1">
+                          <span className="text-sm font-semibold text-slate-900 tabular-nums mr-1">
                             {formatPoisha(latest.totalPoisha, item.currency)}
                           </span>
                         )}
@@ -2114,11 +2120,11 @@ export function BookingsWorkspace({
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="admin-page-title">
                 3. Bookings &amp; Ledger
               </h1>
-              <p className="text-xs text-muted-foreground font-medium mt-1">
-                Select any booking to manage payments, shoot schedule, deliverables, and invoices.
+              <p className="admin-meta mt-1">
+                Click any booking to open a quick-action slide-over drawer or jump to its full workspace.
               </p>
             </div>
             <Link
@@ -2166,53 +2172,67 @@ export function BookingsWorkspace({
             </div>
           </div>
 
-          <div className="atelier-card p-6">
+          <div className="atelier-card p-4 sm:p-5">
             {filteredBookings.length === 0 ? (
-              <p className="text-sm text-slate-500 py-10 text-center">
+              <p className="admin-meta py-10 text-center">
                 No matching bookings. Accept a quote in Price Quotes to create one.
               </p>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[var(--admin-border)]">
                 {filteredBookings.map((b) => (
-                  <Link
+                  <div
                     key={b.id}
-                    href={`/admin/bookings/${b.id}`}
-                    className="w-full text-left py-4 px-3 -mx-3 rounded-xl hover:bg-slate-50 transition-colors flex flex-wrap items-center justify-between gap-4 group"
+                    className="py-3.5 px-2.5 -mx-2.5 rounded-lg hover:bg-[var(--admin-surface-subtle)] transition-colors flex flex-wrap items-center justify-between gap-4"
                   >
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono-code text-xs font-semibold text-slate-500">
+                    <button
+                      type="button"
+                      onClick={() => setQuickDrawerBookingId(b.id)}
+                      className="flex-1 min-w-0 text-left space-y-1 cursor-pointer group focus-visible:outline-none"
+                    >
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="font-mono-code text-xs font-medium text-[var(--admin-muted)] tabular-nums">
                           {b.reference}
                         </span>
                         <StatusBadge status={b.status} />
                         {b.eventType && (
-                          <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                            {b.eventType.name}
+                          <span className="text-xs font-medium text-[var(--admin-accent)]">
+                            • {b.eventType.name}
                           </span>
                         )}
                       </div>
-                      <p className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
+                      <p className="admin-row-title group-hover:text-[var(--admin-accent)] transition-colors line-clamp-1">
                         {b.eventTitle}
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="admin-meta line-clamp-1 tabular-nums">
                         {b.clientName} ({b.clientPhone}) • Event Date:{' '}
                         {formatLocalDate(b.eventDate)}
                       </p>
-                    </div>
-                    <div className="flex items-center gap-4 shrink-0">
+                    </button>
+
+                    <div className="flex items-center gap-3 shrink-0">
                       <div className="text-right">
-                        <p className="text-[11px] font-semibold uppercase text-slate-400">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--admin-muted)]">
                           Agreed Price
                         </p>
-                        <p className="font-mono-code text-sm font-bold text-slate-900 tabular-nums">
+                        <p className="font-mono-code text-[14px] font-semibold text-[var(--admin-text)] tabular-nums">
                           {formatPoisha(b.agreedTotalPoisha, b.currency)}
                         </p>
                       </div>
-                      <span className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 group-hover:border-indigo-300 group-hover:text-indigo-600 transition-colors">
-                        Open Workspace →
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setQuickDrawerBookingId(b.id)}
+                        className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface)] px-3 py-1.5 text-xs font-medium text-[var(--admin-text)] hover:border-[var(--admin-accent)]/50 transition-colors cursor-pointer"
+                      >
+                        Quick View
+                      </button>
+                      <Link
+                        href={`/admin/bookings/${b.id}`}
+                        className="rounded-lg bg-[var(--admin-accent)] px-3 py-1.5 text-xs font-semibold text-[#FCFDFD] hover:opacity-95 transition-opacity"
+                      >
+                        Workspace →
+                      </Link>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}
@@ -2338,7 +2358,7 @@ export function BookingsWorkspace({
                     </span>
                   )}
                 </div>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mt-1">
+                <h1 className="admin-page-title mt-1">
                   {selectedBooking.eventTitle}
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -3492,6 +3512,20 @@ export function BookingsWorkspace({
           onClose={() => setReceiptBookingId(null)}
         />
       )}
+
+      <BookingQuickDrawer
+        bookingId={quickDrawerBookingId}
+        timezone={timezone}
+        onClose={() => setQuickDrawerBookingId(null)}
+        onMutated={() => {
+          void listBookings().then((res) => {
+            if (res.ok && res.data) {
+              setBookings(res.data.data);
+            }
+          });
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

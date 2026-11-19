@@ -2270,7 +2270,7 @@ export function PortfolioEventManager({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto album-preview-isolated">
             <PortfolioEventPageClient
               key={`${selectedEvent.id}-${JSON.stringify(editTheme)}`}
               event={{
@@ -2285,11 +2285,13 @@ export function PortfolioEventManager({
 
       {/* Live Preview Modal */}
       {previewEvent && (
-        <PortfolioEventDetailModal
-          event={previewEvent}
-          isPreview
-          onClose={() => setPreviewEvent(null)}
-        />
+        <div className="album-preview-isolated">
+          <PortfolioEventDetailModal
+            event={previewEvent}
+            isPreview
+            onClose={() => setPreviewEvent(null)}
+          />
+        </div>
       )}
 
       {/* Pick From Studio Gallery Modal (Filtered cleanly by Photos / Video tab) */}

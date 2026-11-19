@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useTransition } from 'react';
+import React, { useSyncExternalStore, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { AuthUserSession } from '@/types/event-management';
@@ -32,10 +32,66 @@ interface NavItem {
   exact?: boolean;
 }
 
+type AdminThemeMode = 'light' | 'dark';
+const THEME_STORAGE_KEY = 'rongilo_admin_theme';
+const THEME_CHANGE_EVENT = 'rongilo-admin-theme-change';
+
+function subscribeAdminTheme(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const handler = () => onStoreChange();
+  window.addEventListener('storage', handler);
+  window.addEventListener(THEME_CHANGE_EVENT, handler);
+  return () => {
+    window.removeEventListener('storage', handler);
+    window.removeEventListener(THEME_CHANGE_EVENT, handler);
+  };
+}
+
+function getAdminThemeSnapshot(): AdminThemeMode {
+  if (typeof window === 'undefined') return 'light';
+  try {
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
+function ThemeModeIcon({ mode }: { mode: AdminThemeMode }) {
+  if (mode === 'dark') {
+    return (
+      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+    </svg>
+  );
+}
+
 export function DashboardShell({ session, children }: DashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const theme = useSyncExternalStore<AdminThemeMode>(
+    subscribeAdminTheme,
+    getAdminThemeSnapshot,
+    () => 'light',
+  );
+
+  const toggleTheme = () => {
+    const next: AdminThemeMode = theme === 'light' ? 'dark' : 'light';
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, next);
+      window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
+    } catch {
+      // Ignore storage failures
+    }
+  };
 
   const isStaffOnly = session.role === 'STAFF';
   const canViewFinance = session.role === 'OWNER' || session.role === 'ACCOUNTANT';
@@ -98,16 +154,16 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
         key={item.href}
         href={item.href}
         className={cn(
-          'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+          'flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] transition-colors',
           active
-            ? 'bg-slate-900 text-white'
-            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+            ? 'font-semibold bg-[var(--admin-accent-soft)] text-[var(--admin-accent)]'
+            : 'font-medium text-[var(--admin-muted)] hover:bg-[var(--admin-surface-subtle)] hover:text-[var(--admin-text)]',
         )}
       >
         <Icon
           className={cn(
             'w-4 h-4 shrink-0',
-            active ? 'text-indigo-400' : 'text-slate-400',
+            active ? 'text-[var(--admin-accent)]' : 'text-[var(--admin-muted)]',
           )}
         />
         <span className="truncate">{item.label}</span>
@@ -116,31 +172,34 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-50/70 text-slate-900">
-      {/* Minimal Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 w-56 flex-col border-r border-slate-200/80 bg-white">
+    <div
+      data-theme={theme}
+      className="admin-shell min-h-screen flex bg-[var(--admin-canvas)] text-[var(--admin-text)] transition-colors duration-200"
+    >
+      {/* Clean Low-Eye-Strain Sidebar */}
+      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 w-56 flex-col border-r border-[var(--admin-border)] bg-[var(--admin-surface)]">
         {/* Studio Brand */}
-        <div className="h-14 px-4 flex items-center border-b border-slate-100 shrink-0">
+        <div className="h-14 px-4 flex items-center border-b border-[var(--admin-border)] shrink-0">
           <Link
             href={isStaffOnly ? '/staff' : '/admin'}
             className="flex items-center gap-2.5 min-w-0"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--admin-accent)] text-[#FCFDFD]">
               <SparklesIcon className="w-3.5 h-3.5" />
             </span>
-            <span className="text-sm font-bold tracking-tight text-slate-900 truncate">
+            <span className="text-[13.5px] font-semibold tracking-tight text-[var(--admin-text)] truncate">
               {session.studioName}
             </span>
           </Link>
         </div>
 
-        {/* Clean Single-Line Navigation */}
+        {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
           <div className="space-y-0.5">{primaryNav.map(renderNavLink)}</div>
 
           {studioNav.length > 0 && (
-            <div className="pt-3 border-t border-slate-100 space-y-0.5">
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            <div className="pt-3 border-t border-[var(--admin-border)] space-y-0.5">
+              <p className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--admin-muted)]">
                 Studio
               </p>
               {studioNav.map(renderNavLink)}
@@ -148,24 +207,37 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
           )}
         </nav>
 
-        {/* Minimal Footer */}
-        <div className="p-3 border-t border-slate-100 space-y-2">
-          <Link
-            href="/"
-            className="flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-          >
-            <span>Public Website</span>
-            <span>↗</span>
-          </Link>
+        {/* Quiet Footer + Theme Toggle */}
+        <div className="p-3 border-t border-[var(--admin-border)] space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Link
+              href="/"
+              className="flex-1 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--admin-muted)] hover:bg-[var(--admin-surface-subtle)] hover:text-[var(--admin-text)] transition-colors"
+            >
+              <span>Public Site</span>
+              <span>↗</span>
+            </Link>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={theme === 'light' ? 'Switch to Soft Dark Navy' : 'Switch to Soft Light'}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-hover)] transition-colors cursor-pointer"
+            >
+              <ThemeModeIcon mode={theme} />
+              <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
+            </button>
+          </div>
 
-          <div className="flex items-center justify-between gap-2 px-2 py-1">
+          <div className="flex items-center justify-between gap-2 px-1.5 py-1">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-700">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--admin-surface-subtle)] border border-[var(--admin-border)] text-[11px] font-semibold text-[var(--admin-text)] tabular-nums">
                 {initials}
               </span>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-900 truncate">{session.name}</p>
-                <p className="text-[10px] font-mono-code uppercase text-slate-400">
+                <p className="text-xs font-medium text-[var(--admin-text)] truncate">
+                  {session.name}
+                </p>
+                <p className="text-[10.5px] font-mono-code uppercase text-[var(--admin-muted)]">
                   {session.role}
                 </p>
               </div>
@@ -175,7 +247,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
               onClick={handleLogout}
               disabled={isPending}
               title="Sign out"
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+              className="rounded-lg p-1.5 text-[var(--admin-muted)] hover:bg-rose-500/10 hover:text-rose-500 transition-colors cursor-pointer"
             >
               <LogOutIcon className="w-4 h-4" />
             </button>
@@ -183,64 +255,86 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
         </div>
       </aside>
 
-      {/* Main Content Area */}
+      {/* Main Workspace Canvas */}
       <div className="flex-1 flex flex-col min-w-0 lg:pl-56">
-        {/* Desktop Top Bar */}
-        <header className="hidden lg:flex sticky top-0 z-20 h-14 items-center justify-between border-b border-slate-200/70 bg-white/90 backdrop-blur-md px-8">
+        {/* Desktop Top Header Bar */}
+        <header className="hidden lg:flex sticky top-0 z-20 h-14 items-center justify-between border-b border-[var(--admin-border)] bg-[var(--admin-header)] backdrop-blur-md px-6">
           <div className="flex items-center gap-2 text-sm">
-            <span className="font-semibold text-slate-900">
+            <span className="text-[14px] font-semibold text-[var(--admin-text)]">
               {pathname.startsWith('/admin/bookings/')
                 ? 'Booking Details'
                 : activeNav?.label || 'Workspace'}
             </span>
           </div>
 
-          {!isStaffOnly && (
-            <div className="flex items-center gap-2">
-              <Link
-                href="/admin/inquiries?new=1"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <PlusIcon className="w-3.5 h-3.5 text-slate-500" />
-                <span>Inquiry</span>
-              </Link>
-              <Link
-                href="/admin/quotes?new=1"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <PlusIcon className="w-3.5 h-3.5 text-slate-500" />
-                <span>Quote</span>
-              </Link>
-              <Link
-                href="/admin/calendar"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition-colors"
-              >
-                <CalendarIcon className="w-3.5 h-3.5" />
-                <span>Schedule</span>
-              </Link>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={theme === 'light' ? 'Switch to Soft Dark Navy' : 'Switch to Soft Light'}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--admin-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-surface-subtle)] transition-colors cursor-pointer"
+            >
+              <ThemeModeIcon mode={theme} />
+              <span>{theme === 'light' ? 'Dark Navy' : 'Soft Light'}</span>
+            </button>
+
+            {!isStaffOnly && (
+              <>
+                <Link
+                  href="/admin/inquiries?new=1"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface)] px-3 py-1.5 text-xs font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-subtle)] transition-colors"
+                >
+                  <PlusIcon className="w-3.5 h-3.5 text-[var(--admin-muted)]" />
+                  <span>Inquiry</span>
+                </Link>
+                <Link
+                  href="/admin/quotes?new=1"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface)] px-3 py-1.5 text-xs font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-subtle)] transition-colors"
+                >
+                  <PlusIcon className="w-3.5 h-3.5 text-[var(--admin-muted)]" />
+                  <span>Quote</span>
+                </Link>
+                <Link
+                  href="/admin/calendar"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--admin-accent)] px-3 py-1.5 text-xs font-semibold text-[#FCFDFD] hover:opacity-95 transition-opacity"
+                >
+                  <CalendarIcon className="w-3.5 h-3.5" />
+                  <span>Schedule</span>
+                </Link>
+              </>
+            )}
+          </div>
         </header>
 
         {/* Mobile Header */}
-        <header className="lg:hidden sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 py-2.5 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white">
+        <header className="lg:hidden sticky top-0 z-30 border-b border-[var(--admin-border)] bg-[var(--admin-header)] backdrop-blur-md px-4 py-2.5 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--admin-accent)] text-[#FCFDFD]">
                 <SparklesIcon className="w-3.5 h-3.5" />
               </span>
-              <span className="text-sm font-bold tracking-tight text-slate-900">
+              <span className="text-[13.5px] font-semibold tracking-tight text-[var(--admin-text)] truncate">
                 {session.studioName}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={isPending}
-              className="rounded-lg px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
-            >
-              Sign out
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+                className="inline-flex items-center gap-1 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] px-2 py-1 text-xs font-medium text-[var(--admin-text)]"
+              >
+                <ThemeModeIcon mode={theme} />
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={isPending}
+                className="rounded-lg px-2.5 py-1 text-xs font-medium text-rose-500 hover:bg-rose-500/10"
+              >
+                Sign out
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
             {allItems.map((item) => {
@@ -252,8 +346,8 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
                   className={cn(
                     'rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors',
                     active
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:text-slate-900',
+                      ? 'bg-[var(--admin-accent-soft)] text-[var(--admin-accent)] font-semibold'
+                      : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)]',
                   )}
                 >
                   {item.label}
@@ -263,7 +357,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto">{children}</main>
       </div>
     </div>
   );

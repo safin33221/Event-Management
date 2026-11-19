@@ -685,10 +685,10 @@ export function CalendarWorkspace({
       {/* Header + Action Buttons */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="admin-page-title">
             Schedule &amp; Google Calendar
           </h1>
-          <p className="text-xs text-muted-foreground font-medium mt-1">
+          <p className="admin-meta mt-1 tabular-nums">
             Interactive studio calendar, live crew conflict checks, and Google Calendar sync •{' '}
             {timezone}
           </p>

@@ -320,10 +320,10 @@ export function GalleryMediaManager({
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="admin-page-title">
             Gallery — Photo &amp; Video Upload
           </h1>
-          <p className="text-xs text-muted-foreground font-medium mt-1">
+          <p className="admin-meta mt-1">
             Drag &amp; drop photos or videos to upload directly to Cloudinary. Click any row in the
             table to preview it on the right.
           </p>

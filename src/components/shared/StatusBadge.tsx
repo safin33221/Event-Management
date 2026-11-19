@@ -1,47 +1,71 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-const STATUS_STYLES: Record<string, { pill: string; dot: string }> = {
-  NEW: { pill: 'bg-sky-50/80 text-sky-700 ring-sky-600/20', dot: 'bg-sky-500' },
-  QUALIFIED: { pill: 'bg-indigo-50/80 text-indigo-700 ring-indigo-600/20', dot: 'bg-indigo-500' },
-  QUOTED: { pill: 'bg-amber-50/80 text-amber-700 ring-amber-600/20', dot: 'bg-amber-500' },
-  CONVERTED: { pill: 'bg-emerald-50/80 text-emerald-700 ring-emerald-600/20', dot: 'bg-emerald-500' },
-  DRAFT: { pill: 'bg-slate-100/80 text-slate-600 ring-slate-500/20', dot: 'bg-slate-400' },
-  SENT: { pill: 'bg-sky-50/80 text-sky-700 ring-sky-600/20', dot: 'bg-sky-500' },
-  ACCEPTED: { pill: 'bg-emerald-50/80 text-emerald-700 ring-emerald-600/20', dot: 'bg-emerald-500' },
-  SUPERSEDED: { pill: 'bg-slate-100/80 text-slate-500 ring-slate-400/20', dot: 'bg-slate-400' },
-  PENDING_CONFIRMATION: { pill: 'bg-amber-50/80 text-amber-700 ring-amber-600/20', dot: 'bg-amber-500' },
-  CONFIRMED: { pill: 'bg-emerald-50/80 text-emerald-700 ring-emerald-600/20', dot: 'bg-emerald-500' },
-  COMPLETED: { pill: 'bg-emerald-50/80 text-emerald-700 ring-emerald-600/20', dot: 'bg-emerald-500' },
-  CANCELLED: { pill: 'bg-rose-50/80 text-rose-700 ring-rose-600/20', dot: 'bg-rose-500' },
-  PENDING: { pill: 'bg-amber-50/80 text-amber-700 ring-amber-600/20', dot: 'bg-amber-500' },
-  VERIFIED: { pill: 'bg-emerald-50/80 text-emerald-700 ring-emerald-600/20', dot: 'bg-emerald-500' },
-  REJECTED: { pill: 'bg-rose-50/80 text-rose-700 ring-rose-600/20', dot: 'bg-rose-500' },
-  SCHEDULED: { pill: 'bg-amber-50/80 text-amber-700 ring-amber-600/20', dot: 'bg-amber-500' },
-  IN_PROGRESS: { pill: 'bg-indigo-50/80 text-indigo-700 ring-indigo-600/20', dot: 'bg-indigo-500' },
-  IN_REVIEW: { pill: 'bg-violet-50/80 text-violet-700 ring-violet-600/20', dot: 'bg-violet-500' },
-  CHANGES_REQUESTED: { pill: 'bg-orange-50/80 text-orange-700 ring-orange-600/20', dot: 'bg-orange-500' },
-  APPROVED: { pill: 'bg-emerald-50/80 text-emerald-700 ring-emerald-600/20', dot: 'bg-emerald-500' },
-  DELIVERED: { pill: 'bg-emerald-50/80 text-emerald-700 ring-emerald-600/20', dot: 'bg-emerald-500' },
-  ASSIGNED: { pill: 'bg-amber-50/80 text-amber-700 ring-amber-600/20', dot: 'bg-amber-500' },
+const STATUS_DOTS: Record<string, { dot: string; label?: string }> = {
+  // Amber — pending / action needed
+  PENDING: { dot: 'bg-amber-500' },
+  PENDING_CONFIRMATION: { dot: 'bg-amber-500' },
+  QUOTED: { dot: 'bg-amber-500' },
+  ASSIGNED: { dot: 'bg-amber-500' },
+  CHANGES_REQUESTED: { dot: 'bg-amber-500' },
+
+  // Emerald — confirmed / paid / delivered / completed
+  CONFIRMED: { dot: 'bg-emerald-500' },
+  COMPLETED: { dot: 'bg-emerald-500' },
+  VERIFIED: { dot: 'bg-emerald-500' },
+  APPROVED: { dot: 'bg-emerald-500' },
+  DELIVERED: { dot: 'bg-emerald-500' },
+  ACCEPTED: { dot: 'bg-emerald-500' },
+  CONVERTED: { dot: 'bg-emerald-500' },
+
+  // Electric Blue — scheduled / active / incoming
+  SCHEDULED: { dot: 'bg-[#2563EB]' },
+  NEW: { dot: 'bg-[#2563EB]' },
+  SENT: { dot: 'bg-[#2563EB]' },
+  IN_PROGRESS: { dot: 'bg-[#2563EB]' },
+  QUALIFIED: { dot: 'bg-[#2563EB]' },
+
+  // Soft Violet — review
+  IN_REVIEW: { dot: 'bg-[#6D28D9]' },
+
+  // Soft Rose — cancelled / rejected
+  CANCELLED: { dot: 'bg-rose-400' },
+  REJECTED: { dot: 'bg-rose-400' },
+
+  // Muted Neutral — draft / archived / closed
+  DRAFT: { dot: 'bg-slate-400' },
+  SUPERSEDED: { dot: 'bg-slate-400' },
+  CLOSED: { dot: 'bg-slate-400' },
 };
 
-const DEFAULT_STYLE = {
-  pill: 'bg-slate-100/80 text-slate-600 ring-slate-500/20',
-  dot: 'bg-slate-400',
-};
+const DEFAULT_DOT = 'bg-slate-400';
 
-export function StatusBadge({ status }: { status: string }) {
-  const style = STATUS_STYLES[status] ?? DEFAULT_STYLE;
+/**
+ * Low-noise status indicator: 7px colored dot + muted label text.
+ */
+export function StatusBadge({
+  status,
+  className,
+}: {
+  status: string;
+  className?: string;
+}) {
+  const style = STATUS_DOTS[status];
+  const dotClass = style?.dot ?? DEFAULT_DOT;
+  const displayLabel = style?.label ?? status.replace(/_/g, ' ').toLowerCase();
+
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium tracking-tight ring-1 ring-inset capitalize',
-        style.pill,
+        'inline-flex items-center gap-1.5 text-[12.5px] font-medium leading-none tracking-tight capitalize text-[var(--admin-muted,#5C6575)]',
+        className,
       )}
     >
-      <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', style.dot)} />
-      {status.replace(/_/g, ' ').toLowerCase()}
+      <span
+        aria-hidden="true"
+        className={cn('h-[7px] w-[7px] rounded-full shrink-0', dotClass)}
+      />
+      <span>{displayLabel}</span>
     </span>
   );
 }

@@ -23,6 +23,7 @@ import {
   SearchIcon,
 } from '@/components/shared/Icons';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { BookingQuickDrawer } from '@/components/module/admin/BookingQuickDrawer';
 
 interface FinancialReportWorkspaceProps {
   initialReport: FinancialReportData;
@@ -87,6 +88,10 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
 
   const [rejectingEntryId, setRejectingEntryId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [drawerState, setDrawerState] = useState<{
+    bookingId: string;
+    focusSection: 'payments' | 'overview';
+  } | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -341,10 +346,10 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
       {/* Header & Export Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          <h1 className="admin-page-title">
             Financial Reports &amp; Accounting
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="admin-meta mt-1 tabular-nums">
             Real-time revenue, bKash/Nagad/Bank collections, accounts receivable, and ledger audit
             in {currency} ({timezone}).
           </p>
@@ -472,115 +477,109 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
       {/* 6 Executive KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="atelier-card p-5 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Effective Contracted Value
-            </span>
-            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-mono-code font-semibold text-slate-700">
-              {summary.activeBookingsCount} Active Bookings
+          <div className="flex items-center justify-between gap-2">
+            <span className="admin-meta font-medium">Effective Contracted Value</span>
+            <span className="admin-meta tabular-nums font-medium">
+              {summary.activeBookingsCount} Active
             </span>
           </div>
-          <p className="font-mono-code text-2xl font-bold text-slate-900 tabular-nums">
+          <p className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
             {formatPoisha(summary.effectiveContractedPoisha, currency)}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="admin-meta tabular-nums line-clamp-1">
             Gross Agreed: {formatPoisha(summary.totalContractedPoisha, currency)} • Credit Notes:{' '}
             {formatPoisha(summary.totalCreditNotesPoisha, currency)}
           </p>
         </div>
 
-        <div className="atelier-card p-5 space-y-1.5 border-emerald-200 bg-emerald-50/30">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800">
+        <div className="atelier-card p-5 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2 admin-meta font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
               Net Collected Revenue
             </span>
-            <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-mono-code font-bold text-emerald-800">
+            <span className="admin-meta tabular-nums font-medium">
               {summary.collectionRatePercent.toFixed(1)}% Collected
             </span>
           </div>
-          <p className="font-mono-code text-2xl font-bold text-emerald-950 tabular-nums">
+          <p className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
             {formatPoisha(summary.netCollectedRevenuePoisha, currency)}
           </p>
-          <p className="text-xs text-emerald-800/80">
-            Verified Receipts: {formatPoisha(summary.verifiedReceiptsPoisha, currency)} • Refunds:{' '}
+          <p className="admin-meta tabular-nums line-clamp-1">
+            Verified: {formatPoisha(summary.verifiedReceiptsPoisha, currency)} • Refunds:{' '}
             {formatPoisha(summary.completedRefundsPoisha, currency)}
           </p>
         </div>
 
-        <div className="atelier-card p-5 space-y-1.5 border-indigo-200 bg-indigo-50/25">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-indigo-800">
+        <div className="atelier-card p-5 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2 admin-meta font-medium">
+              <span className="w-2 h-2 rounded-full bg-[#2563EB]" aria-hidden="true" />
               Outstanding Receivables (Due)
             </span>
-            <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-[11px] font-mono-code font-bold text-indigo-800">
-              {summary.bookingsWithDueCount} Bookings Due
+            <span className="admin-meta tabular-nums font-medium">
+              {summary.bookingsWithDueCount} Due
             </span>
           </div>
-          <p className="font-mono-code text-2xl font-bold text-indigo-950 tabular-nums">
+          <p className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
             {formatPoisha(summary.totalOutstandingDuePoisha, currency)}
           </p>
-          <p className="text-xs text-indigo-800/80">
-            Paid in Full: {summary.fullyPaidBookingsCount} bookings • Completed:{' '}
+          <p className="admin-meta tabular-nums line-clamp-1">
+            Paid in Full: {summary.fullyPaidBookingsCount} • Completed:{' '}
             {summary.completedBookingsCount}
           </p>
         </div>
 
-        <div className="atelier-card p-5 space-y-1.5 border-amber-200 bg-amber-50/30">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-800">
+        <div className="atelier-card p-5 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2 admin-meta font-medium">
+              <span className="w-2 h-2 rounded-full bg-amber-500" aria-hidden="true" />
               Pending Verification
             </span>
-            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-mono-code font-bold text-amber-900">
+            <span className="admin-meta tabular-nums font-medium">
               {summary.pendingReceiptsCount} Pending
             </span>
           </div>
-          <p className="font-mono-code text-2xl font-bold text-amber-950 tabular-nums">
+          <p className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
             {formatPoisha(summary.pendingVerificationPoisha, currency)}
           </p>
-          <p className="text-xs text-amber-800/80">
-            Unverified bKash, Nagad, or Bank entries awaiting approval
+          <p className="admin-meta line-clamp-1">
+            Unverified bKash, Nagad, or Bank receipts awaiting approval
           </p>
         </div>
 
         <div className="atelier-card p-5 space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Refunds &amp; Credit Notes
-            </span>
-            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-mono-code text-slate-600">
-              Adjustments
-            </span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="admin-meta font-medium">Refunds &amp; Credit Notes</span>
+            <span className="admin-meta font-medium">Adjustments</span>
           </div>
-          <p className="font-mono-code text-2xl font-bold text-slate-900 tabular-nums">
+          <p className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
             {formatPoisha(
               summary.completedRefundsPoisha + summary.totalCreditNotesPoisha,
               currency,
             )}
           </p>
-          <p className="text-xs text-slate-500">
-            Cash Refunds: {formatPoisha(summary.completedRefundsPoisha, currency)} • Credit Notes:{' '}
+          <p className="admin-meta tabular-nums line-clamp-1">
+            Refunds: {formatPoisha(summary.completedRefundsPoisha, currency)} • Credit Notes:{' '}
             {formatPoisha(summary.totalCreditNotesPoisha, currency)}
           </p>
         </div>
 
-        <div className="atelier-card p-5 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Collection Progress
-            </span>
-            <span className="font-mono-code text-sm font-bold text-slate-900">
+        <div className="atelier-card p-5 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="admin-meta font-medium">Collection Progress</span>
+            <span className="text-sm font-semibold text-slate-900 tabular-nums">
               {summary.collectionRatePercent.toFixed(1)}%
             </span>
           </div>
-          <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
+          <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
             <div
-              className="h-full bg-emerald-600 transition-all duration-300"
+              className="h-full bg-[#2563EB] transition-all duration-300"
               style={{ width: `${Math.min(100, summary.collectionRatePercent)}%` }}
             />
           </div>
-          <p className="text-xs text-slate-500">
-            {summary.fullyPaidBookingsCount} of {summary.activeBookingsCount} active bookings fully
-            settled
+          <p className="admin-meta tabular-nums">
+            {summary.fullyPaidBookingsCount} of {summary.activeBookingsCount} active bookings settled
           </p>
         </div>
       </div>
@@ -887,61 +886,65 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredReceivables.map((r) => (
-                    <tr key={r.bookingId} className="hover:bg-slate-50/80">
+                    <tr
+                      key={r.bookingId}
+                      onClick={() =>
+                        setDrawerState({ bookingId: r.bookingId, focusSection: 'payments' })
+                      }
+                      className="hover:bg-slate-50/70 transition-colors cursor-pointer"
+                    >
                       <td className="py-3.5 pr-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <Link
-                            href={`/admin/bookings/${r.bookingId}`}
-                            className="font-mono-code font-bold text-indigo-600 hover:underline"
-                          >
+                          <span className="font-mono-code font-semibold text-[#2563EB] tabular-nums">
                             {r.reference}
-                          </Link>
+                          </span>
                           <StatusBadge status={r.status} />
                         </div>
                         {r.eventDate && (
-                          <span className="block text-[11px] font-mono-code text-slate-400 mt-0.5">
+                          <span className="block admin-meta tabular-nums mt-0.5">
                             Event: {formatLocalDate(r.eventDate)}
                           </span>
                         )}
                       </td>
 
-                      <td className="py-3.5 px-3">
-                        <p className="font-semibold text-slate-900">{r.eventTitle}</p>
-                        <p className="text-slate-500">
+                      <td className="py-3.5 px-3 max-w-[260px]">
+                        <p className="admin-row-title line-clamp-1">{r.eventTitle}</p>
+                        <p className="admin-meta line-clamp-1 tabular-nums">
                           {r.clientName} ({r.clientPhone})
                         </p>
                       </td>
 
-                      <td className="py-3.5 px-3 text-right font-mono-code font-semibold text-slate-900 tabular-nums whitespace-nowrap">
+                      <td className="py-3.5 px-3 text-right font-semibold text-slate-900 tabular-nums whitespace-nowrap">
                         {formatPoisha(r.effectiveAgreedChargePoisha, currency)}
                         {r.creditNotesPoisha > 0 && (
-                          <span className="block text-[10px] text-slate-400">
+                          <span className="block text-[11px] font-normal text-slate-400">
                             (-{formatPoisha(r.creditNotesPoisha, currency)} credit)
                           </span>
                         )}
                       </td>
 
-                      <td className="py-3.5 px-3 text-right font-mono-code font-bold text-emerald-700 tabular-nums whitespace-nowrap">
+                      <td className="py-3.5 px-3 text-right font-semibold text-emerald-700 tabular-nums whitespace-nowrap">
                         {formatPoisha(r.verifiedReceiptsPoisha, currency)}
                         {r.completedRefundsPoisha > 0 && (
-                          <span className="block text-[10px] text-rose-600">
+                          <span className="block text-[11px] font-normal text-rose-600">
                             (Refunded: {formatPoisha(r.completedRefundsPoisha, currency)})
                           </span>
                         )}
                       </td>
 
-                      <td className="py-3.5 px-3 text-right font-mono-code text-amber-700 tabular-nums whitespace-nowrap">
+                      <td className="py-3.5 px-3 text-right text-amber-700 tabular-nums whitespace-nowrap">
                         {r.pendingReceiptsPoisha > 0
                           ? formatPoisha(r.pendingReceiptsPoisha, currency)
                           : '—'}
                       </td>
 
-                      <td className="py-3.5 px-3 text-right font-mono-code font-bold tabular-nums whitespace-nowrap">
+                      <td className="py-3.5 px-3 text-right font-semibold tabular-nums whitespace-nowrap">
                         {r.status === 'CANCELLED' ? (
-                          <span className="text-slate-400">Cancelled</span>
+                          <span className="admin-meta">Cancelled</span>
                         ) : r.outstandingDuePoisha <= 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
-                            Paid in Full ✓
+                          <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                            Paid in Full
                           </span>
                         ) : (
                           <span className="text-rose-700">
@@ -950,13 +953,25 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                         )}
                       </td>
 
-                      <td className="py-3.5 pl-3 text-right whitespace-nowrap">
+                      <td
+                        className="py-3.5 pl-3 text-right whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDrawerState({ bookingId: r.bookingId, focusSection: 'payments' })
+                            }
+                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
+                          >
+                            Quick Ledger
+                          </button>
                           <Link
                             href={`/admin/bookings/${r.bookingId}`}
-                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
                           >
-                            Ledger →
+                            Full Page →
                           </Link>
                           <a
                             href={`/api/bookings/${encodeURIComponent(r.bookingId)}/invoice.pdf`}
@@ -1033,41 +1048,47 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                 return (
                   <div key={t.id} className="py-3.5 space-y-2 text-xs">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="space-y-0.5">
+                      <div className="space-y-0.5 min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
                             className={cn(
-                              'rounded-md border px-2 py-0.5 text-[11px] font-bold',
+                              'rounded-md border px-2 py-0.5 text-[11px] font-semibold',
                               methodMeta.badgeClass,
                             )}
                           >
                             {methodMeta.label}
                           </span>
-                          <span className="font-semibold text-slate-900">{t.type}</span>
+                          <span className="font-medium text-slate-900">{t.type}</span>
                           {t.transactionRef && (
-                            <span className="font-mono-code rounded bg-slate-100 px-2 py-0.5 text-slate-700">
+                            <span className="font-mono-code rounded bg-slate-100 px-2 py-0.5 text-slate-700 tabular-nums">
                               TrxID: {t.transactionRef}
                             </span>
                           )}
-                          <Link
-                            href={`/admin/bookings/${t.booking.id}`}
-                            className="font-mono-code font-semibold text-indigo-600 hover:underline"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDrawerState({
+                                bookingId: t.booking.id,
+                                focusSection: 'payments',
+                              })
+                            }
+                            className="font-mono-code font-semibold text-[#2563EB] hover:underline tabular-nums cursor-pointer"
                           >
                             {t.booking.reference}
-                          </Link>
+                          </button>
                           <span className="text-slate-600">• {t.booking.clientName}</span>
                         </div>
-                        <p className="text-slate-500">
+                        <p className="admin-meta line-clamp-1 tabular-nums">
                           {t.booking.eventTitle} • Recorded{' '}
                           {formatDateTimeInTz(t.createdAt, timezone)}
                           {t.reason ? ` • Note: ${t.reason}` : ''}
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2.5 shrink-0">
                         <span
                           className={cn(
-                            'font-mono-code text-sm font-bold tabular-nums',
+                            'text-sm font-semibold tabular-nums',
                             t.type === 'REFUND' ? 'text-rose-700' : 'text-slate-900',
                           )}
                         >
@@ -1075,6 +1096,18 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                           {formatPoisha(t.amountPoisha, t.currency)}
                         </span>
                         <StatusBadge status={t.verificationState} />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDrawerState({
+                              bookingId: t.booking.id,
+                              focusSection: 'payments',
+                            })
+                          }
+                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
+                        >
+                          Inspect
+                        </button>
 
                         {t.verificationState === 'PENDING' &&
                           t.booking.status !== 'CANCELLED' && (
@@ -1130,6 +1163,14 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
           )}
         </div>
       )}
+
+      <BookingQuickDrawer
+        bookingId={drawerState?.bookingId ?? null}
+        focusSection={drawerState?.focusSection ?? 'overview'}
+        timezone={timezone}
+        onClose={() => setDrawerState(null)}
+        onMutated={() => refreshReport()}
+      />
     </div>
   );
 }

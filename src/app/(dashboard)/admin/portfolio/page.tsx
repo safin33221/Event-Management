@@ -36,10 +36,10 @@ async function AdminPortfolioContent({ searchParams }: AdminPortfolioPageProps) 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className="admin-page-title">
           Client Digital Portfolios
         </h1>
-        <p className="text-xs text-muted-foreground font-medium mt-1">
+        <p className="admin-meta mt-1">
           Create a short, shareable digital album (/album/...) for any COMPLETED event
           booking—auto-filled from booking details with zero duplicate entry.
         </p>
