@@ -10,6 +10,7 @@ interface LazyViewportImageProps {
   alt: string;
   className?: string;
   containerClassName?: string;
+  containerStyle?: React.CSSProperties;
   rootMargin?: string;
 }
 
@@ -26,6 +27,7 @@ export function LazyViewportImage({
   alt,
   className,
   containerClassName,
+  containerStyle,
   rootMargin = '80px 0px',
 }: LazyViewportImageProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -61,13 +63,14 @@ export function LazyViewportImage({
   return (
     <div
       ref={containerRef}
-      className={cn('relative overflow-hidden bg-slate-100', containerClassName)}
+      style={containerStyle}
+      className={cn('relative overflow-hidden bg-[#EFE8DC]', containerClassName)}
     >
       {/* Shimmer skeleton shown before entering viewport and while image bytes load */}
       {!isLoaded && (
         <div
           aria-hidden="true"
-          className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200"
+          className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#EAE2D6] via-[#FAF6EE] to-[#EAE2D6]"
         />
       )}
 

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
 import { getPublicBranding } from '@/service/agency/agency.service';
 import { getPublicPortfolioEventBySlug } from '@/service/catalog/catalog.service';
-import { NEUTRAL_PREVIEW_BRANDING } from '@/lib/publicStorefront';
+import { resolvePublicBranding } from '@/lib/publicStorefront';
 import { PortfolioEventPageClient } from '@/components/module/public/PortfolioEventPageClient';
 
 interface AlbumSlugPageProps {
@@ -22,7 +22,7 @@ async function DigitalAlbumContent({ params }: AlbumSlugPageProps) {
     notFound();
   }
 
-  const branding = brandRes.ok && brandRes.data ? brandRes.data : NEUTRAL_PREVIEW_BRANDING;
+  const branding = resolvePublicBranding(brandRes.ok ? brandRes.data : null);
 
   return <PortfolioEventPageClient event={eventRes.data} branding={branding} />;
 }

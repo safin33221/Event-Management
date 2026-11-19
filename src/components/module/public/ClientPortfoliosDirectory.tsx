@@ -55,31 +55,37 @@ export function ClientPortfoliosDirectory({
     });
   }, [clientAlbums, selectedEventTypeId, filmOnly, searchQuery]);
 
-  const accent = branding.themeTokens.accentColor || '#4F46E5';
+  const accent = branding.themeTokens.accentColor || '#B91C47';
 
   return (
-    <main className="flex-1 bg-slate-50">
-      {/* Directory Header */}
-      <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="space-y-2 max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-700">
+    <main className="flex-1 bg-[#FDFBF7] text-[#181216]">
+      {/* Editorial Directory Header */}
+      <section className="relative overflow-hidden border-b border-[#EAE2D6] bg-[#FDFBF7]">
+        <div
+          className="absolute inset-0 opacity-[0.09] pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at 12% 20%, ${accent}, transparent 45%), radial-gradient(circle at 90% 70%, #C98A2C, transparent 45%)`,
+          }}
+        />
+        <div className="relative mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 space-y-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2.5 max-w-2xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#F3DEC0] bg-[#FEF7EC] px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8E5B17]">
                 <CameraIcon className="w-3.5 h-3.5" />
                 <span>Client Digital Portfolios</span>
               </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900">
+              <h1 className="font-editorial text-4xl sm:text-5xl font-semibold text-[#181216]">
                 All Client Event Albums
               </h1>
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-                Explore bespoke digital albums and cinematic highlight films crafted by{' '}
-                <span className="font-semibold text-slate-800">{branding.displayName}</span>.
+              <p className="text-sm sm:text-base text-[#54474E] leading-relaxed">
+                Explore bespoke wedding, holud, reception &amp; corporate highlight films curated
+                by <span className="font-semibold text-[#181216]">{branding.displayName}</span>.
               </p>
             </div>
 
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#DFD5C7] bg-white px-4 py-2 text-xs font-semibold text-[#3B3036] hover:bg-[#F7F3EB] transition-colors"
             >
               ← Back to Home
             </Link>
@@ -94,8 +100,8 @@ export function ClientPortfoliosDirectory({
                 className={cn(
                   'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                   selectedEventTypeId === 'ALL'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                    ? 'bg-[#181216] text-white'
+                    : 'bg-white border border-[#E2D8C8] text-[#4A3F45] hover:border-[#B91C47]/40',
                 )}
               >
                 All Albums ({clientAlbums.length})
@@ -108,8 +114,8 @@ export function ClientPortfoliosDirectory({
                   className={cn(
                     'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                     selectedEventTypeId === et.id
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                      ? 'bg-[#181216] text-white'
+                      : 'bg-white border border-[#E2D8C8] text-[#4A3F45] hover:border-[#B91C47]/40',
                   )}
                 >
                   {et.name}
@@ -121,8 +127,8 @@ export function ClientPortfoliosDirectory({
                 className={cn(
                   'rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                   filmOnly
-                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                    ? 'border-[#B91C47] bg-[#FDF2F4] text-[#B91C47]'
+                    : 'border-[#E2D8C8] bg-white text-[#4A3F45] hover:bg-[#FAF6EE]',
                 )}
               >
                 ▶ With Cinematic Film
@@ -130,13 +136,13 @@ export function ClientPortfoliosDirectory({
             </div>
 
             <div className="relative w-full md:w-64">
-              <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <SearchIcon className="w-3.5 h-3.5 text-[#8A756B] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search client albums..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-8 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white"
+                className="w-full rounded-xl border border-[#DFD5C7] bg-white pl-8 pr-3 py-2 text-xs text-[#181216] placeholder:text-[#9A8A80] outline-none focus:border-[#B91C47]"
               />
             </div>
           </div>
@@ -147,8 +153,10 @@ export function ClientPortfoliosDirectory({
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 space-y-10">
         {filteredAlbums.length === 0 ? (
           <div className="atelier-card p-12 text-center bg-white space-y-2">
-            <p className="text-base font-bold text-slate-900">No matching client albums found</p>
-            <p className="text-xs text-slate-500">
+            <p className="font-editorial text-2xl font-semibold text-[#181216]">
+              No matching client albums found
+            </p>
+            <p className="text-xs text-[#6B5A62]">
               Try clearing your search filter or check back soon for newly published albums.
             </p>
           </div>
@@ -171,7 +179,7 @@ export function ClientPortfoliosDirectory({
                   className="group atelier-card atelier-card-hover overflow-hidden flex flex-col justify-between bg-white"
                 >
                   <div>
-                    <div className="relative aspect-[4/3] w-full bg-slate-100 overflow-hidden">
+                    <div className="relative aspect-[4/3] w-full bg-[#EFE8DC] overflow-hidden">
                       {coverSrc ? (
                         <Image
                           src={coverSrc}
@@ -183,15 +191,15 @@ export function ClientPortfoliosDirectory({
                           className="object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                       ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-slate-900 text-slate-400 text-xs font-medium">
+                        <div className="h-full w-full flex items-center justify-center bg-[#181216] text-[#BFB2A7] text-xs font-medium">
                           Digital Album
                         </div>
                       )}
 
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#141013]/65 via-transparent to-transparent" />
 
                       <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-950/75 backdrop-blur-xs px-3 py-1 text-[11px] font-semibold text-white">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#141013]/80 backdrop-blur-xs px-3 py-1 text-[11px] font-semibold text-white">
                           {photoCount} Photos{videoCount > 0 ? ` • ${videoCount} Film` : ''}
                         </span>
                         <span
@@ -204,17 +212,17 @@ export function ClientPortfoliosDirectory({
 
                     <div className="p-5 space-y-2">
                       {ev.eventType && (
-                        <span className="inline-block rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-700">
+                        <span className="inline-block rounded-full bg-[#FEF7EC] border border-[#F3DEC0] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#8E5B17]">
                           {ev.eventType.name}
                         </span>
                       )}
-                      <h2 className="text-lg font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2">
+                      <h2 className="font-editorial text-2xl font-semibold text-[#181216] group-hover:text-[#B91C47] transition-colors line-clamp-2 leading-snug">
                         {ev.title}
                       </h2>
                     </div>
                   </div>
 
-                  <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between text-xs font-semibold text-slate-700 group-hover:text-indigo-600">
+                  <div className="px-5 py-3 border-t border-[#EFE8DC] bg-[#FAF6EE]/70 flex items-center justify-between text-xs font-semibold text-[#4A3F45] group-hover:text-[#B91C47]">
                     <span>Open Digital Album</span>
                     <ArrowRightIcon className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
                   </div>
@@ -224,20 +232,23 @@ export function ClientPortfoliosDirectory({
           </div>
         )}
 
-        {/* Bottom CTA */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center space-y-3">
-          <h2 className="text-xl font-bold text-slate-900">
-            Want a custom Digital Album for your upcoming event?
-          </h2>
-          <p className="text-sm text-slate-600 max-w-lg mx-auto">
-            Every completed booking includes an optional bespoke, high-resolution Digital Photo
-            &amp; Cinematic Film Album tailored to your theme.
+        {/* Bottom Concierge CTA */}
+        <div className="rounded-2xl border border-[#2D232A] bg-[#141013] p-8 sm:p-10 text-center space-y-3 text-white">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#E9BE78]">
+            {branding.displayName}
           </p>
-          <div className="pt-1">
+          <h2 className="font-editorial text-3xl sm:text-4xl font-semibold text-white">
+            Want a custom Digital Album for your celebration?
+          </h2>
+          <p className="text-sm text-[#BFB2A7] max-w-lg mx-auto leading-relaxed">
+            Every completed celebration includes an optional bespoke, high-resolution Digital Photo
+            &amp; Cinematic Film Album tailored to your event theme.
+          </p>
+          <div className="pt-2">
             <Link
               href="/#inquire"
               style={{ backgroundColor: accent }}
-              className="inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-sm hover:opacity-95 transition-opacity"
             >
               <span>Request a Date &amp; Quote</span>
               <ArrowRightIcon className="w-4 h-4" />

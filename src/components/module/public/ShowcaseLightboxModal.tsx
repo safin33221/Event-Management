@@ -54,7 +54,7 @@ export function ShowcaseLightboxModal({ item, onClose }: ShowcaseLightboxModalPr
         <div className="shrink-0 flex items-center justify-between gap-4 px-5 py-4 border-b border-white/10">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-indigo-300">
+              <span className="rounded-full bg-[#C98A2C]/20 border border-[#C98A2C]/35 px-2.5 py-0.5 text-xs font-medium text-[#E9BE78]">
                 {media.kind === 'video'
                   ? 'Video Film'
                   : totalPhotos > 1

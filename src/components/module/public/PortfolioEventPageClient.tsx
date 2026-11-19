@@ -279,13 +279,13 @@ export function PortfolioEventPageClient({
           <div className="flex items-center gap-3 min-w-0">
             <span
               className={cn(
-                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold tracking-widest',
+                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border font-editorial text-sm font-bold',
                 darkGallery
-                  ? 'border-amber-200/30 bg-amber-100/10 text-amber-200'
-                  : 'border-stone-300 bg-white text-stone-800 shadow-2xs',
+                  ? 'border-[#C98A2C]/40 bg-[#C98A2C]/15 text-[#E9BE78]'
+                  : 'border-[#E2D5C1] bg-white text-[#B91C47] shadow-2xs',
               )}
             >
-              {(branding.displayName || 'DA').slice(0, 2).toUpperCase()}
+              {(branding.displayName || 'R').slice(0, 1).toUpperCase()}
             </span>
             <div className="min-w-0">
               <p

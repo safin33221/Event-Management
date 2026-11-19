@@ -47,7 +47,7 @@ export function InquiryForm({
 
   const [copied, setCopied] = useState(false);
 
-  const accent = branding.themeTokens.accentColor || '#4F46E5';
+  const accent = branding.themeTokens.accentColor || '#B91C47';
   const selectedPkg = packages.find((p) => p.id === packageId);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -101,42 +101,44 @@ export function InquiryForm({
 
   if (confirmation) {
     return (
-      <div className="atelier-card p-8 sm:p-10 text-center space-y-4">
+      <div className="atelier-card p-8 sm:p-10 text-center space-y-4 bg-white">
         <div
           className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-sm"
           style={{ backgroundColor: accent }}
         >
           <CheckCircleIcon className="w-6 h-6" />
         </div>
-        <h3 className="text-2xl font-bold tracking-tight text-slate-900">
-          Request Sent!
+        <h3 className="font-editorial text-3xl font-semibold text-[#181216]">
+          Request Received
         </h3>
-        <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-          Thank you. {branding.displayName} has received your request and will send you a price
-          quote soon.
+        <p className="text-sm text-[#54474E] max-w-md mx-auto leading-relaxed">
+          Thank you. {branding.displayName} has logged your celebration inquiry and will send an
+          itemized quote shortly.
         </p>
-        <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2">
-          <span className="text-xs text-slate-500">Reference:</span>
-          <span className="font-mono-code text-sm font-semibold text-slate-900">
+        <div className="inline-flex items-center gap-2 rounded-xl border border-[#E5DCCD] bg-[#FAF6EE] px-4 py-2">
+          <span className="text-xs text-[#7D6860]">Reference:</span>
+          <span className="font-mono-code text-sm font-semibold text-[#181216]">
             {confirmation.reference}
           </span>
           <button
             type="button"
             onClick={() => handleCopyRef(confirmation.reference)}
-            className="ml-1 rounded-md bg-white px-2 py-0.5 text-sm font-semibold text-indigo-600 border border-slate-200 hover:bg-indigo-50 transition-colors"
+            className="ml-1 rounded-md bg-white px-2.5 py-0.5 text-xs font-semibold border border-[#DFD5C7] hover:bg-[#FEF7EC] transition-colors cursor-pointer"
+            style={{ color: accent }}
           >
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
-        <p className="text-xs text-slate-500 max-w-md mx-auto">
-          Note: Submitting an inquiry requests availability review; dates are reserved upon quote
-          acceptance and booking confirmation.
+        <p className="text-xs text-[#7D6860] max-w-md mx-auto">
+          Submitting an inquiry requests availability review; dates are locked once you accept your
+          quote and confirm the booking deposit.
         </p>
         <div>
           <button
             type="button"
             onClick={() => setConfirmation(null)}
-            className="mt-2 text-sm font-semibold text-indigo-600 hover:text-indigo-700 underline underline-offset-4"
+            className="mt-2 text-sm font-semibold underline underline-offset-4 cursor-pointer"
+            style={{ color: accent }}
           >
             Submit another inquiry
           </button>
@@ -146,37 +148,37 @@ export function InquiryForm({
   }
 
   const inputClass =
-    'w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/15 transition-all';
+    'w-full rounded-xl border border-[#DFD5C7] bg-[#FDFBF7] px-3.5 py-2.5 text-sm text-[#181216] placeholder:text-[#9A8A80] outline-none focus:border-[#B91C47] focus:bg-white focus:ring-2 focus:ring-[#B91C47]/15 transition-all';
 
   return (
-    <form onSubmit={handleSubmit} className="atelier-card p-6 sm:p-8 space-y-5">
-      <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+    <form onSubmit={handleSubmit} className="atelier-card p-6 sm:p-8 space-y-5 bg-white">
+      <div className="flex items-start justify-between gap-4 border-b border-[#EFE8DC] pb-4">
         <div>
-          <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+          <h3 className="font-editorial text-2xl sm:text-3xl font-semibold text-[#181216]">
             Ask for a Quote
           </h3>
-          <p className="text-sm text-slate-500 mt-1">
-            Tell us your event date, details, and the package you like.
+          <p className="text-sm text-[#54474E] mt-1">
+            Tell us your event date, venue, and the collection you have in mind.
           </p>
         </div>
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 shrink-0">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F7F3EB] text-[#8E5B17] border border-[#EAE2D6] shrink-0">
           <CalendarIcon className="w-4 h-4" />
         </span>
       </div>
 
       {selectedPkg && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-2.5 text-sm">
-          <div className="flex items-center gap-2 text-indigo-950">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#F3DEC0] bg-[#FEF7EC] px-4 py-2.5 text-sm">
+          <div className="flex items-center gap-2 text-[#181216]">
             <span className="font-semibold">Selected Package:</span>
             <span>{selectedPkg.name}</span>
-            <span className="font-mono-code font-semibold text-indigo-700">
+            <span className="font-mono-code font-semibold text-[#B91C47]">
               ({formatPoisha(selectedPkg.basePricePoisha, branding.currency)})
             </span>
           </div>
           <button
             type="button"
             onClick={() => setPackageId('')}
-            className="font-semibold text-indigo-700 hover:text-indigo-900"
+            className="font-semibold text-[#8E5B17] hover:text-[#181216] cursor-pointer"
           >
             Clear
           </button>

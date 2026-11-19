@@ -1,13 +1,16 @@
 import React, { Suspense } from 'react';
 import { LoginForm } from '@/components/module/auth/LoginForm';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
+import { resolvePublicBranding } from '@/lib/publicStorefront';
+import { getPublicBranding } from '@/service/agency/agency.service';
 
 async function LoginContent({
   searchParams,
 }: {
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
-  const params = await searchParams;
+  const [params, brandRes] = await Promise.all([searchParams, getPublicBranding()]);
+  const branding = resolvePublicBranding(brandRes.ok ? brandRes.data : null);
   const raw = params?.callbackUrl;
   const callbackUrl =
     typeof raw === 'string' &&
@@ -18,7 +21,7 @@ async function LoginContent({
       ? raw
       : undefined;
 
-  return <LoginForm callbackUrl={callbackUrl} />;
+  return <LoginForm callbackUrl={callbackUrl} branding={branding} />;
 }
 
 export default function LoginPage({

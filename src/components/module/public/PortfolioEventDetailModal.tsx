@@ -99,20 +99,20 @@ export function PortfolioEventDetailModal({
                 </span>
               )}
               {event.eventType && (
-                <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+                <span className="rounded-full bg-[#FEF7EC] border border-[#F3DEC0] px-2.5 py-0.5 text-xs font-semibold text-[#8E5B17]">
                   {event.eventType.name}
                 </span>
               )}
               {event.eventDate && (
-                <span className="text-xs font-mono-code text-slate-500">
+                <span className="text-xs font-mono-code text-[#6B5A62]">
                   {formatLocalDate(event.eventDate)}
                 </span>
               )}
               {event.location && (
-                <span className="text-xs text-slate-500">• {event.location}</span>
+                <span className="text-xs text-[#6B5A62]">• {event.location}</span>
               )}
             </div>
-            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 mt-1 truncate">
+            <h2 className="font-editorial text-xl sm:text-2xl font-semibold text-[#181216] mt-1 truncate">
               {event.title}
             </h2>
           </div>
@@ -121,7 +121,7 @@ export function PortfolioEventDetailModal({
             {!isPreview && event.status === 'PUBLISHED' && (
               <Link
                 href={`/album/${event.slug}`}
-                className="rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                className="rounded-xl border border-[#B91C47]/30 bg-[#FDF2F4] px-3.5 py-1.5 text-xs font-semibold text-[#B91C47] hover:bg-[#B91C47] hover:text-white transition-colors"
               >
                 Open Full Page ↗
               </Link>

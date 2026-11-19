@@ -2,7 +2,7 @@ import React, { Suspense } from 'react';
 import { Navbar } from '@/components/common/Navbar';
 import { Footer } from '@/components/common/Footer';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
-import { NEUTRAL_PREVIEW_BRANDING } from '@/lib/publicStorefront';
+import { resolvePublicBranding } from '@/lib/publicStorefront';
 import { getPublicBranding } from '@/service/agency/agency.service';
 import {
   getPublicEventTypes,
@@ -17,7 +17,7 @@ async function AllPortfoliosContent() {
     getPublicEventTypes(),
   ]);
 
-  const branding = brandRes.ok && brandRes.data ? brandRes.data : NEUTRAL_PREVIEW_BRANDING;
+  const branding = resolvePublicBranding(brandRes.ok ? brandRes.data : null);
   const events = eventsRes.ok && eventsRes.data ? eventsRes.data.data : [];
   const eventTypes = etRes.ok && etRes.data ? etRes.data : [];
 

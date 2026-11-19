@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Softilo Event Management — Curated Event & Studio Operations',
+  title: 'Rongilo Event Management — Bespoke Celebrations, Photography & Studio Craft',
   description:
-    'White-label event management storefront, quotes, bookings, schedules, verified ledgers, and deliverables.',
+    'Rongilo Event Management: curated wedding & corporate event design, transparent quotes, date-locked bookings, and signature digital albums.',
 };
 
 export default function RootLayout({
@@ -14,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-indigo-500/15 selection:text-indigo-950">
+      <body className="min-h-full flex flex-col bg-[#FDFBF7] text-[#181216] font-sans selection:bg-[#B91C47]/15 selection:text-[#181216]">
         {children}
       </body>
     </html>
