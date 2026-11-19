@@ -116,7 +116,8 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
         { href: '/admin/gallery', label: 'Gallery', icon: CameraIcon },
         { href: '/admin/portfolio', label: 'Client Portfolios', icon: LayersIcon },
         { href: '/admin/catalog', label: 'Packages', icon: PaletteIcon },
-        { href: '/admin/team', label: 'Team & Crew', icon: UsersIcon },
+        { href: '/admin/crew', label: 'Crew & Gear', icon: UsersIcon },
+        { href: '/admin/team', label: 'Team & Rules', icon: ShieldCheckIcon },
         { href: '/admin/settings', label: 'Settings', icon: SparklesIcon },
       ];
 
@@ -154,10 +155,10 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
         key={item.href}
         href={item.href}
         className={cn(
-          'flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] transition-colors',
+          'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] transition-colors',
           active
-            ? 'font-semibold bg-[var(--admin-accent-soft)] text-[var(--admin-accent)]'
-            : 'font-medium text-[var(--admin-muted)] hover:bg-[var(--admin-surface-subtle)] hover:text-[var(--admin-text)]',
+            ? 'font-semibold bg-[var(--admin-surface)] text-[var(--admin-accent)] border border-[var(--admin-border)]'
+            : 'font-medium text-[var(--admin-muted)] hover:bg-[var(--admin-surface-hover)] hover:text-[var(--admin-text)] border border-transparent',
         )}
       >
         <Icon
@@ -177,9 +178,9 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
       className="admin-shell min-h-screen flex bg-[var(--admin-canvas)] text-[var(--admin-text)] transition-colors duration-200"
     >
       {/* Clean Low-Eye-Strain Sidebar */}
-      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 w-56 flex-col border-r border-[var(--admin-border)] bg-[var(--admin-surface)]">
+      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 w-56 flex-col border-r border-[var(--admin-border)] bg-[var(--admin-sidebar)]">
         {/* Studio Brand */}
-        <div className="h-14 px-4 flex items-center border-b border-[var(--admin-border)] shrink-0">
+        <div className="h-12 px-4 flex items-center border-b border-[var(--admin-border)] shrink-0">
           <Link
             href={isStaffOnly ? '/staff' : '/admin'}
             className="flex items-center gap-2.5 min-w-0"
@@ -193,13 +194,13 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
           </Link>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+        {/* Navigation (scrollbar cleanly hidden so sidebar stays crisp on all heights) */}
+        <nav className="flex-1 overflow-y-auto no-scrollbar px-3 py-2.5 space-y-2.5">
           <div className="space-y-0.5">{primaryNav.map(renderNavLink)}</div>
 
           {studioNav.length > 0 && (
-            <div className="pt-3 border-t border-[var(--admin-border)] space-y-0.5">
-              <p className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--admin-muted)]">
+            <div className="pt-2.5 border-t border-[var(--admin-border)] space-y-0.5">
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--admin-muted)]">
                 Studio
               </p>
               {studioNav.map(renderNavLink)}
@@ -208,11 +209,11 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
         </nav>
 
         {/* Quiet Footer + Theme Toggle */}
-        <div className="p-3 border-t border-[var(--admin-border)] space-y-2">
+        <div className="p-2.5 border-t border-[var(--admin-border)] space-y-1.5 shrink-0">
           <div className="flex items-center gap-1.5">
             <Link
               href="/"
-              className="flex-1 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--admin-muted)] hover:bg-[var(--admin-surface-subtle)] hover:text-[var(--admin-text)] transition-colors"
+              className="flex-1 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--admin-muted)] hover:bg-[var(--admin-surface-hover)] hover:text-[var(--admin-text)] transition-colors"
             >
               <span>Public Site</span>
               <span>↗</span>
@@ -221,14 +222,14 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
               type="button"
               onClick={toggleTheme}
               title={theme === 'light' ? 'Switch to Soft Dark Navy' : 'Switch to Soft Light'}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-hover)] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-hover)] transition-colors cursor-pointer"
             >
               <ThemeModeIcon mode={theme} />
               <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
             </button>
           </div>
 
-          <div className="flex items-center justify-between gap-2 px-1.5 py-1">
+          <div className="flex items-center justify-between gap-2 px-1.5 py-0.5">
             <div className="flex items-center gap-2 min-w-0">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--admin-surface-subtle)] border border-[var(--admin-border)] text-[11px] font-semibold text-[var(--admin-text)] tabular-nums">
                 {initials}
@@ -336,7 +337,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
             {allItems.map((item) => {
               const active = isItemActive(item);
               return (

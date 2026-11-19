@@ -21,10 +21,10 @@ async function AdminTeamContent({ searchParams }: AdminTeamPageProps) {
   if (session.role === 'STAFF') redirect('/staff');
 
   const resolvedSearch = searchParams ? await searchParams : {};
-  const initialTab =
-    resolvedSearch.tab === 'roster' || resolvedSearch.tab === 'automation'
-      ? resolvedSearch.tab
-      : 'members';
+  if (resolvedSearch.tab === 'roster') {
+    redirect('/admin/crew');
+  }
+  const initialTab = resolvedSearch.tab === 'automation' ? 'automation' : 'members';
 
   const [etRes, memRes, resRes, delLabelsRes, taskTplRes] = await Promise.all([
     listEventTypes(),

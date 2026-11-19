@@ -8,22 +8,18 @@ import {
   EventSession,
   Resource,
   ResourceAvailabilityItem,
-  ResourceType,
   SessionStatus,
   StudioMember,
 } from '@/types/event-management';
 import {
-  archiveResource,
   cancelSession,
   checkResourceAvailability,
   completeSession,
-  createResource,
   createSession,
   getCalendar,
   getCalendarSubscription,
   rescheduleSession,
   rotateCalendarSubscription,
-  updateResource,
 } from '@/service/schedule/schedule.service';
 import { cn, formatDateTimeInTz } from '@/lib/utils';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -159,7 +155,7 @@ export function CalendarWorkspace({
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
   const [sessions, setSessions] = useState<EventSession[]>(initialSessions);
-  const [resources, setResources] = useState<Resource[]>(initialResources);
+  const resources = initialResources;
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -174,20 +170,12 @@ export function CalendarWorkspace({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [resourceFilter, setResourceFilter] = useState<string>('ALL');
 
-  // Panels ('none' | 'schedule' | 'resources' | 'google')
-  const [activePanel, setActivePanel] = useState<'none' | 'schedule' | 'resources' | 'google'>(
-    'none',
-  );
+  // Panels ('none' | 'schedule' | 'google')
+  const [activePanel, setActivePanel] = useState<'none' | 'schedule' | 'google'>('none');
 
   // Google Calendar Subscription state
   const [subscriptionInfo, setSubscriptionInfo] = useState<CalendarSubscriptionInfo | null>(null);
   const [copiedFeedUrl, setCopiedFeedUrl] = useState(false);
-
-  // Add resource state
-  const [poolAddMode, setPoolAddMode] = useState<'member' | 'freelance' | 'gear'>('member');
-  const [selectedMemberId, setSelectedMemberId] = useState('');
-  const [resName, setResName] = useState('');
-  const [resType, setResType] = useState<ResourceType>('EQUIPMENT');
 
   // Schedulable bookings (exclude cancelled and completed, prioritize confirmed)
   const schedulableBookings = useMemo(() => {
@@ -383,77 +371,6 @@ export function CalendarWorkspace({
     for (const m of members) map.set(m.id, m);
     return map;
   }, [members]);
-
-  const handleAddResource = (e: React.FormEvent) => {
-    e.preventDefault();
-    startTransition(async () => {
-      if (poolAddMode === 'member') {
-        const chosen = members.find((m) => m.id === selectedMemberId);
-        if (!chosen) {
-          setFeedback({ type: 'err', text: 'Select a studio team member first.' });
-          return;
-        }
-        const titlePart = resName.trim();
-        const formatted = titlePart ? `${chosen.name} (${titlePart})` : chosen.name;
-        const res = await createResource({
-          name: formatted,
-          type: 'CREW',
-          userId: chosen.id,
-        });
-        if (!res.ok || !res.data) {
-          setFeedback({ type: 'err', text: res.message || 'Failed to add team member to shoot crew' });
-          return;
-        }
-        setResources([...resources, res.data]);
-        setSelectedMemberId('');
-        setResName('');
-        setFeedback({ type: 'ok', text: `Linked & added shoot crew: ${res.data.name}` });
-        return;
-      }
-
-      const targetType: ResourceType = poolAddMode === 'freelance' ? 'CREW' : resType;
-      const res = await createResource({ name: resName, type: targetType });
-      if (!res.ok || !res.data) {
-        setFeedback({ type: 'err', text: res.message || 'Failed to add crew or equipment' });
-        return;
-      }
-      setResources([...resources, res.data]);
-      setResName('');
-      setFeedback({
-        type: 'ok',
-        text: `Added ${poolAddMode === 'freelance' ? 'Freelance Crew' : res.data.type}: ${res.data.name}`,
-      });
-    });
-  };
-
-  const handleLinkResourceAccount = (resourceId: string, userId: string | null) => {
-    startTransition(async () => {
-      const res = await updateResource(resourceId, { userId });
-      if (!res.ok || !res.data) {
-        setFeedback({ type: 'err', text: res.message || 'Failed to update account link' });
-        return;
-      }
-      setResources((prev) => prev.map((r) => (r.id === res.data!.id ? res.data! : r)));
-      setFeedback({
-        type: 'ok',
-        text: userId
-          ? `Linked "${res.data.name}" to studio account.`
-          : `Unlinked "${res.data.name}" (marked as freelance).`,
-      });
-    });
-  };
-
-  const handleArchivePoolResource = (resource: Resource) => {
-    startTransition(async () => {
-      const res = await archiveResource(resource.id);
-      if (!res.ok) {
-        setFeedback({ type: 'err', text: res.message || 'Failed to remove item from pool' });
-        return;
-      }
-      setResources((prev) => prev.filter((r) => r.id !== resource.id));
-      setFeedback({ type: 'ok', text: `Removed "${resource.name}" from active pool.` });
-    });
-  };
 
   const toggleResource = (id: string) => {
     setSelectedResourceIds((prev) =>
@@ -787,18 +704,12 @@ export function CalendarWorkspace({
             <span>Google Calendar Sync</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActivePanel(activePanel === 'resources' ? 'none' : 'resources')}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all duration-200',
-              activePanel === 'resources'
-                ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
-                : 'border-border/60 bg-card text-slate-700 hover:bg-slate-50 hover:border-primary/40',
-            )}
+          <Link
+            href="/admin/crew"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <span>Crew &amp; Gear ({resources.length})</span>
-          </button>
+            <span>Crew &amp; Gear ({resources.length}) →</span>
+          </Link>
 
           <button
             type="button"
@@ -822,30 +733,36 @@ export function CalendarWorkspace({
 
       {/* KPI Summary Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm transition-all duration-200">
-          <p className="text-sm font-medium text-muted-foreground">Sessions in Range</p>
-          <p className="text-2xl font-bold tracking-tight text-slate-900 mt-2 tabular-nums">
+        <div className="atelier-card p-5">
+          <p className="admin-meta font-medium">Sessions in Range</p>
+          <p className="text-2xl font-semibold tracking-tight text-slate-900 mt-2 tabular-nums">
             {sessions.length}
           </p>
         </div>
-        <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm transition-all duration-200">
-          <p className="text-sm font-medium text-muted-foreground">Upcoming Scheduled</p>
-          <p className="text-2xl font-bold tracking-tight text-primary mt-2 tabular-nums">
+        <div className="atelier-card p-5">
+          <p className="admin-meta font-medium">Upcoming Scheduled</p>
+          <p className="text-2xl font-semibold tracking-tight text-[#2563EB] mt-2 tabular-nums">
             {scheduledCount}
           </p>
         </div>
-        <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm transition-all duration-200">
-          <p className="text-sm font-medium text-muted-foreground">Completed Shoots</p>
-          <p className="text-2xl font-bold tracking-tight text-emerald-600 mt-2 tabular-nums">
+        <div className="atelier-card p-5">
+          <p className="admin-meta font-medium">Completed Shoots</p>
+          <p className="text-2xl font-semibold tracking-tight text-emerald-600 mt-2 tabular-nums">
             {completedCount}
           </p>
         </div>
-        <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-card to-slate-50/40 p-5 hover:border-primary/40 hover:shadow-sm transition-all duration-200">
-          <p className="text-sm font-medium text-muted-foreground">Crew &amp; Equipment Pool</p>
-          <p className="text-2xl font-bold tracking-tight text-slate-900 mt-2 tabular-nums">
-            {resources.length}
-          </p>
-        </div>
+        <Link
+          href="/admin/crew"
+          className="atelier-card p-5 block hover:border-[#2563EB] transition-colors"
+        >
+          <p className="admin-meta font-medium">Crew &amp; Equipment Pool</p>
+          <div className="flex items-baseline justify-between mt-2">
+            <p className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
+              {resources.length}
+            </p>
+            <span className="text-xs font-medium text-[#2563EB]">Manage →</span>
+          </div>
+        </Link>
       </div>
 
       {feedback && (
@@ -1088,13 +1005,21 @@ export function CalendarWorkspace({
 
             {resources.length > 0 && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-slate-600">
                     Assign Shoot Crew &amp; Equipment
                   </p>
-                  {checkingAvail && (
-                    <span className="text-xs text-indigo-600">Checking live availability...</span>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {checkingAvail && (
+                      <span className="text-xs text-indigo-600">Checking live availability...</span>
+                    )}
+                    <Link
+                      href="/admin/crew"
+                      className="text-xs font-medium text-[#2563EB] hover:underline"
+                    >
+                      Manage Pool →
+                    </Link>
+                  </div>
                 </div>
 
                 {crewResources.length > 0 && (
@@ -1228,238 +1153,6 @@ export function CalendarWorkspace({
               </button>
             </div>
           </form>
-        </div>
-      )}
-
-      {/* Modal: Shoot Crew & Equipment Pool */}
-      {activePanel === 'resources' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 space-y-5 my-8">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
-              <div>
-                <h2 className="admin-section-title">
-                  Shoot Crew &amp; Equipment Pool ({resources.length})
-                </h2>
-                <p className="admin-meta mt-0.5">
-                  Link Studio Team members as bookable crew (no duplicate typing), add freelancers, or register camera kits &amp; rooms.
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Link
-                  href="/admin/team?tab=roster"
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-[#2563EB] hover:bg-slate-100"
-                >
-                  Open Team &amp; Crew Hub ↗
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setActivePanel('none')}
-                  className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <form
-              onSubmit={handleAddResource}
-              className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2.5"
-            >
-              <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5 w-fit">
-                {[
-                  { id: 'member' as const, label: 'From Team Member' },
-                  { id: 'freelance' as const, label: 'Freelance Crew' },
-                  { id: 'gear' as const, label: 'Gear / Studio Room' },
-                ].map((mode) => (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    onClick={() => {
-                      setPoolAddMode(mode.id);
-                      setResName('');
-                    }}
-                    className={cn(
-                      'rounded-md px-2.5 py-1 text-xs font-medium cursor-pointer',
-                      poolAddMode === mode.id
-                        ? 'bg-slate-900 text-white'
-                        : 'text-slate-600 hover:text-slate-900',
-                    )}
-                  >
-                    {mode.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {poolAddMode === 'member' && (
-                  <>
-                    <select
-                      required
-                      value={selectedMemberId}
-                      onChange={(e) => setSelectedMemberId(e.target.value)}
-                      className="flex-1 min-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
-                    >
-                      <option value="">Select Studio Team member...</option>
-                      {members.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} ({m.role})
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      value={resName}
-                      onChange={(e) => setResName(e.target.value)}
-                      placeholder="Specialty (e.g. Lead Photographer)"
-                      className="flex-1 min-w-[170px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#2563EB]"
-                    />
-                  </>
-                )}
-
-                {poolAddMode === 'freelance' && (
-                  <input
-                    required
-                    value={resName}
-                    onChange={(e) => setResName(e.target.value)}
-                    placeholder="Freelancer name & role (e.g. Tariq Hasan (Sound))"
-                    className="flex-1 min-w-[240px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#2563EB]"
-                  />
-                )}
-
-                {poolAddMode === 'gear' && (
-                  <>
-                    <input
-                      required
-                      value={resName}
-                      onChange={(e) => setResName(e.target.value)}
-                      placeholder="Equipment or studio room name (e.g. Sony FX6 Kit B)"
-                      className="flex-1 min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#2563EB]"
-                    />
-                    <select
-                      value={resType === 'CREW' ? 'EQUIPMENT' : resType}
-                      onChange={(e) => setResType(e.target.value as ResourceType)}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium"
-                    >
-                      <option value="EQUIPMENT">Equipment</option>
-                      <option value="ROOM">Studio / Room</option>
-                      <option value="OTHER">Other Asset</option>
-                    </select>
-                  </>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 cursor-pointer"
-                >
-                  <PlusIcon className="w-3.5 h-3.5" />
-                  <span>Add</span>
-                </button>
-              </div>
-            </form>
-
-            <div className="grid gap-4 sm:grid-cols-2 max-h-72 overflow-y-auto pr-1">
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-700">
-                  Shoot Crew ({crewResources.length})
-                </p>
-                {crewResources.length === 0 ? (
-                  <p className="admin-meta">No shoot crew added yet.</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {crewResources.map((r) => {
-                      const linkedUser =
-                        r.user || (r.userId ? memberById.get(r.userId) : undefined) || null;
-                      return (
-                        <div
-                          key={r.id}
-                          className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 space-y-1.5"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-slate-900 truncate">
-                                {r.name}
-                              </p>
-                              <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
-                                <span
-                                  className={cn(
-                                    'h-1.5 w-1.5 rounded-full shrink-0',
-                                    linkedUser ? 'bg-emerald-500' : 'bg-amber-500',
-                                  )}
-                                />
-                                <span className="truncate">
-                                  {linkedUser
-                                    ? `Account: ${linkedUser.name}`
-                                    : 'Freelance / Unlinked'}
-                                </span>
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              disabled={isPending}
-                              onClick={() => handleArchivePoolResource(r)}
-                              className="text-[11px] font-medium text-rose-600 hover:underline shrink-0 cursor-pointer"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                          {!linkedUser && members.length > 0 && (
-                            <select
-                              defaultValue=""
-                              disabled={isPending}
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  handleLinkResourceAccount(r.id, e.target.value);
-                                }
-                              }}
-                              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 cursor-pointer"
-                            >
-                              <option value="">Link to Studio Account...</option>
-                              {members.map((m) => (
-                                <option key={m.id} value={m.id}>
-                                  Link {m.name} ({m.role})
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-700">
-                  Equipment &amp; Studio Rooms ({gearResources.length})
-                </p>
-                {gearResources.length === 0 ? (
-                  <p className="admin-meta">No camera kits or rooms added yet.</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {gearResources.map((r) => (
-                      <div
-                        key={r.id}
-                        className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 flex items-center justify-between gap-2"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-900 truncate">{r.name}</p>
-                          <p className="text-[11px] text-slate-500">{r.type}</p>
-                        </div>
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => handleArchivePoolResource(r)}
-                          className="text-[11px] font-medium text-rose-600 hover:underline shrink-0 cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       )}
 

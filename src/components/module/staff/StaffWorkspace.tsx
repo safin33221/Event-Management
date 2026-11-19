@@ -136,10 +136,16 @@ export function StaffWorkspace({
               </button>
             </div>
             <Link
+              href="/admin/crew"
+              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Crew &amp; Gear →
+            </Link>
+            <Link
               href="/admin/team"
               className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
-              Team &amp; Crew Setup →
+              Team &amp; Rules →
             </Link>
           </div>
         )}

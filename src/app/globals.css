@@ -80,15 +80,16 @@ body {
 
 .admin-shell {
   --admin-canvas: #f6f7f9;
+  --admin-sidebar: #edf1f7;
   --admin-surface: #fcfdfd;
   --admin-surface-subtle: #eff2f6;
-  --admin-surface-hover: #e8ecf2;
-  --admin-border: #e6e9ef;
+  --admin-surface-hover: #e4e9f2;
+  --admin-border: #e2e6ee;
   --admin-text: #1e2430;
   --admin-muted: #5c6575;
   --admin-accent: #2563eb;
   --admin-accent-hover: #1d4ed8;
-  --admin-accent-soft: rgba(37, 99, 235, 0.1);
+  --admin-accent-soft: rgba(37, 99, 235, 0.11);
   --admin-violet: #6d28d9;
   --admin-violet-soft: rgba(109, 40, 217, 0.1);
   --admin-header: rgba(252, 253, 253, 0.92);
@@ -99,6 +100,7 @@ body {
 
 .admin-shell[data-theme='dark'] {
   --admin-canvas: #0b1020;
+  --admin-sidebar: #0e1528;
   --admin-surface: #11182e;
   --admin-surface-subtle: #16203c;
   --admin-surface-hover: #1b2748;
@@ -107,11 +109,20 @@ body {
   --admin-muted: #8e9ab3;
   --admin-accent: #4f7cff;
   --admin-accent-hover: #3b69f5;
-  --admin-accent-soft: rgba(79, 124, 255, 0.14);
+  --admin-accent-soft: rgba(79, 124, 255, 0.16);
   --admin-violet: #8b5cf6;
   --admin-violet-soft: rgba(139, 92, 246, 0.14);
   --admin-header: rgba(17, 24, 46, 0.92);
   color-scheme: dark;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 .admin-shell .atelier-card,

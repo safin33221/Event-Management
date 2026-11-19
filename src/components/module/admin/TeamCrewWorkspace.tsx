@@ -636,13 +636,12 @@ export function TeamCrewWorkspace({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab('roster')}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+              <Link
+                href="/admin/crew"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-[#2563EB] hover:bg-slate-50"
               >
-                Open Gear &amp; Freelance Pool →
-              </button>
+                Open Dedicated Crew &amp; Gear Page →
+              </Link>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">

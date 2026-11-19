@@ -2896,17 +2896,25 @@ export function BookingsWorkspace({
                     </div>
 
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-semibold text-slate-600">
                           Reserve Shoot Crew &amp; Gear
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowQuickResource((v) => !v)}
-                          className="text-xs font-semibold text-indigo-600 hover:underline cursor-pointer"
-                        >
-                          {showQuickResource ? 'Cancel Quick Add' : '+ Quick Add Crew/Gear'}
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <Link
+                            href="/admin/crew"
+                            className="text-xs font-medium text-slate-500 hover:text-[#2563EB] hover:underline"
+                          >
+                            Crew &amp; Gear Page ↗
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => setShowQuickResource((v) => !v)}
+                            className="text-xs font-semibold text-indigo-600 hover:underline cursor-pointer"
+                          >
+                            {showQuickResource ? 'Cancel Quick Add' : '+ Quick Add Crew/Gear'}
+                          </button>
+                        </div>
                       </div>
                       {resources.some((r) => r.type === 'CREW') && (
                         <div className="space-y-1">
