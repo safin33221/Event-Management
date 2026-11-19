@@ -97,7 +97,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
   const canViewFinance = session.role === 'OWNER' || session.role === 'ACCOUNTANT';
 
   const primaryNav: NavItem[] = isStaffOnly
-    ? [{ href: '/staff', label: 'My Tasks', icon: CheckCircleIcon }]
+    ? [{ href: '/staff', label: 'My Shoots & Tasks', icon: CheckCircleIcon }]
     : [
         { href: '/admin', label: 'Overview', icon: SparklesIcon, exact: true },
         { href: '/admin/inquiries', label: 'Inquiries', icon: CameraIcon },
@@ -107,7 +107,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
         ...(canViewFinance
           ? [{ href: '/admin/finance', label: 'Finance Report', icon: ReceiptIcon }]
           : []),
-        { href: '/staff', label: 'Crew Tasks', icon: LayersIcon },
+        { href: '/staff', label: 'Crew Dispatch', icon: LayersIcon },
       ];
 
   const studioNav: NavItem[] = isStaffOnly
@@ -116,7 +116,7 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
         { href: '/admin/gallery', label: 'Gallery', icon: CameraIcon },
         { href: '/admin/portfolio', label: 'Client Portfolios', icon: LayersIcon },
         { href: '/admin/catalog', label: 'Packages', icon: PaletteIcon },
-        { href: '/admin/team', label: 'Team & Rules', icon: UsersIcon },
+        { href: '/admin/team', label: 'Team & Crew', icon: UsersIcon },
         { href: '/admin/settings', label: 'Settings', icon: SparklesIcon },
       ];
 

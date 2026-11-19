@@ -28,7 +28,46 @@ export async function createResource(payload: {
   const result = await parseApiResponse<Resource>(res);
   if (result.ok) {
     revalidatePath('/admin/calendar');
+    revalidatePath('/admin/team');
     revalidatePath('/admin/bookings');
+    revalidatePath('/staff');
+  }
+  return result;
+}
+
+export async function updateResource(
+  resourceId: string,
+  payload: {
+    name?: string;
+    type?: ResourceType;
+    userId?: string | null;
+    isActive?: boolean;
+  },
+): Promise<ActionResult<Resource>> {
+  const res = await serverFetch.patch(`/resources/${encodeURIComponent(resourceId)}`, {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<Resource>(res);
+  if (result.ok) {
+    revalidatePath('/admin/calendar');
+    revalidatePath('/admin/team');
+    revalidatePath('/admin/bookings');
+    revalidatePath('/staff');
+  }
+  return result;
+}
+
+export async function archiveResource(
+  resourceId: string,
+): Promise<ActionResult<{ archived: boolean; id: string }>> {
+  const res = await serverFetch.delete(`/resources/${encodeURIComponent(resourceId)}`);
+  const result = await parseApiResponse<{ archived: boolean; id: string }>(res);
+  if (result.ok) {
+    revalidatePath('/admin/calendar');
+    revalidatePath('/admin/team');
+    revalidatePath('/admin/bookings');
+    revalidatePath('/staff');
   }
   return result;
 }

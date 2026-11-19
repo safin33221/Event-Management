@@ -1,7 +1,11 @@
 import React, { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getMe } from '@/service/auth';
-import { listMyAssignments } from '@/service/operations/operations.service';
+import { getAgencySettings } from '@/service/agency/agency.service';
+import {
+  getMyCrewWorkspace,
+  getStudioDispatch,
+} from '@/service/operations/operations.service';
 import { StaffWorkspace } from '@/components/module/staff/StaffWorkspace';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
 
@@ -9,13 +13,34 @@ async function StaffContent() {
   const session = await getMe();
   if (!session) redirect('/login');
 
-  const res = await listMyAssignments();
-  return <StaffWorkspace initialAssignments={res.ok && res.data ? res.data : []} />;
+  const isManager = session.role === 'OWNER' || session.role === 'COORDINATOR';
+
+  const [myRes, settingsRes, dispatchRes] = await Promise.all([
+    getMyCrewWorkspace(session.id),
+    getAgencySettings(),
+    isManager ? getStudioDispatch() : Promise.resolve(null),
+  ]);
+
+  const timezone =
+    settingsRes.ok && settingsRes.data ? settingsRes.data.timezone : 'Asia/Dhaka';
+
+  return (
+    <StaffWorkspace
+      userRole={session.role}
+      currentUserId={session.id}
+      timezone={timezone}
+      initialAssignments={myRes.ok && myRes.data ? myRes.data.assignments : []}
+      initialShoots={myRes.ok && myRes.data ? myRes.data.upcomingShoots : []}
+      initialStudioDispatch={
+        dispatchRes && dispatchRes.ok && dispatchRes.data ? dispatchRes.data : null
+      }
+    />
+  );
 }
 
 export default function StaffPage() {
   return (
-    <Suspense fallback={<PageSkeleton label="Loading assigned work..." />}>
+    <Suspense fallback={<PageSkeleton label="Loading crew dispatch & tasks..." />}>
       <StaffContent />
     </Suspense>
   );

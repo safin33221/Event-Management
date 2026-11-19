@@ -323,6 +323,23 @@ export interface Resource {
   type: ResourceType;
   userId: string | null;
   isActive: boolean;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    isActive?: boolean;
+  } | null;
+}
+
+export interface StudioMember {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  isActive: boolean;
+  resources?: Resource[];
+  openAssignmentsCount?: number;
 }
 
 export interface ResourceAvailabilityItem extends Resource {
@@ -358,6 +375,8 @@ export interface EventSession {
     reference: string;
     eventTitle: string;
     clientName: string;
+    clientPhone?: string;
+    eventDate?: string | null;
     status: BookingStatus;
   };
   reservations?: Array<{
@@ -365,8 +384,34 @@ export interface EventSession {
     resourceId: string;
     startAt: string;
     endAt: string;
-    resource?: { id: string; name: string; type: ResourceType };
+    resource?: {
+      id: string;
+      name: string;
+      type: ResourceType;
+      userId?: string | null;
+    };
   }>;
+}
+
+export interface MyCrewWorkspaceData {
+  assignments: Assignment[];
+  upcomingShoots: EventSession[];
+}
+
+export interface StudioDispatchMemberSummary {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  crewResources: Resource[];
+  openTasksCount: number;
+  upcomingShootsCount: number;
+}
+
+export interface StudioDispatchData {
+  assignments: Assignment[];
+  upcomingSessions: EventSession[];
+  crewSummary: StudioDispatchMemberSummary[];
 }
 
 export interface Assignment {

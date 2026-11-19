@@ -10,8 +10,10 @@ import {
   ResourceAvailabilityItem,
   ResourceType,
   SessionStatus,
+  StudioMember,
 } from '@/types/event-management';
 import {
+  archiveResource,
   cancelSession,
   checkResourceAvailability,
   completeSession,
@@ -21,6 +23,7 @@ import {
   getCalendarSubscription,
   rescheduleSession,
   rotateCalendarSubscription,
+  updateResource,
 } from '@/service/schedule/schedule.service';
 import { cn, formatDateTimeInTz } from '@/lib/utils';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -34,6 +37,7 @@ interface CalendarWorkspaceProps {
   initialSessions: EventSession[];
   initialResources: Resource[];
   bookings: Booking[];
+  members?: StudioMember[];
 }
 
 type ViewMode = 'month' | 'agenda' | 'resources';
@@ -150,6 +154,7 @@ export function CalendarWorkspace({
   initialSessions,
   initialResources,
   bookings,
+  members = [],
 }: CalendarWorkspaceProps) {
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
@@ -179,8 +184,10 @@ export function CalendarWorkspace({
   const [copiedFeedUrl, setCopiedFeedUrl] = useState(false);
 
   // Add resource state
+  const [poolAddMode, setPoolAddMode] = useState<'member' | 'freelance' | 'gear'>('member');
+  const [selectedMemberId, setSelectedMemberId] = useState('');
   const [resName, setResName] = useState('');
-  const [resType, setResType] = useState<ResourceType>('CREW');
+  const [resType, setResType] = useState<ResourceType>('EQUIPMENT');
 
   // Schedulable bookings (exclude cancelled and completed, prioritize confirmed)
   const schedulableBookings = useMemo(() => {
@@ -363,17 +370,88 @@ export function CalendarWorkspace({
     });
   };
 
+  const crewResources = useMemo(
+    () => resources.filter((r) => r.type === 'CREW'),
+    [resources],
+  );
+  const gearResources = useMemo(
+    () => resources.filter((r) => r.type !== 'CREW'),
+    [resources],
+  );
+  const memberById = useMemo(() => {
+    const map = new Map<string, StudioMember>();
+    for (const m of members) map.set(m.id, m);
+    return map;
+  }, [members]);
+
   const handleAddResource = (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
-      const res = await createResource({ name: resName, type: resType });
+      if (poolAddMode === 'member') {
+        const chosen = members.find((m) => m.id === selectedMemberId);
+        if (!chosen) {
+          setFeedback({ type: 'err', text: 'Select a studio team member first.' });
+          return;
+        }
+        const titlePart = resName.trim();
+        const formatted = titlePart ? `${chosen.name} (${titlePart})` : chosen.name;
+        const res = await createResource({
+          name: formatted,
+          type: 'CREW',
+          userId: chosen.id,
+        });
+        if (!res.ok || !res.data) {
+          setFeedback({ type: 'err', text: res.message || 'Failed to add team member to shoot crew' });
+          return;
+        }
+        setResources([...resources, res.data]);
+        setSelectedMemberId('');
+        setResName('');
+        setFeedback({ type: 'ok', text: `Linked & added shoot crew: ${res.data.name}` });
+        return;
+      }
+
+      const targetType: ResourceType = poolAddMode === 'freelance' ? 'CREW' : resType;
+      const res = await createResource({ name: resName, type: targetType });
       if (!res.ok || !res.data) {
         setFeedback({ type: 'err', text: res.message || 'Failed to add crew or equipment' });
         return;
       }
       setResources([...resources, res.data]);
       setResName('');
-      setFeedback({ type: 'ok', text: `Added ${res.data.type}: ${res.data.name}` });
+      setFeedback({
+        type: 'ok',
+        text: `Added ${poolAddMode === 'freelance' ? 'Freelance Crew' : res.data.type}: ${res.data.name}`,
+      });
+    });
+  };
+
+  const handleLinkResourceAccount = (resourceId: string, userId: string | null) => {
+    startTransition(async () => {
+      const res = await updateResource(resourceId, { userId });
+      if (!res.ok || !res.data) {
+        setFeedback({ type: 'err', text: res.message || 'Failed to update account link' });
+        return;
+      }
+      setResources((prev) => prev.map((r) => (r.id === res.data!.id ? res.data! : r)));
+      setFeedback({
+        type: 'ok',
+        text: userId
+          ? `Linked "${res.data.name}" to studio account.`
+          : `Unlinked "${res.data.name}" (marked as freelance).`,
+      });
+    });
+  };
+
+  const handleArchivePoolResource = (resource: Resource) => {
+    startTransition(async () => {
+      const res = await archiveResource(resource.id);
+      if (!res.ok) {
+        setFeedback({ type: 'err', text: res.message || 'Failed to remove item from pool' });
+        return;
+      }
+      setResources((prev) => prev.filter((r) => r.id !== resource.id));
+      setFeedback({ type: 'ok', text: `Removed "${resource.name}" from active pool.` });
     });
   };
 
@@ -1009,62 +1087,126 @@ export function CalendarWorkspace({
             </div>
 
             {resources.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-slate-600">
-                    Assign Crew &amp; Equipment
+                    Assign Shoot Crew &amp; Equipment
                   </p>
                   {checkingAvail && (
                     <span className="text-xs text-indigo-600">Checking live availability...</span>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2 max-h-44 overflow-y-auto p-1">
-                  {resources.map((r) => {
-                    const active = selectedResourceIds.includes(r.id);
-                    const avail = availabilityMap[r.id];
-                    const isBusy = avail && !avail.available;
-                    return (
-                      <button
-                        key={r.id}
-                        type="button"
-                        disabled={Boolean(isBusy)}
-                        onClick={() => toggleResource(r.id)}
-                        title={
-                          isBusy && avail.conflict
-                            ? `Busy: ${avail.conflict.bookingReference ?? ''} ${avail.conflict.title}`
-                            : 'Available for this slot'
-                        }
-                        className={cn(
-                          'rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors text-left',
-                          isBusy
-                            ? 'bg-rose-50 text-rose-700 border-rose-200 opacity-75 cursor-not-allowed'
-                            : active
-                              ? 'bg-indigo-600 text-white border-indigo-600'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-indigo-300',
-                        )}
-                      >
-                        <span>{r.name}</span>
-                        <span className="ml-1.5 opacity-75">({r.type})</span>
-                        {avail && (
-                          <span
+
+                {crewResources.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                      Shoot Crew ({crewResources.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-0.5">
+                      {crewResources.map((r) => {
+                        const active = selectedResourceIds.includes(r.id);
+                        const avail = availabilityMap[r.id];
+                        const isBusy = avail && !avail.available;
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            disabled={Boolean(isBusy)}
+                            onClick={() => toggleResource(r.id)}
+                            title={
+                              isBusy && avail.conflict
+                                ? `Busy: ${avail.conflict.bookingReference ?? ''} ${avail.conflict.title}`
+                                : r.userId
+                                  ? 'Linked studio crew (appears on their My Shoots portal)'
+                                  : 'Freelance / external crew'
+                            }
                             className={cn(
-                              'ml-1.5 font-semibold',
+                              'rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors text-left cursor-pointer',
                               isBusy
-                                ? 'text-rose-700'
+                                ? 'bg-rose-50 text-rose-700 border-rose-200 opacity-75 cursor-not-allowed'
                                 : active
-                                  ? 'text-indigo-100'
-                                  : 'text-emerald-700',
+                                  ? 'bg-indigo-600 text-white border-indigo-600'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-indigo-300',
                             )}
                           >
-                            {isBusy
-                              ? `• Busy (${avail.conflict?.bookingReference || 'Booked'})`
-                              : '• Free'}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                            <span>{r.name}</span>
+                            {avail && (
+                              <span
+                                className={cn(
+                                  'ml-1.5 font-semibold',
+                                  isBusy
+                                    ? 'text-rose-700'
+                                    : active
+                                      ? 'text-indigo-100'
+                                      : 'text-emerald-700',
+                                )}
+                              >
+                                {isBusy
+                                  ? `• Busy (${avail.conflict?.bookingReference || 'Booked'})`
+                                  : '• Free'}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {gearResources.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                      Equipment Kits &amp; Studio Rooms ({gearResources.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-0.5">
+                      {gearResources.map((r) => {
+                        const active = selectedResourceIds.includes(r.id);
+                        const avail = availabilityMap[r.id];
+                        const isBusy = avail && !avail.available;
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            disabled={Boolean(isBusy)}
+                            onClick={() => toggleResource(r.id)}
+                            title={
+                              isBusy && avail.conflict
+                                ? `Busy: ${avail.conflict.bookingReference ?? ''} ${avail.conflict.title}`
+                                : 'Available for this slot'
+                            }
+                            className={cn(
+                              'rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors text-left cursor-pointer',
+                              isBusy
+                                ? 'bg-rose-50 text-rose-700 border-rose-200 opacity-75 cursor-not-allowed'
+                                : active
+                                  ? 'bg-slate-900 text-white border-slate-900'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-400',
+                            )}
+                          >
+                            <span>{r.name}</span>
+                            <span className="ml-1 opacity-70 text-[11px]">({r.type})</span>
+                            {avail && (
+                              <span
+                                className={cn(
+                                  'ml-1.5 font-semibold',
+                                  isBusy
+                                    ? 'text-rose-700'
+                                    : active
+                                      ? 'text-emerald-300'
+                                      : 'text-emerald-700',
+                                )}
+                              >
+                                {isBusy
+                                  ? `• Busy (${avail.conflict?.bookingReference || 'Booked'})`
+                                  : '• Free'}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1089,68 +1231,234 @@ export function CalendarWorkspace({
         </div>
       )}
 
-      {/* Modal: Crew & Gear Pool */}
+      {/* Modal: Shoot Crew & Equipment Pool */}
       {activePanel === 'resources' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 space-y-5 my-8">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
-                <h2 className="text-base font-bold tracking-tight text-slate-900">
-                  Crew &amp; Equipment Pool ({resources.length})
+                <h2 className="admin-section-title">
+                  Shoot Crew &amp; Equipment Pool ({resources.length})
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Add photographers, cinematographers, editors, drones, or studio rooms.
+                <p className="admin-meta mt-0.5">
+                  Link Studio Team members as bookable crew (no duplicate typing), add freelancers, or register camera kits &amp; rooms.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setActivePanel('none')}
-                className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  href="/admin/team?tab=roster"
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-[#2563EB] hover:bg-slate-100"
+                >
+                  Open Team &amp; Crew Hub ↗
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setActivePanel('none')}
+                  className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleAddResource} className="flex flex-wrap gap-2">
-              <input
-                required
-                value={resName}
-                onChange={(e) => setResName(e.target.value)}
-                placeholder="Name (e.g. Tariq Hasan / Sony FX6 Kit B)"
-                className="flex-1 min-w-[200px] rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs outline-none focus:border-indigo-500 focus:bg-white"
-              />
-              <select
-                value={resType}
-                onChange={(e) => setResType(e.target.value as ResourceType)}
-                className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-medium"
-              >
-                <option value="CREW">Crew</option>
-                <option value="EQUIPMENT">Equipment</option>
-                <option value="ROOM">Room</option>
-                <option value="OTHER">Other</option>
-              </select>
-              <button
-                type="submit"
-                disabled={isPending}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-              >
-                <PlusIcon className="w-3.5 h-3.5" />
-                <span>Add</span>
-              </button>
-            </form>
-
-            {resources.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pt-1">
-                {resources.map((r) => (
-                  <span
-                    key={r.id}
-                    className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-medium text-slate-700"
+            <form
+              onSubmit={handleAddResource}
+              className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2.5"
+            >
+              <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5 w-fit">
+                {[
+                  { id: 'member' as const, label: 'From Team Member' },
+                  { id: 'freelance' as const, label: 'Freelance Crew' },
+                  { id: 'gear' as const, label: 'Gear / Studio Room' },
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => {
+                      setPoolAddMode(mode.id);
+                      setResName('');
+                    }}
+                    className={cn(
+                      'rounded-md px-2.5 py-1 text-xs font-medium cursor-pointer',
+                      poolAddMode === mode.id
+                        ? 'bg-slate-900 text-white'
+                        : 'text-slate-600 hover:text-slate-900',
+                    )}
                   >
-                    {r.name} <span className="text-slate-400">• {r.type}</span>
-                  </span>
+                    {mode.label}
+                  </button>
                 ))}
               </div>
-            )}
+
+              <div className="flex flex-wrap gap-2">
+                {poolAddMode === 'member' && (
+                  <>
+                    <select
+                      required
+                      value={selectedMemberId}
+                      onChange={(e) => setSelectedMemberId(e.target.value)}
+                      className="flex-1 min-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                    >
+                      <option value="">Select Studio Team member...</option>
+                      {members.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.role})
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      value={resName}
+                      onChange={(e) => setResName(e.target.value)}
+                      placeholder="Specialty (e.g. Lead Photographer)"
+                      className="flex-1 min-w-[170px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#2563EB]"
+                    />
+                  </>
+                )}
+
+                {poolAddMode === 'freelance' && (
+                  <input
+                    required
+                    value={resName}
+                    onChange={(e) => setResName(e.target.value)}
+                    placeholder="Freelancer name & role (e.g. Tariq Hasan (Sound))"
+                    className="flex-1 min-w-[240px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#2563EB]"
+                  />
+                )}
+
+                {poolAddMode === 'gear' && (
+                  <>
+                    <input
+                      required
+                      value={resName}
+                      onChange={(e) => setResName(e.target.value)}
+                      placeholder="Equipment or studio room name (e.g. Sony FX6 Kit B)"
+                      className="flex-1 min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-[#2563EB]"
+                    />
+                    <select
+                      value={resType === 'CREW' ? 'EQUIPMENT' : resType}
+                      onChange={(e) => setResType(e.target.value as ResourceType)}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium"
+                    >
+                      <option value="EQUIPMENT">Equipment</option>
+                      <option value="ROOM">Studio / Room</option>
+                      <option value="OTHER">Other Asset</option>
+                    </select>
+                  </>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  <span>Add</span>
+                </button>
+              </div>
+            </form>
+
+            <div className="grid gap-4 sm:grid-cols-2 max-h-72 overflow-y-auto pr-1">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-700">
+                  Shoot Crew ({crewResources.length})
+                </p>
+                {crewResources.length === 0 ? (
+                  <p className="admin-meta">No shoot crew added yet.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {crewResources.map((r) => {
+                      const linkedUser =
+                        r.user || (r.userId ? memberById.get(r.userId) : undefined) || null;
+                      return (
+                        <div
+                          key={r.id}
+                          className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-slate-900 truncate">
+                                {r.name}
+                              </p>
+                              <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                                <span
+                                  className={cn(
+                                    'h-1.5 w-1.5 rounded-full shrink-0',
+                                    linkedUser ? 'bg-emerald-500' : 'bg-amber-500',
+                                  )}
+                                />
+                                <span className="truncate">
+                                  {linkedUser
+                                    ? `Account: ${linkedUser.name}`
+                                    : 'Freelance / Unlinked'}
+                                </span>
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isPending}
+                              onClick={() => handleArchivePoolResource(r)}
+                              className="text-[11px] font-medium text-rose-600 hover:underline shrink-0 cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          {!linkedUser && members.length > 0 && (
+                            <select
+                              defaultValue=""
+                              disabled={isPending}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  handleLinkResourceAccount(r.id, e.target.value);
+                                }
+                              }}
+                              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700 cursor-pointer"
+                            >
+                              <option value="">Link to Studio Account...</option>
+                              {members.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  Link {m.name} ({m.role})
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-700">
+                  Equipment &amp; Studio Rooms ({gearResources.length})
+                </p>
+                {gearResources.length === 0 ? (
+                  <p className="admin-meta">No camera kits or rooms added yet.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {gearResources.map((r) => (
+                      <div
+                        key={r.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-900 truncate">{r.name}</p>
+                          <p className="text-[11px] text-slate-500">{r.type}</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleArchivePoolResource(r)}
+                          className="text-[11px] font-medium text-rose-600 hover:underline shrink-0 cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1460,54 +1768,130 @@ export function CalendarWorkspace({
 
         {/* VIEW 3: By Crew & Gear Workload */}
         {viewMode === 'resources' && (
-          <div className="grid gap-4 md:grid-cols-2">
-            {resources.map((resource) => {
-              const assignedSessions = filteredSessions.filter((s) =>
-                s.reservations?.some((r) => r.resourceId === resource.id),
-              );
-              return (
-                <div
-                  key={resource.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3"
-                >
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                    <div>
-                      <p className="font-bold text-sm text-slate-900">{resource.name}</p>
-                      <p className="text-xs text-slate-500">{resource.type}</p>
-                    </div>
-                    <span className="rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-                      {assignedSessions.length} slot{assignedSessions.length === 1 ? '' : 's'}
-                    </span>
-                  </div>
-
-                  {assignedSessions.length === 0 ? (
-                    <p className="text-xs text-slate-500">
-                      Completely free in this filtered date range.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {assignedSessions.map((sess) => (
-                        <div
-                          key={sess.id}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 flex items-center justify-between gap-2"
-                        >
+          <div className="space-y-6">
+            {crewResources.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="admin-section-title">Shoot Crew Workload ({crewResources.length})</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {crewResources.map((resource) => {
+                    const assignedSessions = filteredSessions.filter((s) =>
+                      s.reservations?.some((r) => r.resourceId === resource.id),
+                    );
+                    const linkedUser =
+                      resource.user ||
+                      (resource.userId ? memberById.get(resource.userId) : undefined) ||
+                      null;
+                    return (
+                      <div
+                        key={resource.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3"
+                      >
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                           <div className="min-w-0">
-                            <p className="text-xs font-semibold text-slate-900 truncate">
-                              {sess.title}
-                            </p>
-                            <p className="text-[11px] text-slate-500">
-                              {formatDateTimeInTz(sess.startAt, timezone)} →{' '}
-                              {formatTimeShortInTz(sess.endAt, timezone)}
+                            <p className="admin-row-title truncate">{resource.name}</p>
+                            <p className="admin-meta flex items-center gap-1.5">
+                              <span
+                                className={cn(
+                                  'h-1.5 w-1.5 rounded-full shrink-0',
+                                  linkedUser ? 'bg-emerald-500' : 'bg-amber-500',
+                                )}
+                              />
+                              <span>
+                                {linkedUser
+                                  ? `Linked: ${linkedUser.name} (${linkedUser.role})`
+                                  : 'Freelance Crew'}
+                              </span>
                             </p>
                           </div>
-                          <StatusBadge status={sess.status} />
+                          <span className="rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700 tabular-nums shrink-0">
+                            {assignedSessions.length} slot{assignedSessions.length === 1 ? '' : 's'}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
+
+                        {assignedSessions.length === 0 ? (
+                          <p className="admin-meta">Completely free in this filtered date range.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {assignedSessions.map((sess) => (
+                              <div
+                                key={sess.id}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 flex items-center justify-between gap-2"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-slate-900 truncate">
+                                    {sess.title}
+                                  </p>
+                                  <p className="text-[11px] text-slate-500 tabular-nums">
+                                    {formatDateTimeInTz(sess.startAt, timezone)} →{' '}
+                                    {formatTimeShortInTz(sess.endAt, timezone)}
+                                  </p>
+                                </div>
+                                <StatusBadge status={sess.status} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            )}
+
+            {gearResources.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="admin-section-title">
+                  Equipment Kits &amp; Studio Rooms ({gearResources.length})
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {gearResources.map((resource) => {
+                    const assignedSessions = filteredSessions.filter((s) =>
+                      s.reservations?.some((r) => r.resourceId === resource.id),
+                    );
+                    return (
+                      <div
+                        key={resource.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3"
+                      >
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                          <div>
+                            <p className="admin-row-title">{resource.name}</p>
+                            <p className="admin-meta">{resource.type}</p>
+                          </div>
+                          <span className="rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700 tabular-nums">
+                            {assignedSessions.length} slot{assignedSessions.length === 1 ? '' : 's'}
+                          </span>
+                        </div>
+
+                        {assignedSessions.length === 0 ? (
+                          <p className="admin-meta">Completely free in this filtered date range.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {assignedSessions.map((sess) => (
+                              <div
+                                key={sess.id}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 flex items-center justify-between gap-2"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-slate-900 truncate">
+                                    {sess.title}
+                                  </p>
+                                  <p className="text-[11px] text-slate-500 tabular-nums">
+                                    {formatDateTimeInTz(sess.startAt, timezone)} →{' '}
+                                    {formatTimeShortInTz(sess.endAt, timezone)}
+                                  </p>
+                                </div>
+                                <StatusBadge status={sess.status} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1583,40 +1967,85 @@ export function CalendarWorkspace({
               </div>
             </div>
 
-            <div>
-              <p className="text-xs font-semibold text-slate-600 mb-1.5">
-                Crew &amp; Gear Assignment
+            <div className="space-y-2.5">
+              <p className="text-xs font-semibold text-slate-600">
+                Shoot Crew &amp; Gear Assignment
               </p>
-              <div className="flex flex-wrap gap-1.5">
-                {resources.map((r) => {
-                  const active = reschedResourceIds.includes(r.id);
-                  const avail = reschedAvailMap[r.id];
-                  const isBusy = avail && !avail.available;
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      disabled={Boolean(isBusy)}
-                      onClick={() =>
-                        setReschedResourceIds((prev) =>
-                          prev.includes(r.id) ? prev.filter((x) => x !== r.id) : [...prev, r.id],
-                        )
-                      }
-                      className={cn(
-                        'rounded-lg border px-2.5 py-1 text-xs font-medium',
-                        isBusy
-                          ? 'bg-rose-50 text-rose-700 border-rose-200 cursor-not-allowed opacity-75'
-                          : active
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'bg-slate-50 text-slate-700 border-slate-200',
-                      )}
-                    >
-                      {r.name}
-                      {isBusy ? ' (Busy)' : ''}
-                    </button>
-                  );
-                })}
-              </div>
+              {crewResources.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                    Shoot Crew
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {crewResources.map((r) => {
+                      const active = reschedResourceIds.includes(r.id);
+                      const avail = reschedAvailMap[r.id];
+                      const isBusy = avail && !avail.available;
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          disabled={Boolean(isBusy)}
+                          onClick={() =>
+                            setReschedResourceIds((prev) =>
+                              prev.includes(r.id) ? prev.filter((x) => x !== r.id) : [...prev, r.id],
+                            )
+                          }
+                          className={cn(
+                            'rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer',
+                            isBusy
+                              ? 'bg-rose-50 text-rose-700 border-rose-200 cursor-not-allowed opacity-75'
+                              : active
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-slate-50 text-slate-700 border-slate-200',
+                          )}
+                        >
+                          {r.name}
+                          {isBusy ? ' (Busy)' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {gearResources.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                    Equipment &amp; Rooms
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {gearResources.map((r) => {
+                      const active = reschedResourceIds.includes(r.id);
+                      const avail = reschedAvailMap[r.id];
+                      const isBusy = avail && !avail.available;
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          disabled={Boolean(isBusy)}
+                          onClick={() =>
+                            setReschedResourceIds((prev) =>
+                              prev.includes(r.id) ? prev.filter((x) => x !== r.id) : [...prev, r.id],
+                            )
+                          }
+                          className={cn(
+                            'rounded-lg border px-2.5 py-1 text-xs font-medium cursor-pointer',
+                            isBusy
+                              ? 'bg-rose-50 text-rose-700 border-rose-200 cursor-not-allowed opacity-75'
+                              : active
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-slate-50 text-slate-700 border-slate-200',
+                          )}
+                        >
+                          {r.name}
+                          {isBusy ? ' (Busy)' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

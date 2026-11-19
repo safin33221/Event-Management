@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getMe } from '@/service/auth';
-import { getAgencySettings } from '@/service/agency/agency.service';
+import { getAgencySettings, listAgencyMembers } from '@/service/agency/agency.service';
 import { listBookings } from '@/service/bookings/bookings.service';
 import { getCalendar, listResources } from '@/service/schedule/schedule.service';
 import { CalendarWorkspace } from '@/components/module/admin/CalendarWorkspace';
@@ -42,10 +42,11 @@ async function AdminCalendarContent() {
   const todayIso = formatYmdInTz(new Date(), timezone);
   const { monthStart, monthEnd } = getMonthBounds(todayIso);
 
-  const [calRes, resRes, bookingsRes] = await Promise.all([
+  const [calRes, resRes, bookingsRes, membersRes] = await Promise.all([
     getCalendar(monthStart, monthEnd),
     listResources(),
     listBookings(),
+    listAgencyMembers(),
   ]);
 
   return (
@@ -57,6 +58,7 @@ async function AdminCalendarContent() {
       initialSessions={calRes.ok && calRes.data ? calRes.data.sessions : []}
       initialResources={resRes.ok && resRes.data ? resRes.data : []}
       bookings={bookingsRes.ok && bookingsRes.data ? bookingsRes.data.data : []}
+      members={membersRes.ok && membersRes.data ? membersRes.data.filter((m) => m.isActive) : []}
     />
   );
 }

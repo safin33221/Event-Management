@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { serverFetch } from '@/lib/serverFetch';
 import {
   PublicBranding,
+  StudioMember,
   StudioSettings,
   UserRole,
 } from '@/types/event-management';
@@ -42,19 +43,9 @@ export async function updateAgencyBranding(payload: {
   return result;
 }
 
-export async function listAgencyMembers(): Promise<
-  ActionResult<
-    Array<{
-      id: string;
-      email: string;
-      name: string;
-      role: UserRole;
-      isActive: boolean;
-    }>
-  >
-> {
+export async function listAgencyMembers(): Promise<ActionResult<StudioMember[]>> {
   const res = await serverFetch.get('/studio/members');
-  return parseApiResponse(res);
+  return parseApiResponse<StudioMember[]>(res);
 }
 
 export async function addAgencyMember(payload: {
@@ -62,20 +53,43 @@ export async function addAgencyMember(payload: {
   name: string;
   password?: string;
   role: UserRole;
-}): Promise<ActionResult<{ id: string; email: string; name: string; role: UserRole; isActive: boolean }>> {
+  isBookableCrew?: boolean;
+  crewTitle?: string;
+}): Promise<ActionResult<StudioMember>> {
   const res = await serverFetch.post('/studio/members', {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  const result = await parseApiResponse<{
-    id: string;
-    email: string;
-    name: string;
-    role: UserRole;
-    isActive: boolean;
-  }>(res);
+  const result = await parseApiResponse<StudioMember>(res);
   if (result.ok) {
+    revalidatePath('/admin/team');
+    revalidatePath('/admin/calendar');
     revalidatePath('/admin/catalog');
+    revalidatePath('/staff');
+  }
+  return result;
+}
+
+export async function updateAgencyMember(
+  memberId: string,
+  payload: {
+    name?: string;
+    role?: UserRole;
+    isActive?: boolean;
+    isBookableCrew?: boolean;
+    crewTitle?: string;
+  },
+): Promise<ActionResult<StudioMember>> {
+  const res = await serverFetch.patch(`/studio/members/${encodeURIComponent(memberId)}`, {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<StudioMember>(res);
+  if (result.ok) {
+    revalidatePath('/admin/team');
+    revalidatePath('/admin/calendar');
+    revalidatePath('/admin/bookings');
+    revalidatePath('/staff');
   }
   return result;
 }
