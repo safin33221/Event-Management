@@ -119,6 +119,7 @@ export function BookingQuickDrawer({
         setFeedback({ type: 'ok', text: 'Payment receipt verified.' });
       }
       await loadDrawerData(booking.id);
+      window.dispatchEvent(new Event('rongilo-notifications-refresh'));
       onMutated?.();
     });
   };
@@ -138,6 +139,7 @@ export function BookingQuickDrawer({
       setRejectReason('');
       setFeedback({ type: 'ok', text: 'Payment marked rejected.' });
       await loadDrawerData(booking.id);
+      window.dispatchEvent(new Event('rongilo-notifications-refresh'));
       onMutated?.();
     });
   };
@@ -152,6 +154,7 @@ export function BookingQuickDrawer({
       }
       setFeedback({ type: 'ok', text: 'Booking confirmed & operations synced.' });
       await loadDrawerData(booking.id);
+      window.dispatchEvent(new Event('rongilo-notifications-refresh'));
       onMutated?.();
     });
   };
@@ -183,6 +186,7 @@ export function BookingQuickDrawer({
         text: 'Payment recorded (pending verification below).',
       });
       await loadDrawerData(booking.id);
+      window.dispatchEvent(new Event('rongilo-notifications-refresh'));
       onMutated?.();
     });
   };
@@ -197,6 +201,7 @@ export function BookingQuickDrawer({
       }
       setFeedback({ type: 'ok', text: `"${d.label}" marked as delivered.` });
       await loadDrawerData(booking.id);
+      window.dispatchEvent(new Event('rongilo-notifications-refresh'));
       onMutated?.();
     });
   };

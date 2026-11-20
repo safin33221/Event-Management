@@ -54,6 +54,7 @@ export function StaffWorkspace({
         setDispatchAssignments((prev) =>
           prev.map((a) => (a.id === id ? { ...a, status: res.data!.status } : a)),
         );
+        window.dispatchEvent(new Event('rongilo-notifications-refresh'));
       }
     });
   };
@@ -387,6 +388,17 @@ export function StaffWorkspace({
       ================================================================ */}
       {viewMode === 'my' && (
         <div className="space-y-6">
+          {assignments.some((a) => a.status === 'ASSIGNED') && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 flex items-center gap-2.5 text-xs text-slate-800">
+              <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+              <span className="tabular-nums">
+                <strong>Action needed:</strong> You have{' '}
+                {assignments.filter((a) => a.status === 'ASSIGNED').length} newly assigned task
+                {assignments.filter((a) => a.status === 'ASSIGNED').length === 1 ? '' : 's'} awaiting acceptance below.
+              </span>
+            </div>
+          )}
+
           {/* My Scheduled Shoots from Calendar Reservations */}
           <div className="atelier-card p-4 sm:p-5 space-y-4">
             <div className="border-b border-slate-100 pb-3">

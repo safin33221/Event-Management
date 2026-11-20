@@ -3,9 +3,10 @@
 import React, { useSyncExternalStore, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { AuthUserSession } from '@/types/event-management';
+import { AuthUserSession, NotificationsFeed } from '@/types/event-management';
 import { logout } from '@/service/auth';
 import { cn } from '@/lib/utils';
+import { NotificationBell } from './NotificationBell';
 import {
   CalendarIcon,
   CameraIcon,
@@ -22,6 +23,7 @@ import {
 
 interface DashboardShellProps {
   session: AuthUserSession;
+  initialNotifications?: NotificationsFeed;
   children: React.ReactNode;
 }
 
@@ -72,7 +74,11 @@ function ThemeModeIcon({ mode }: { mode: AdminThemeMode }) {
   );
 }
 
-export function DashboardShell({ session, children }: DashboardShellProps) {
+export function DashboardShell({
+  session,
+  initialNotifications,
+  children,
+}: DashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -269,6 +275,8 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            <NotificationBell initialFeed={initialNotifications} align="right" />
+
             <button
               type="button"
               onClick={toggleTheme}
@@ -319,6 +327,8 @@ export function DashboardShell({ session, children }: DashboardShellProps) {
               </span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
+              <NotificationBell initialFeed={initialNotifications} align="right" />
+
               <button
                 type="button"
                 onClick={toggleTheme}

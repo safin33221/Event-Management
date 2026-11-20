@@ -414,6 +414,37 @@ export interface StudioDispatchData {
   crewSummary: StudioDispatchMemberSummary[];
 }
 
+export type NotificationCategory =
+  | 'INQUIRY'
+  | 'PAYMENT'
+  | 'BOOKING'
+  | 'SCHEDULE'
+  | 'TASK'
+  | 'DELIVERABLE';
+
+export type NotificationSeverity = 'INFO' | 'ACTION' | 'URGENT' | 'SUCCESS';
+
+export interface StudioNotification {
+  id: string;
+  recipientUserId: string;
+  category: NotificationCategory;
+  severity: NotificationSeverity;
+  title: string;
+  body: string;
+  href: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationsFeed {
+  unreadCount: number;
+  urgentUnreadCount: number;
+  items: StudioNotification[];
+}
+
 export interface Assignment {
   id: string;
   bookingId: string;
