@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useMemo, useState, useTransition } from 'react';
-import Link from 'next/link';
+import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   BookingStatus,
   ExpenseCategory,
@@ -22,95 +22,80 @@ import {
   formatPoisha,
 } from '@/lib/utils';
 import {
+  ChevronDownIcon,
+  DownloadIcon,
   PlusIcon,
   ReceiptIcon,
   SearchIcon,
 } from '@/components/shared/Icons';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import {
+  BreakdownDonutChart,
+  formatCompactPoisha,
+  formatMonthShort,
+  GroupedBarChart,
+  HorizontalRankBars,
+} from './AdminCharts';
+import { BookingQuickDrawer } from './BookingQuickDrawer';
 
 interface FinancialReportWorkspaceProps {
   initialReport: FinancialReportData;
 }
 
-const METHOD_LABELS: Record<PaymentMethod, { label: string; badgeClass: string; barClass: string }> = {
-  BKASH: {
-    label: 'bKash',
-    badgeClass: 'bg-pink-50 text-pink-700 border-pink-200',
-    barClass: 'bg-pink-600',
-  },
-  NAGAD: {
-    label: 'Nagad',
-    badgeClass: 'bg-orange-50 text-orange-700 border-orange-200',
-    barClass: 'bg-orange-500',
-  },
-  BANK: {
-    label: 'Bank Transfer',
-    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    barClass: 'bg-indigo-600',
-  },
-  CASH: {
-    label: 'Cash',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    barClass: 'bg-emerald-600',
-  },
-  OTHER: {
-    label: 'Other',
-    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
-    barClass: 'bg-slate-600',
-  },
+type FinanceTab = 'overview' | 'breakdown' | 'receivables' | 'expenses' | 'ledger';
+type DatePreset = 'ALL' | 'THIS_MONTH' | 'LAST_30' | 'THIS_YEAR' | 'CUSTOM';
+
+const METHOD_META: Record<PaymentMethod, { label: string; color: string }> = {
+  BKASH: { label: 'bKash', color: '#E11D48' },
+  NAGAD: { label: 'Nagad', color: '#F97316' },
+  BANK: { label: 'Bank Transfer', color: '#2563EB' },
+  CASH: { label: 'Cash', color: '#10B981' },
+  OTHER: { label: 'Other', color: '#64748B' },
 };
 
 const EXPENSE_CATEGORY_META: Record<
   ExpenseCategory,
-  { label: string; hint: string; badgeClass: string; barClass: string }
+  { label: string; hint: string; color: string; isEventDirectDefault?: boolean }
 > = {
   CREW_PAYOUT: {
     label: 'Crew & Freelancer Payout',
     hint: 'Photographers, cinematographers, editors, assistants',
-    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    barClass: 'bg-indigo-600',
+    color: '#2563EB',
   },
   ALBUM_PRINTING: {
     label: 'Album & Lab Printing',
     hint: 'Story albums, photo frames, pen-drive boxes',
-    badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
-    barClass: 'bg-purple-600',
+    color: '#6D28D9',
   },
   EQUIPMENT_RENTAL: {
     label: 'Camera & Gear Rental',
     hint: 'Lenses, drone, crane, gimbal, lighting kits',
-    badgeClass: 'bg-sky-50 text-sky-700 border-sky-200',
-    barClass: 'bg-sky-600',
+    color: '#0284C7',
   },
   TRANSPORT_FOOD: {
     label: 'Transport & Crew Food',
     hint: 'Venue travel, fuel, microbus, crew meals',
-    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
-    barClass: 'bg-amber-500',
+    color: '#D97706',
   },
   VENUE_DECOR: {
     label: 'Stage, Venue & Vendor',
     hint: 'Sub-contracted stage, floral, sound, or lighting',
-    badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
-    barClass: 'bg-rose-600',
+    color: '#E11D48',
   },
   STUDIO_OVERHEAD: {
     label: 'Studio Rent & Utilities',
     hint: 'Office rent, electricity, internet, cloud storage',
-    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
-    barClass: 'bg-slate-700',
+    color: '#475569',
   },
   MARKETING: {
     label: 'Marketing & Ads',
     hint: 'Facebook/Instagram boosting, bridal fair, promos',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    barClass: 'bg-emerald-600',
+    color: '#10B981',
   },
   OTHER: {
     label: 'Other Expense',
     hint: 'Miscellaneous studio or event expense',
-    badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
-    barClass: 'bg-slate-500',
+    color: '#64748B',
   },
 };
 
@@ -123,10 +108,12 @@ function escapeCsvCell(value: string | number | null | undefined): string {
 }
 
 export function FinancialReportWorkspace({ initialReport }: FinancialReportWorkspaceProps) {
+  const router = useRouter();
   const [report, setReport] = useState<FinancialReportData>(initialReport);
-  const [activeTab, setActiveTab] = useState<
-    'overview' | 'receivables' | 'expenses' | 'ledger'
-  >('overview');
+  const [activeTab, setActiveTab] = useState<FinanceTab>('overview');
+  const [activePreset, setActivePreset] = useState<DatePreset>(
+    initialReport.filters.from || initialReport.filters.to ? 'CUSTOM' : 'ALL',
+  );
 
   // Server filter state
   const [fromDate, setFromDate] = useState(initialReport.filters.from || '');
@@ -136,14 +123,13 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
     initialReport.filters.bookingStatus || 'ALL',
   );
 
-  // Client sub-filters inside Receivables, Expenses & Ledger tabs
+  // Tab-local search & sub-filters
   const [searchQuery, setSearchQuery] = useState('');
   const [receivableSubFilter, setReceivableSubFilter] = useState<
     'ALL' | 'DUE' | 'PAID' | 'PENDING'
   >('ALL');
-  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState<'ALL' | ExpenseCategory>(
-    'ALL',
-  );
+  const [expenseScopeFilter, setExpenseScopeFilter] = useState<'ALL' | 'BOOKING' | 'OVERHEAD'>('ALL');
+  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState<'ALL' | ExpenseCategory>('ALL');
   const [ledgerSubFilter, setLedgerSubFilter] = useState<
     'ALL' | 'PENDING' | 'VERIFIED' | 'REFUND' | 'REJECTED'
   >('ALL');
@@ -160,10 +146,29 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
   const [expBookingId, setExpBookingId] = useState('');
   const [expNotes, setExpNotes] = useState('');
 
+  // Export menu + Quick Drawer + Inline actions
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement | null>(null);
+  const [drawerState, setDrawerState] = useState<{
+    bookingId: string;
+    focus: 'overview' | 'payments' | 'confirm' | 'schedule' | 'deliverables';
+  } | null>(null);
+  const [confirmDeleteExpenseId, setConfirmDeleteExpenseId] = useState<string | null>(null);
   const [rejectingEntryId, setRejectingEntryId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [exportOpen]);
 
   const notify = (type: 'ok' | 'err', text: string) => setFeedback({ type, text });
 
@@ -195,7 +200,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
     });
   };
 
-  const applyDatePreset = (preset: 'ALL' | 'THIS_MONTH' | 'LAST_30' | 'THIS_YEAR') => {
+  const applyDatePreset = (preset: Exclude<DatePreset, 'CUSTOM'>) => {
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -209,19 +214,28 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
       nextTo = todayStr;
     } else if (preset === 'LAST_30') {
       const past = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const py = past.getFullYear();
-      const pm = String(past.getMonth() + 1).padStart(2, '0');
-      const pd = String(past.getDate()).padStart(2, '0');
-      nextFrom = `${py}-${pm}-${pd}`;
+      nextFrom = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(
+        past.getDate(),
+      ).padStart(2, '0')}`;
       nextTo = todayStr;
     } else if (preset === 'THIS_YEAR') {
       nextFrom = `${yyyy}-01-01`;
       nextTo = `${yyyy}-12-31`;
     }
 
+    setActivePreset(preset);
     setFromDate(nextFrom);
     setToDate(nextTo);
     refreshReport({ from: nextFrom, to: nextTo });
+  };
+
+  const handleResetFilters = () => {
+    setActivePreset('ALL');
+    setFromDate('');
+    setToDate('');
+    setMethodFilter('ALL');
+    setBookingStatusFilter('ALL');
+    refreshReport({ from: '', to: '', method: 'ALL', bookingStatus: 'ALL' });
   };
 
   const handleRecordExpense = (e: React.FormEvent) => {
@@ -258,7 +272,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
       setShowExpenseModal(false);
       notify(
         'ok',
-        `Recorded expense "${res.data.title}" (${formatPoisha(res.data.amountPoisha, report.currency)}). Final net profit updated.`,
+        `Recorded expense "${res.data.title}" (${formatPoisha(res.data.amountPoisha, report.currency)}).`,
       );
       refreshReport();
     });
@@ -271,7 +285,8 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
         notify('err', res.message || 'Failed to delete expense.');
         return;
       }
-      notify('ok', 'Expense entry deleted and financial report recalculated.');
+      setConfirmDeleteExpenseId(null);
+      notify('ok', 'Expense entry deleted and profit recalculated.');
       refreshReport();
     });
   };
@@ -284,7 +299,9 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
         return;
       }
       notify('ok', 'Payment verified and added to collected revenue.');
+      window.dispatchEvent(new Event('rongilo-notifications-refresh'));
       refreshReport();
+      router.refresh();
     });
   };
 
@@ -299,8 +316,10 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
       }
       setRejectingEntryId(null);
       setRejectReason('');
-      notify('ok', 'Payment entry marked as REJECTED.');
+      notify('ok', 'Payment entry marked as rejected.');
+      window.dispatchEvent(new Event('rongilo-notifications-refresh'));
       refreshReport();
+      router.refresh();
     });
   };
 
@@ -350,6 +369,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
     a.download = `financial-receivables-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    setExportOpen(false);
   };
 
   const handleExportExpensesCsv = () => {
@@ -388,6 +408,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
     a.download = `financial-expenses-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    setExportOpen(false);
   };
 
   const q = searchQuery.trim().toLowerCase();
@@ -417,6 +438,8 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
 
   const filteredExpenses = useMemo(() => {
     return (report.expenses || []).filter((exp) => {
+      if (expenseScopeFilter === 'BOOKING' && !exp.bookingId) return false;
+      if (expenseScopeFilter === 'OVERHEAD' && exp.bookingId) return false;
       if (expenseCategoryFilter !== 'ALL' && exp.category !== expenseCategoryFilter) {
         return false;
       }
@@ -431,7 +454,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
       }
       return true;
     });
-  }, [report.expenses, expenseCategoryFilter, q]);
+  }, [report.expenses, expenseScopeFilter, expenseCategoryFilter, q]);
 
   const filteredTransactions = useMemo(() => {
     return report.transactions.filter((t) => {
@@ -466,15 +489,111 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
     summary.projectedNetProfitPoisha ??
     summary.effectiveContractedPoisha - totalExpensesPoisha;
 
+  const hasActiveServerFilter =
+    Boolean(fromDate) ||
+    Boolean(toDate) ||
+    methodFilter !== 'ALL' ||
+    bookingStatusFilter !== 'ALL';
+
+  const monthlyChartData = useMemo(() => {
+    return [...report.byMonth]
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-8)
+      .map((m) => {
+        const exp = m.expensesPoisha ?? 0;
+        const profit = m.netCashProfitPoisha ?? m.netCollectedPoisha - exp;
+        return {
+          label: formatMonthShort(m.month),
+          sublabel: m.month,
+          values: [m.netCollectedPoisha, exp, profit],
+        };
+      });
+  }, [report.byMonth]);
+
+  const cashflowSplitSegments = useMemo(() => {
+    return [
+      {
+        id: 'profit',
+        label: 'Net Cash Profit',
+        value: Math.max(0, netCashProfitPoisha),
+        displayValue: formatCompactPoisha(netCashProfitPoisha, currency),
+        hint: `${(summary.profitMarginPercent ?? 0).toFixed(1)}% margin`,
+        color: '#10B981',
+      },
+      {
+        id: 'expenses',
+        label: 'Studio & Event Expenses',
+        value: totalExpensesPoisha,
+        displayValue: formatCompactPoisha(totalExpensesPoisha, currency),
+        hint: `${summary.expensesCount} recorded entries`,
+        color: '#F43F5E',
+      },
+      {
+        id: 'dues',
+        label: 'Remaining Client Dues',
+        value: summary.totalOutstandingDuePoisha,
+        displayValue: formatCompactPoisha(summary.totalOutstandingDuePoisha, currency),
+        hint: `${summary.bookingsWithDueCount} bookings with balance`,
+        color: '#F59E0B',
+      },
+    ];
+  }, [
+    netCashProfitPoisha,
+    totalExpensesPoisha,
+    summary.profitMarginPercent,
+    summary.expensesCount,
+    summary.totalOutstandingDuePoisha,
+    summary.bookingsWithDueCount,
+    currency,
+  ]);
+
+  const eventCategoryBars = useMemo(() => {
+    const maxAgreed = Math.max(
+      1,
+      ...report.byEventType.map((e) => e.agreedTotalPoisha),
+    );
+    return report.byEventType.map((et, idx) => ({
+      id: et.eventTypeId,
+      label: et.eventTypeName,
+      value: et.agreedTotalPoisha,
+      displayValue: formatPoisha(et.agreedTotalPoisha, currency),
+      percent: (et.agreedTotalPoisha / maxAgreed) * 100,
+      subtext: `${et.bookingsCount} bookings • Collected ${formatPoisha(et.collectedPoisha, currency)} • Due ${formatPoisha(et.outstandingDuePoisha, currency)}`,
+      color: ['#2563EB', '#6D28D9', '#10B981', '#F59E0B', '#64748B'][idx % 5],
+    }));
+  }, [report.byEventType, currency]);
+
+  const expenseCategoryBars = useMemo(() => {
+    return (report.byExpenseCategory || []).map((cat) => {
+      const meta = EXPENSE_CATEGORY_META[cat.category];
+      return {
+        id: cat.category,
+        label: meta.label,
+        value: cat.amountPoisha,
+        displayValue: formatPoisha(cat.amountPoisha, currency),
+        percent: cat.sharePercent,
+        subtext: `${cat.count} ${cat.count === 1 ? 'item' : 'items'} • ${meta.hint}`,
+        color: meta.color,
+        onClick: () => {
+          setExpenseCategoryFilter(cat.category);
+          setActiveTab('expenses');
+        },
+      };
+    });
+  }, [report.byExpenseCategory, currency]);
+
   const inputClass =
-    'w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white transition-all';
+    'w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] px-3 py-2 text-[13px] text-[var(--admin-text)] placeholder:text-[var(--admin-muted)] outline-none focus:border-[var(--admin-accent)] transition-colors';
+
+  const compactInputClass =
+    'h-8 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] px-2.5 text-[12.5px] text-[var(--admin-text)] outline-none focus:border-[var(--admin-accent)] transition-colors';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {feedback && (
         <div
           className={cn(
-            'rounded-xl border px-4 py-3 text-xs sm:text-sm font-medium flex items-center justify-between gap-3',
+            'rounded-xl border px-4 py-3 text-[13px] font-medium flex items-center justify-between gap-3',
             feedback.type === 'ok'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
               : 'border-rose-200 bg-rose-50 text-rose-900',
@@ -484,337 +603,510 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
           <button
             type="button"
             onClick={() => setFeedback(null)}
-            className="text-xs underline shrink-0"
+            className="text-xs underline shrink-0 cursor-pointer"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Header & Action Toolbar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            Financial Report, Expenses &amp; Net Profit
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Complete studio P&amp;L: customer collections, vendor/crew expenses, receivables, and
-            clear final profit in {currency} ({timezone}).
+      {/* Header & Single-Line Toolbar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="admin-page-title">Finance &amp; Profit Ledger</h1>
+          <p className="admin-meta mt-1 tabular-nums">
+            Collections, expenses, client receivables, and net cash profit in {currency} ({timezone})
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0 print:hidden">
           <button
             type="button"
             onClick={() => {
               setExpBookingId('');
               setShowExpenseModal(true);
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--admin-accent)] px-3.5 py-2 text-[13px] font-semibold text-[#FCFDFD] hover:bg-[var(--admin-accent-hover)] transition-colors whitespace-nowrap cursor-pointer"
           >
             <PlusIcon className="w-3.5 h-3.5" />
             <span>Record Expense</span>
           </button>
-          <button
-            type="button"
-            onClick={handleExportReceivablesCsv}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            <span>⬇ Receivables CSV</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleExportExpensesCsv}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            <span>⬇ Expenses CSV</span>
-          </button>
+
+          <div ref={exportRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setExportOpen((o) => !o)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface)] px-3 py-2 text-[13px] font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-subtle)] transition-colors whitespace-nowrap cursor-pointer"
+            >
+              <DownloadIcon className="w-3.5 h-3.5 text-[var(--admin-muted)]" />
+              <span>Export CSV</span>
+              <ChevronDownIcon className="w-3.5 h-3.5 text-[var(--admin-muted)]" />
+            </button>
+
+            {exportOpen && (
+              <div className="absolute right-0 mt-1.5 w-48 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)] p-1 z-30 shadow-sm">
+                <button
+                  type="button"
+                  onClick={handleExportReceivablesCsv}
+                  className="w-full text-left rounded-lg px-3 py-2 text-[12.5px] font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-subtle)] transition-colors cursor-pointer"
+                >
+                  Receivables CSV ({report.receivables.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportExpensesCsv}
+                  className="w-full text-left rounded-lg px-3 py-2 text-[12.5px] font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-subtle)] transition-colors cursor-pointer"
+                >
+                  Expenses CSV ({report.expenses?.length ?? 0})
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface)] px-3 py-2 text-[13px] font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-subtle)] transition-colors whitespace-nowrap cursor-pointer"
           >
-            <ReceiptIcon className="w-3.5 h-3.5" />
-            <span>Print Report</span>
+            <ReceiptIcon className="w-3.5 h-3.5 text-[var(--admin-muted)]" />
+            <span>Print</span>
           </button>
         </div>
       </div>
 
-      {/* CLEAR FINAL FINANCIAL EQUATION BANNER (Revenue - Expenses = Net Profit) */}
-      <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 p-5 sm:p-6 text-white shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3 mb-4">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-300">
-              Final Studio Financial Bottom Line (Clear Summary)
+      {/* 4 Calm Soft-Surface Profit Equation KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="admin-card p-4 sm:p-5 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--admin-muted)]">
+              <span className="h-[7px] w-[7px] rounded-full bg-emerald-500 shrink-0" />
+              <span>Net Collected (+)</span>
             </span>
-            <p className="text-xs text-slate-300 mt-0.5">
-              Vendor &amp; crew expenses are tracked separately from customer booking dues so your
-              true net profit is always crystal clear.
-            </p>
+            <span className="font-mono-code text-[11px] font-medium text-[var(--admin-muted)] tabular-nums">
+              {summary.collectionRatePercent.toFixed(0)}% rate
+            </span>
           </div>
-          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-mono-code text-indigo-200">
-            Profit Margin: {(summary.profitMarginPercent ?? 0).toFixed(1)}%
-          </span>
+          <p className="font-mono-code text-[22px] font-semibold tracking-tight text-[var(--admin-text)] tabular-nums">
+            {formatPoisha(summary.netCollectedRevenuePoisha, currency)}
+          </p>
+          <p className="admin-meta tabular-nums truncate">
+            Verified receipts minus refunds
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-            <span className="text-xs font-medium text-emerald-300">
-              1. Net Collected Revenue (+)
+        <div className="admin-card p-4 sm:p-5 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--admin-muted)]">
+              <span className="h-[7px] w-[7px] rounded-full bg-rose-400 shrink-0" />
+              <span>Studio Expenses (−)</span>
             </span>
-            <p className="font-mono-code text-xl sm:text-2xl font-bold text-white mt-1 tabular-nums">
-              {formatPoisha(summary.netCollectedRevenuePoisha, currency)}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Verified receipts minus completed refunds
-            </p>
+            <span className="font-mono-code text-[11px] font-medium text-[var(--admin-muted)] tabular-nums">
+              {summary.expensesCount} entries
+            </span>
           </div>
+          <p className="font-mono-code text-[22px] font-semibold tracking-tight text-[var(--admin-text)] tabular-nums">
+            {formatPoisha(totalExpensesPoisha, currency)}
+          </p>
+          <p className="admin-meta tabular-nums truncate">
+            Event: {formatPoisha(summary.directBookingExpensesPoisha ?? 0, currency)} • Overhead:{' '}
+            {formatPoisha(summary.generalOverheadExpensesPoisha ?? 0, currency)}
+          </p>
+        </div>
 
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-            <span className="text-xs font-medium text-rose-300">
-              2. Total Studio &amp; Event Expenses (−)
+        <div className="admin-card p-4 sm:p-5 space-y-2 border-[var(--admin-accent)]/35">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--admin-text)]">
+              <span
+                className={cn(
+                  'h-[7px] w-[7px] rounded-full shrink-0',
+                  netCashProfitPoisha >= 0 ? 'bg-emerald-500' : 'bg-rose-400',
+                )}
+              />
+              <span>Net Cash Profit (=)</span>
             </span>
-            <p className="font-mono-code text-xl sm:text-2xl font-bold text-rose-300 mt-1 tabular-nums">
-              {formatPoisha(totalExpensesPoisha, currency)}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Event Cost: {formatPoisha(summary.directBookingExpensesPoisha ?? 0, currency)} •
-              Overhead: {formatPoisha(summary.generalOverheadExpensesPoisha ?? 0, currency)}
-            </p>
-          </div>
-
-          <div
-            className={cn(
-              'rounded-xl border p-4',
-              netCashProfitPoisha >= 0
-                ? 'bg-emerald-500/15 border-emerald-400/40'
-                : 'bg-rose-500/15 border-rose-400/40',
-            )}
-          >
-            <span className="text-xs font-bold uppercase tracking-wider text-white">
-              3. Final Net Cash Profit (=)
-            </span>
-            <p
+            <span
               className={cn(
-                'font-mono-code text-xl sm:text-2xl font-extrabold mt-1 tabular-nums',
-                netCashProfitPoisha >= 0 ? 'text-emerald-300' : 'text-rose-300',
+                'font-mono-code rounded-md px-2 py-0.5 text-[11px] font-medium tabular-nums',
+                netCashProfitPoisha >= 0
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-rose-50 text-rose-700',
               )}
             >
-              {formatPoisha(netCashProfitPoisha, currency)}
-            </p>
-            <p className="text-[11px] text-slate-300 mt-1">
-              Actual cash surplus in hand after all expenses
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-            <span className="text-xs font-medium text-indigo-300">
-              4. Projected Profit (After Dues)
+              {(summary.profitMarginPercent ?? 0).toFixed(1)}% margin
             </span>
-            <p className="font-mono-code text-xl sm:text-2xl font-bold text-indigo-200 mt-1 tabular-nums">
-              {formatPoisha(projectedNetProfitPoisha, currency)}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Includes {formatPoisha(summary.totalOutstandingDuePoisha, currency)} remaining client
-              dues
-            </p>
           </div>
+          <p
+            className={cn(
+              'font-mono-code text-[22px] font-semibold tracking-tight tabular-nums',
+              netCashProfitPoisha >= 0 ? 'text-emerald-700' : 'text-rose-700',
+            )}
+          >
+            {formatPoisha(netCashProfitPoisha, currency)}
+          </p>
+          <p className="admin-meta truncate">Actual cash surplus after expenses</p>
+        </div>
+
+        <div className="admin-card p-4 sm:p-5 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--admin-muted)]">
+              <span className="h-[7px] w-[7px] rounded-full bg-[#2563EB] shrink-0" />
+              <span>Projected Profit</span>
+            </span>
+            <span className="font-mono-code text-[11px] font-medium text-[var(--admin-muted)] tabular-nums">
+              {summary.bookingsWithDueCount} due
+            </span>
+          </div>
+          <p className="font-mono-code text-[22px] font-semibold tracking-tight text-[var(--admin-text)] tabular-nums">
+            {formatPoisha(projectedNetProfitPoisha, currency)}
+          </p>
+          <p className="admin-meta tabular-nums truncate">
+            Incl. {formatPoisha(summary.totalOutstandingDuePoisha, currency)} client due
+          </p>
         </div>
       </div>
 
-      {/* Date Range & Channel Filter Card */}
-      <div className="atelier-card p-4 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
-              From Date
-            </label>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-mono-code text-slate-900"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
-              To Date
-            </label>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-mono-code text-slate-900"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
-              Payment Method
-            </label>
-            <select
-              value={methodFilter}
-              onChange={(e) => {
-                setMethodFilter(e.target.value);
-                refreshReport({ method: e.target.value });
-              }}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800"
-            >
-              <option value="ALL">All Methods</option>
-              <option value="BKASH">bKash</option>
-              <option value="NAGAD">Nagad</option>
-              <option value="BANK">Bank Transfer</option>
-              <option value="CASH">Cash</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold uppercase text-slate-500 mb-1">
-              Booking Status
-            </label>
-            <select
-              value={bookingStatusFilter}
-              onChange={(e) => {
-                setBookingStatusFilter(e.target.value);
-                refreshReport({ bookingStatus: e.target.value });
-              }}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800"
-            >
-              <option value="ALL">All Bookings</option>
-              <option value="PENDING_CONFIRMATION">Pending Confirmation</option>
-              <option value="CONFIRMED">Confirmed</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
-          </div>
-
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => refreshReport()}
-            className="rounded-xl bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors cursor-pointer"
-          >
-            {isPending ? 'Updating...' : 'Apply Filter'}
-          </button>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
+      {/* Compact Unified Filter Strip */}
+      <div className="admin-card px-4 py-3 flex flex-col xl:flex-row xl:items-center justify-between gap-3 print:hidden">
+        <div className="inline-flex flex-wrap rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-1 gap-1 self-start">
           {[
             { id: 'ALL' as const, label: 'All Time' },
             { id: 'THIS_MONTH' as const, label: 'This Month' },
-            { id: 'LAST_30' as const, label: 'Last 30 Days' },
+            { id: 'LAST_30' as const, label: 'Last 30d' },
             { id: 'THIS_YEAR' as const, label: 'This Year' },
           ].map((preset) => (
             <button
               key={preset.id}
               type="button"
               onClick={() => applyDatePreset(preset.id)}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer"
+              className={cn(
+                'rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
+                activePreset === preset.id
+                  ? 'bg-[var(--admin-surface)] text-[var(--admin-text)] border border-[var(--admin-border)]'
+                  : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)]',
+              )}
             >
               {preset.label}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* 4 Focused Report Section Tabs */}
-      <div className="inline-flex flex-wrap rounded-xl border border-slate-200 bg-white p-1 gap-1 shadow-2xs">
-        {[
-          {
-            id: 'overview' as const,
-            label: '1. Profit, Channels & Expense Breakdown',
-          },
-          {
-            id: 'receivables' as const,
-            label: `2. Booking Receivables & Profit (${report.receivables.length})`,
-          },
-          {
-            id: 'expenses' as const,
-            label: `3. Expenses & Vendor Payouts (${report.expenses?.length ?? 0})`,
-          },
-          {
-            id: 'ledger' as const,
-            label: `4. Customer Receipt Ledger (${report.transactions.length})`,
-          },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              'rounded-lg px-4 py-2 text-xs font-semibold transition-all cursor-pointer',
-              activeTab === tab.id
-                ? 'bg-indigo-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
-            )}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11.5px] font-medium text-[var(--admin-muted)]">From</span>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setActivePreset('CUSTOM');
+              }}
+              className={`${compactInputClass} font-mono-code`}
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11.5px] font-medium text-[var(--admin-muted)]">To</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setActivePreset('CUSTOM');
+              }}
+              className={`${compactInputClass} font-mono-code`}
+            />
+          </div>
+
+          <select
+            value={methodFilter}
+            onChange={(e) => {
+              setMethodFilter(e.target.value);
+              refreshReport({ method: e.target.value });
+            }}
+            aria-label="Filter by payment method"
+            className={compactInputClass}
           >
-            {tab.label}
+            <option value="ALL">All Channels</option>
+            <option value="BKASH">bKash</option>
+            <option value="NAGAD">Nagad</option>
+            <option value="BANK">Bank Transfer</option>
+            <option value="CASH">Cash</option>
+          </select>
+
+          <select
+            value={bookingStatusFilter}
+            onChange={(e) => {
+              setBookingStatusFilter(e.target.value);
+              refreshReport({ bookingStatus: e.target.value });
+            }}
+            aria-label="Filter by booking status"
+            className={compactInputClass}
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="PENDING_CONFIRMATION">Pending Confirmation</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => refreshReport()}
+            className="h-8 rounded-lg bg-[var(--admin-accent)] px-3 text-xs font-semibold text-[#FCFDFD] hover:bg-[var(--admin-accent-hover)] transition-colors cursor-pointer whitespace-nowrap"
+          >
+            {isPending ? 'Loading...' : 'Apply'}
           </button>
-        ))}
+
+          {hasActiveServerFilter && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="h-8 px-2 text-xs font-medium text-[var(--admin-muted)] hover:text-[var(--admin-text)] underline cursor-pointer"
+            >
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* TAB 1: CHANNEL, EXPENSE CATEGORY & MONTHLY PROFIT BREAKDOWN */}
+      {/* 5 Clean Category Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex flex-wrap rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-1 gap-1">
+          {[
+            { id: 'overview' as const, label: 'Overview & Charts' },
+            { id: 'breakdown' as const, label: 'Channels & Costs' },
+            {
+              id: 'receivables' as const,
+              label: `Receivables (${report.receivables.length})`,
+            },
+            {
+              id: 'expenses' as const,
+              label: `Expenses (${report.expenses?.length ?? 0})`,
+            },
+            {
+              id: 'ledger' as const,
+              label: `Receipt Ledger (${report.transactions.length})`,
+              alertCount: summary.pendingReceiptsCount,
+            },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors cursor-pointer whitespace-nowrap tabular-nums',
+                activeTab === tab.id
+                  ? 'bg-[var(--admin-surface)] text-[var(--admin-text)] border border-[var(--admin-border)]'
+                  : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)]',
+              )}
+            >
+              {tab.alertCount !== undefined && tab.alertCount > 0 && (
+                <span className="h-[6px] w-[6px] rounded-full bg-amber-500 shrink-0" />
+              )}
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {summary.pendingReceiptsCount > 0 && activeTab !== 'ledger' && (
+          <button
+            type="button"
+            onClick={() => {
+              setLedgerSubFilter('PENDING');
+              setActiveTab('ledger');
+            }}
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--admin-accent)] hover:underline cursor-pointer tabular-nums"
+          >
+            <span className="h-[6px] w-[6px] rounded-full bg-amber-500 shrink-0" />
+            <span>{summary.pendingReceiptsCount} receipts awaiting verification →</span>
+          </button>
+        )}
+      </div>
+
+      {/* TAB 1: OVERVIEW CHARTS & MONTHLY P&L STATEMENT */}
       {activeTab === 'overview' && (
-        <div className="space-y-6">
-          {/* Payment Method Breakdown */}
-          <div className="atelier-card p-6 space-y-4">
-            <div className="border-b border-slate-100 pb-3">
-              <h2 className="text-base font-bold text-slate-900">
-                Customer Collections by Payment Channel (bKash, Nagad, Bank, Cash)
-              </h2>
-              <p className="text-xs text-slate-500">
-                Breakdown of verified customer receipts, pending unverified entries, and refunds.
+        <div className="space-y-5">
+          <div className="grid gap-5 lg:grid-cols-12">
+            <section className="lg:col-span-7 admin-card p-4 sm:p-5 space-y-4">
+              <div className="border-b border-[var(--admin-border)] pb-3">
+                <h2 className="admin-section-title">Monthly Cashflow &amp; Net Profit</h2>
+                <p className="admin-meta">
+                  Collected receipts vs. recorded expenses vs. cash profit ({timezone})
+                </p>
+              </div>
+              <GroupedBarChart
+                data={monthlyChartData}
+                series={[
+                  { key: 'collected', label: 'Collected', color: '#10B981' },
+                  { key: 'expenses', label: 'Expenses', color: '#F43F5E' },
+                  { key: 'profit', label: 'Net Profit', color: '#2563EB' },
+                ]}
+                formatValue={(v) => formatPoisha(v, currency)}
+                formatAxis={(v) => formatCompactPoisha(v, currency)}
+                emptyMessage="No monthly financial entries recorded for this period."
+              />
+            </section>
+
+            <section className="lg:col-span-5 admin-card p-4 sm:p-5 space-y-4">
+              <div className="border-b border-[var(--admin-border)] pb-3">
+                <h2 className="admin-section-title">Studio Cashflow Split</h2>
+                <p className="admin-meta">
+                  Distribution of net profit, expenses, and pending client balances
+                </p>
+              </div>
+              <BreakdownDonutChart
+                segments={cashflowSplitSegments}
+                centerLabel="Collected"
+                centerValue={formatCompactPoisha(summary.netCollectedRevenuePoisha, currency)}
+                emptyMessage="No verified collections or dues recorded yet."
+              />
+            </section>
+          </div>
+
+          <section className="admin-card p-4 sm:p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--admin-border)] pb-3">
+              <div>
+                <h2 className="admin-section-title">Monthly Statement</h2>
+                <p className="admin-meta">Grouped by agency local month ({timezone})</p>
+              </div>
+              <span className="admin-meta tabular-nums">{report.byMonth.length} months</span>
+            </div>
+
+            {report.byMonth.length === 0 ? (
+              <p className="admin-meta py-8 text-center">
+                No monthly financial records for this period.
               </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-[var(--admin-border)] text-[var(--admin-muted)] text-[11.5px] font-medium uppercase tracking-wide">
+                      <th className="py-2.5 pr-3">Month</th>
+                      <th className="py-2.5 px-2 text-right">Contracted</th>
+                      <th className="py-2.5 px-2 text-right">Net Collected</th>
+                      <th className="py-2.5 px-2 text-right">Expenses</th>
+                      <th className="py-2.5 pl-2 text-right">Net Profit</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--admin-border)]">
+                    {report.byMonth.map((m) => {
+                      const monthExpenses = m.expensesPoisha ?? 0;
+                      const monthProfit =
+                        m.netCashProfitPoisha ?? m.netCollectedPoisha - monthExpenses;
+                      return (
+                        <tr
+                          key={m.month}
+                          className="hover:bg-[var(--admin-surface-subtle)] transition-colors"
+                        >
+                          <td className="py-3 pr-3 font-mono-code font-medium text-[var(--admin-text)] tabular-nums">
+                            {m.month}{' '}
+                            <span className="text-[11.5px] font-normal text-[var(--admin-muted)]">
+                              ({m.bookingsCount} bkg)
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-right font-mono-code text-[var(--admin-muted)] tabular-nums">
+                            {formatPoisha(m.contractedPoisha, currency)}
+                          </td>
+                          <td className="py-3 px-2 text-right font-mono-code font-medium text-emerald-700 tabular-nums">
+                            {formatPoisha(m.netCollectedPoisha, currency)}
+                          </td>
+                          <td className="py-3 px-2 text-right font-mono-code text-rose-700 tabular-nums">
+                            {monthExpenses > 0
+                              ? `-${formatPoisha(monthExpenses, currency)}`
+                              : formatPoisha(0, currency)}
+                          </td>
+                          <td
+                            className={cn(
+                              'py-3 pl-2 text-right font-mono-code font-semibold tabular-nums',
+                              monthProfit >= 0 ? 'text-[var(--admin-text)]' : 'text-rose-700',
+                            )}
+                          >
+                            {formatPoisha(monthProfit, currency)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {/* TAB 2: PAYMENT CHANNELS, EVENT TYPES & EXPENSE CATEGORIES */}
+      {activeTab === 'breakdown' && (
+        <div className="space-y-5">
+          {/* Payment Channels */}
+          <section className="admin-card p-4 sm:p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--admin-border)] pb-3">
+              <div>
+                <h2 className="admin-section-title">Collections by Payment Channel</h2>
+                <p className="admin-meta">
+                  Verified collections, unverified pending amounts, and share by channel
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('ledger')}
+                className="text-xs font-medium text-[var(--admin-accent)] hover:underline cursor-pointer"
+              >
+                Open Receipt Ledger →
+              </button>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {report.byMethod
                 .filter((m) => m.method !== 'OTHER' || m.transactionCount > 0)
                 .map((m) => {
-                  const meta = METHOD_LABELS[m.method];
+                  const meta = METHOD_META[m.method];
                   return (
                     <div
                       key={m.method}
-                      className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3"
+                      className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-4 space-y-3"
                     >
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={cn(
-                            'rounded-lg border px-2.5 py-0.5 text-xs font-bold',
-                            meta.badgeClass,
-                          )}
-                        >
-                          {meta.label}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--admin-text)]">
+                          <span
+                            className="h-2 w-2 rounded-full shrink-0"
+                            style={{ backgroundColor: meta.color }}
+                          />
+                          <span>{meta.label}</span>
                         </span>
-                        <span className="font-mono-code text-xs font-semibold text-slate-500">
-                          {m.sharePercent.toFixed(1)}% share
+                        <span className="font-mono-code text-xs text-[var(--admin-muted)] tabular-nums">
+                          {m.sharePercent.toFixed(1)}%
                         </span>
                       </div>
 
                       <div>
-                        <p className="text-[11px] font-semibold uppercase text-slate-400">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--admin-muted)]">
                           Net Verified
                         </p>
-                        <p className="font-mono-code text-lg font-bold text-slate-900 tabular-nums mt-0.5">
+                        <p className="font-mono-code text-[18px] font-semibold text-[var(--admin-text)] tabular-nums mt-0.5">
                           {formatPoisha(m.netCollectedPoisha, currency)}
                         </p>
                       </div>
 
-                      <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                      <div className="h-1.5 w-full rounded-full bg-[var(--admin-border)] overflow-hidden">
                         <div
-                          className={cn('h-full', meta.barClass)}
-                          style={{ width: `${Math.min(100, m.sharePercent)}%` }}
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{
+                            width: `${m.sharePercent > 0 ? Math.max(4, Math.min(100, m.sharePercent)) : 0}%`,
+                            backgroundColor: meta.color,
+                          }}
                         />
                       </div>
 
-                      <div className="space-y-1 pt-1 border-t border-slate-200/70 text-xs text-slate-600">
+                      <div className="space-y-1 pt-1 border-t border-[var(--admin-border)] text-[12px] text-[var(--admin-muted)] tabular-nums">
                         <div className="flex justify-between">
-                          <span>Verified Receipts:</span>
-                          <span className="font-mono-code font-semibold">
+                          <span>Verified:</span>
+                          <span className="font-mono-code font-medium text-[var(--admin-text)]">
                             {formatPoisha(m.verifiedReceiptsPoisha, currency)}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Pending Approval:</span>
-                          <span className="font-mono-code font-semibold text-amber-700">
+                          <span>Pending verify:</span>
+                          <span className="font-mono-code font-medium text-amber-700">
                             {formatPoisha(m.pendingReceiptsPoisha, currency)}
                           </span>
                         </div>
@@ -823,233 +1115,69 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                   );
                 })}
             </div>
-          </div>
+          </section>
 
-          {/* Expense Breakdown by Category */}
-          <div className="atelier-card p-6 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">
-                  Where Expenses Are Happening (By Category)
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Track crew payouts, album printing, equipment rentals, transport, and studio
-                  overheads.
+          {/* Two-Column Breakdown: Event Categories & Expense Categories */}
+          <div className="grid gap-5 lg:grid-cols-12">
+            <section className="lg:col-span-6 admin-card p-4 sm:p-5 space-y-4">
+              <div className="border-b border-[var(--admin-border)] pb-3">
+                <h2 className="admin-section-title">Revenue by Event Category</h2>
+                <p className="admin-meta">
+                  Contracted value, collected totals, and remaining dues per event type
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setExpBookingId('');
-                  setShowExpenseModal(true);
-                }}
-                className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 cursor-pointer"
-              >
-                + Record New Expense
-              </button>
-            </div>
+              <HorizontalRankBars
+                items={eventCategoryBars}
+                emptyMessage="No active bookings found for category breakdown."
+              />
+            </section>
 
-            <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-              {(report.byExpenseCategory || []).map((cat) => {
-                const meta = EXPENSE_CATEGORY_META[cat.category];
-                return (
-                  <div
-                    key={cat.category}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2.5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={cn(
-                          'rounded-lg border px-2.5 py-0.5 text-[11px] font-bold',
-                          meta.badgeClass,
-                        )}
-                      >
-                        {meta.label}
-                      </span>
-                      <span className="font-mono-code text-xs text-slate-400">
-                        {cat.count} {cat.count === 1 ? 'item' : 'items'}
-                      </span>
-                    </div>
-
-                    <p className="font-mono-code text-lg font-bold text-slate-900 tabular-nums">
-                      {formatPoisha(cat.amountPoisha, currency)}
-                    </p>
-
-                    <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className={cn('h-full', meta.barClass)}
-                        style={{ width: `${Math.min(100, cat.sharePercent)}%` }}
-                      />
-                    </div>
-
-                    <p className="text-[11px] text-slate-500 leading-snug">{meta.hint}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Monthly Trend & Event Type Breakdown */}
-          <div className="grid gap-6 lg:grid-cols-12">
-            {/* Monthly Revenue vs Expenses vs Net Cash Profit Table */}
-            <div className="lg:col-span-7 atelier-card p-6 space-y-4">
-              <div className="border-b border-slate-100 pb-3">
-                <h2 className="text-base font-bold text-slate-900">
-                  Monthly Revenue vs. Expenses &amp; Final Net Profit
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Grouped by agency local month ({timezone}).
-                </p>
-              </div>
-
-              {report.byMonth.length === 0 ? (
-                <p className="text-xs text-slate-500 py-8 text-center">
-                  No monthly financial records for this period.
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500 uppercase text-[11px]">
-                        <th className="py-2.5 pr-3">Month</th>
-                        <th className="py-2.5 px-2 text-right">Contracted</th>
-                        <th className="py-2.5 px-2 text-right">Net Collected</th>
-                        <th className="py-2.5 px-2 text-right">Expenses</th>
-                        <th className="py-2.5 pl-2 text-right">Net Profit</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {report.byMonth.map((m) => {
-                        const monthExpenses = m.expensesPoisha ?? 0;
-                        const monthProfit =
-                          m.netCashProfitPoisha ?? m.netCollectedPoisha - monthExpenses;
-                        return (
-                          <tr key={m.month} className="hover:bg-slate-50">
-                            <td className="py-3 pr-3 font-mono-code font-bold text-slate-900">
-                              {m.month}{' '}
-                              <span className="text-[11px] font-normal text-slate-400">
-                                ({m.bookingsCount} bkg)
-                              </span>
-                            </td>
-                            <td className="py-3 px-2 text-right font-mono-code text-slate-700 tabular-nums">
-                              {formatPoisha(m.contractedPoisha, currency)}
-                            </td>
-                            <td className="py-3 px-2 text-right font-mono-code font-semibold text-emerald-700 tabular-nums">
-                              {formatPoisha(m.netCollectedPoisha, currency)}
-                            </td>
-                            <td className="py-3 px-2 text-right font-mono-code font-semibold text-rose-700 tabular-nums">
-                              {monthExpenses > 0
-                                ? `-${formatPoisha(monthExpenses, currency)}`
-                                : 'Tk 0'}
-                            </td>
-                            <td
-                              className={cn(
-                                'py-3 pl-2 text-right font-mono-code font-bold tabular-nums',
-                                monthProfit >= 0 ? 'text-slate-900' : 'text-rose-700',
-                              )}
-                            >
-                              {formatPoisha(monthProfit, currency)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+            <section className="lg:col-span-6 admin-card p-4 sm:p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--admin-border)] pb-3">
+                <div>
+                  <h2 className="admin-section-title">Expenses by Category</h2>
+                  <p className="admin-meta">Click any category row to filter its entries</p>
                 </div>
-              )}
-            </div>
-
-            {/* Event Category Revenue Breakdown */}
-            <div className="lg:col-span-5 atelier-card p-6 space-y-4">
-              <div className="border-b border-slate-100 pb-3">
-                <h2 className="text-base font-bold text-slate-900">
-                  Revenue by Event Category
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Contracted value, verified collection, and remaining dues per event type.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpBookingId('');
+                    setShowExpenseModal(true);
+                  }}
+                  className="text-xs font-medium text-[var(--admin-accent)] hover:underline cursor-pointer"
+                >
+                  + Log Expense
+                </button>
               </div>
-
-              {report.byEventType.length === 0 ? (
-                <p className="text-xs text-slate-500 py-8 text-center">
-                  No active bookings found for category breakdown.
-                </p>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {report.byEventType.map((et) => (
-                    <div key={et.eventTypeId} className="py-3.5 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm text-slate-900">
-                          {et.eventTypeName}
-                        </span>
-                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-                          {et.bookingsCount} {et.bookingsCount === 1 ? 'Booking' : 'Bookings'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs pt-1">
-                        <div>
-                          <span className="block text-[10px] uppercase text-slate-400">
-                            Contracted
-                          </span>
-                          <span className="font-mono-code font-semibold text-slate-900 tabular-nums">
-                            {formatPoisha(et.agreedTotalPoisha, currency)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="block text-[10px] uppercase text-emerald-700">
-                            Collected
-                          </span>
-                          <span className="font-mono-code font-bold text-emerald-700 tabular-nums">
-                            {formatPoisha(et.collectedPoisha, currency)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="block text-[10px] uppercase text-amber-700">
-                            Client Due
-                          </span>
-                          <span className="font-mono-code font-bold text-amber-800 tabular-nums">
-                            {formatPoisha(et.outstandingDuePoisha, currency)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+              <HorizontalRankBars
+                items={expenseCategoryBars}
+                emptyMessage="No expense categories recorded yet."
+              />
+            </section>
           </div>
         </div>
       )}
 
-      {/* TAB 2: ACCOUNTS RECEIVABLE & PER-BOOKING PROFITABILITY */}
+      {/* TAB 3: ACCOUNTS RECEIVABLE & PER-BOOKING PROFITABILITY */}
       {activeTab === 'receivables' && (
-        <div className="atelier-card p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div className="flex flex-wrap items-center gap-1.5">
+        <section className="admin-card p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--admin-border)] pb-4">
+            <div className="inline-flex flex-wrap rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-1 gap-1 self-start">
               {[
-                { id: 'ALL' as const, label: `All Bookings (${report.receivables.length})` },
-                {
-                  id: 'DUE' as const,
-                  label: `Has Balance Due (${summary.bookingsWithDueCount})`,
-                },
-                {
-                  id: 'PAID' as const,
-                  label: `Paid in Full (${summary.fullyPaidBookingsCount})`,
-                },
-                {
-                  id: 'PENDING' as const,
-                  label: 'Has Pending Receipt',
-                },
+                { id: 'ALL' as const, label: `All (${report.receivables.length})` },
+                { id: 'DUE' as const, label: `Has Due (${summary.bookingsWithDueCount})` },
+                { id: 'PAID' as const, label: `Paid Full (${summary.fullyPaidBookingsCount})` },
+                { id: 'PENDING' as const, label: 'Pending Verify' },
               ].map((st) => (
                 <button
                   key={st.id}
                   type="button"
                   onClick={() => setReceivableSubFilter(st.id)}
                   className={cn(
-                    'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                    'rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer tabular-nums',
                     receivableSubFilter === st.id
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                      ? 'bg-[var(--admin-surface)] text-[var(--admin-text)] border border-[var(--admin-border)]'
+                      : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)]',
                   )}
                 >
                   {st.label}
@@ -1058,103 +1186,112 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
             </div>
 
             <div className="relative w-full sm:w-64">
-              <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <SearchIcon className="w-3.5 h-3.5 text-[var(--admin-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search booking ref, client, or phone..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-1.5 text-xs text-slate-900 outline-none focus:border-indigo-500 focus:bg-white"
+                placeholder="Search ref, client, or phone..."
+                className="w-full h-8 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] pl-8 pr-3 text-xs text-[var(--admin-text)] outline-none focus:border-[var(--admin-accent)]"
               />
             </div>
           </div>
 
           {filteredReceivables.length === 0 ? (
-            <p className="text-xs text-slate-500 py-10 text-center">
+            <p className="admin-meta py-10 text-center">
               No bookings match this receivable filter.
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-slate-200 text-slate-500 uppercase text-[11px]">
+                  <tr className="border-b border-[var(--admin-border)] text-[var(--admin-muted)] uppercase text-[11px] font-medium">
                     <th className="py-2.5 pr-3">Booking</th>
                     <th className="py-2.5 px-2">Client &amp; Event</th>
-                    <th className="py-2.5 px-2 text-right">Agreed Charge</th>
+                    <th className="py-2.5 px-2 text-right">Agreed</th>
                     <th className="py-2.5 px-2 text-right">Verified Paid</th>
-                    <th className="py-2.5 px-2 text-right">Event Expenses</th>
-                    <th className="py-2.5 px-2 text-right">Event Profit</th>
+                    <th className="py-2.5 px-2 text-right">Expenses</th>
+                    <th className="py-2.5 px-2 text-right">Net Profit</th>
                     <th className="py-2.5 px-2 text-right">Client Due</th>
                     <th className="py-2.5 pl-2 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[var(--admin-border)]">
                   {filteredReceivables.map((r) => {
                     const directExp = r.directExpensesPoisha ?? 0;
                     const bkgProfit =
                       r.bookingNetProfitPoisha ?? r.verifiedReceiptsPoisha - directExp;
                     return (
-                      <tr key={r.bookingId} className="hover:bg-slate-50/80">
-                        <td className="py-3.5 pr-3 whitespace-nowrap">
+                      <tr
+                        key={r.bookingId}
+                        className="hover:bg-[var(--admin-surface-subtle)] transition-colors"
+                      >
+                        <td className="py-3 pr-3 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            <Link
-                              href={`/admin/bookings/${r.bookingId}`}
-                              className="font-mono-code font-bold text-indigo-600 hover:underline"
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDrawerState({ bookingId: r.bookingId, focus: 'overview' })
+                              }
+                              className="font-mono-code font-semibold text-[var(--admin-accent)] hover:underline cursor-pointer tabular-nums"
                             >
                               {r.reference}
-                            </Link>
+                            </button>
                             <StatusBadge status={r.status} />
                           </div>
                           {r.eventDate && (
-                            <span className="block text-[11px] font-mono-code text-slate-400 mt-0.5">
-                              Event: {formatLocalDate(r.eventDate)}
+                            <span className="block text-[11.5px] font-mono-code text-[var(--admin-muted)] mt-0.5 tabular-nums">
+                              {formatLocalDate(r.eventDate)}
                             </span>
                           )}
                         </td>
 
-                        <td className="py-3.5 px-2">
-                          <p className="font-semibold text-slate-900">{r.eventTitle}</p>
-                          <p className="text-slate-500">
+                        <td className="py-3 px-2 max-w-[240px]">
+                          <p className="admin-row-title line-clamp-1">{r.eventTitle}</p>
+                          <p className="admin-meta line-clamp-1 tabular-nums">
                             {r.clientName} ({r.clientPhone})
                           </p>
                         </td>
 
-                        <td className="py-3.5 px-2 text-right font-mono-code font-semibold text-slate-900 tabular-nums whitespace-nowrap">
+                        <td className="py-3 px-2 text-right font-mono-code text-[var(--admin-text)] tabular-nums whitespace-nowrap">
                           {formatPoisha(r.effectiveAgreedChargePoisha, currency)}
                         </td>
 
-                        <td className="py-3.5 px-2 text-right font-mono-code font-bold text-emerald-700 tabular-nums whitespace-nowrap">
+                        <td className="py-3 px-2 text-right font-mono-code font-medium text-emerald-700 tabular-nums whitespace-nowrap">
                           {formatPoisha(r.verifiedReceiptsPoisha, currency)}
                         </td>
 
-                        <td className="py-3.5 px-2 text-right font-mono-code text-rose-700 tabular-nums whitespace-nowrap">
-                          {directExp > 0 ? `-${formatPoisha(directExp, currency)}` : 'Tk 0'}
+                        <td className="py-3 px-2 text-right font-mono-code text-rose-700 tabular-nums whitespace-nowrap">
+                          {directExp > 0
+                            ? `-${formatPoisha(directExp, currency)}`
+                            : formatPoisha(0, currency)}
                         </td>
 
                         <td
                           className={cn(
-                            'py-3.5 px-2 text-right font-mono-code font-bold tabular-nums whitespace-nowrap',
-                            bkgProfit >= 0 ? 'text-slate-900' : 'text-rose-700',
+                            'py-3 px-2 text-right font-mono-code font-semibold tabular-nums whitespace-nowrap',
+                            bkgProfit >= 0 ? 'text-[var(--admin-text)]' : 'text-rose-700',
                           )}
                         >
                           {formatPoisha(bkgProfit, currency)}
                         </td>
 
-                        <td className="py-3.5 px-2 text-right font-mono-code font-bold tabular-nums whitespace-nowrap">
+                        <td className="py-3 px-2 text-right font-mono-code font-medium tabular-nums whitespace-nowrap">
                           {r.status === 'CANCELLED' ? (
-                            <span className="text-slate-400">Cancelled</span>
+                            <span className="text-[var(--admin-muted)]">Cancelled</span>
                           ) : r.outstandingDuePoisha <= 0 ? (
-                            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
-                              Paid ✓
+                            <span className="inline-flex items-center gap-1.5 text-[12px] text-emerald-700">
+                              <span className="h-[6px] w-[6px] rounded-full bg-emerald-500" />
+                              Paid
                             </span>
                           ) : (
-                            <span className="text-amber-800">
+                            <span className="text-amber-700">
                               {formatPoisha(r.outstandingDuePoisha, currency)}
                             </span>
                           )}
                         </td>
 
-                        <td className="py-3.5 pl-2 text-right whitespace-nowrap">
+                        <td className="py-3 pl-2 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-1.5">
                             <button
                               type="button"
@@ -1162,25 +1299,26 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                                 setExpBookingId(r.bookingId);
                                 setShowExpenseModal(true);
                               }}
-                              className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100 cursor-pointer"
-                              title="Log an expense for this booking"
+                              className="rounded-md border border-[var(--admin-border)] bg-[var(--admin-surface)] px-2 py-1 text-[11.5px] font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-subtle)] cursor-pointer"
                             >
-                              + Expense
+                              + Cost
                             </button>
-                            <Link
-                              href={`/admin/bookings/${r.bookingId}`}
-                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDrawerState({ bookingId: r.bookingId, focus: 'payments' })
+                              }
+                              className="rounded-md border border-[var(--admin-border)] bg-[var(--admin-surface)] px-2 py-1 text-[11.5px] font-medium text-[var(--admin-accent)] hover:bg-[var(--admin-surface-subtle)] cursor-pointer"
                             >
-                              Ledger →
-                            </Link>
+                              Inspect
+                            </button>
                             <a
                               href={`/api/bookings/${encodeURIComponent(r.bookingId)}/invoice.pdf`}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-800"
-                              title="Download PDF Invoice"
+                              className="rounded-md border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] px-2 py-1 text-[11.5px] font-medium text-[var(--admin-text)] hover:bg-[var(--admin-surface-hover)]"
                             >
-                              <span>PDF</span>
+                              PDF
                             </a>
                           </div>
                         </td>
@@ -1191,52 +1329,62 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
               </table>
             </div>
           )}
-        </div>
+        </section>
       )}
 
-      {/* TAB 3: STUDIO & EVENT EXPENSES LEDGER */}
+      {/* TAB 4: STUDIO & EVENT EXPENSES LEDGER */}
       {activeTab === 'expenses' && (
-        <div className="atelier-card p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setExpenseCategoryFilter('ALL')}
-                className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
-                  expenseCategoryFilter === 'ALL'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                )}
+        <section className="admin-card p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[var(--admin-border)] pb-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-1 gap-1">
+                {[
+                  { id: 'ALL' as const, label: `All (${report.expenses?.length ?? 0})` },
+                  { id: 'BOOKING' as const, label: 'Event Costs' },
+                  { id: 'OVERHEAD' as const, label: 'Overhead' },
+                ].map((sc) => (
+                  <button
+                    key={sc.id}
+                    type="button"
+                    onClick={() => setExpenseScopeFilter(sc.id)}
+                    className={cn(
+                      'rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer tabular-nums',
+                      expenseScopeFilter === sc.id
+                        ? 'bg-[var(--admin-surface)] text-[var(--admin-text)] border border-[var(--admin-border)]'
+                        : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)]',
+                    )}
+                  >
+                    {sc.label}
+                  </button>
+                ))}
+              </div>
+
+              <select
+                value={expenseCategoryFilter}
+                onChange={(e) =>
+                  setExpenseCategoryFilter(e.target.value as 'ALL' | ExpenseCategory)
+                }
+                aria-label="Filter expenses by category"
+                className={compactInputClass}
               >
-                All Expenses ({report.expenses?.length ?? 0})
-              </button>
-              {(Object.keys(EXPENSE_CATEGORY_META) as ExpenseCategory[]).map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setExpenseCategoryFilter(cat)}
-                  className={cn(
-                    'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
-                    expenseCategoryFilter === cat
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                  )}
-                >
-                  {EXPENSE_CATEGORY_META[cat].label}
-                </button>
-              ))}
+                <option value="ALL">All Categories</option>
+                {(Object.keys(EXPENSE_CATEGORY_META) as ExpenseCategory[]).map((cat) => (
+                  <option key={cat} value={cat}>
+                    {EXPENSE_CATEGORY_META[cat].label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="flex items-center gap-2">
               <div className="relative w-full sm:w-56">
-                <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <SearchIcon className="w-3.5 h-3.5 text-[var(--admin-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search expense, vendor..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-1.5 text-xs text-slate-900 outline-none focus:border-indigo-500 focus:bg-white"
+                  placeholder="Search title, vendor, ref..."
+                  className="w-full h-8 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] pl-8 pr-3 text-xs text-[var(--admin-text)] outline-none focus:border-[var(--admin-accent)]"
                 />
               </div>
               <button
@@ -1245,7 +1393,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                   setExpBookingId('');
                   setShowExpenseModal(true);
                 }}
-                className="shrink-0 rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 cursor-pointer"
+                className="shrink-0 h-8 rounded-lg bg-[var(--admin-accent)] px-3 text-xs font-semibold text-[#FCFDFD] hover:bg-[var(--admin-accent-hover)] cursor-pointer whitespace-nowrap"
               >
                 + Add Expense
               </button>
@@ -1254,107 +1402,124 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
 
           {filteredExpenses.length === 0 ? (
             <div className="py-12 text-center space-y-2">
-              <p className="text-sm font-semibold text-slate-800">No expenses recorded yet</p>
-              <p className="text-xs text-slate-500">
-                Click &ldquo;Record Expense&rdquo; to log crew payouts, album printing, gear
+              <p className="admin-row-title">No expenses match this view</p>
+              <p className="admin-meta">
+                Click &ldquo;+ Record Expense&rdquo; to log crew payouts, lab printing, gear
                 rentals, or studio overheads.
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[var(--admin-border)]">
               {filteredExpenses.map((exp) => {
                 const catMeta = EXPENSE_CATEGORY_META[exp.category] || EXPENSE_CATEGORY_META.OTHER;
-                const methodMeta = METHOD_LABELS[exp.method] || METHOD_LABELS.CASH;
+                const methodMeta = METHOD_META[exp.method] || METHOD_META.CASH;
+                const confirmingDelete = confirmDeleteExpenseId === exp.id;
                 return (
                   <div
                     key={exp.id}
-                    className="py-3.5 flex flex-wrap items-center justify-between gap-3 text-xs"
+                    className="py-3.5 flex flex-wrap items-center justify-between gap-3 text-[13px]"
                   >
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={cn(
-                            'rounded-md border px-2 py-0.5 text-[11px] font-bold',
-                            catMeta.badgeClass,
-                          )}
-                        >
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                        <span className="inline-flex items-center gap-1.5 font-medium text-[var(--admin-text)]">
+                          <span
+                            className="h-2 w-2 rounded-full shrink-0"
+                            style={{ backgroundColor: catMeta.color }}
+                          />
                           {catMeta.label}
                         </span>
-                        <span
-                          className={cn(
-                            'rounded-md border px-2 py-0.5 text-[11px] font-semibold',
-                            methodMeta.badgeClass,
-                          )}
-                        >
-                          {methodMeta.label}
-                        </span>
-                        <span className="font-mono-code text-slate-500">
+                        <span className="text-[var(--admin-muted)]">• {methodMeta.label}</span>
+                        <span className="font-mono-code text-[var(--admin-muted)] tabular-nums">
                           {formatLocalDate(exp.incurredOn)}
                         </span>
                         {exp.booking ? (
-                          <Link
-                            href={`/admin/bookings/${exp.booking.id}`}
-                            className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono-code font-semibold text-indigo-700 hover:underline"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDrawerState({ bookingId: exp.booking!.id, focus: 'overview' })
+                            }
+                            className="font-mono-code font-medium text-[var(--admin-accent)] hover:underline cursor-pointer"
                           >
                             {exp.booking.reference} • {exp.booking.eventTitle}
-                          </Link>
+                          </button>
                         ) : (
-                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
-                            General Studio Overhead
-                          </span>
+                          <span className="text-[var(--admin-muted)]">Studio Overhead</span>
                         )}
                       </div>
-                      <p className="text-sm font-bold text-slate-900">
+
+                      <p className="admin-row-title line-clamp-1">
                         {exp.title}
-                        {exp.vendorOrPayee ? (
-                          <span className="font-normal text-slate-500">
+                        {exp.vendorOrPayee && (
+                          <span className="font-normal text-[var(--admin-muted)]">
                             {' '}
-                            • Paid to: <strong className="text-slate-700">{exp.vendorOrPayee}</strong>
+                            • Paid to {exp.vendorOrPayee}
                           </span>
-                        ) : null}
+                        )}
                       </p>
+
                       {(exp.reference || exp.notes) && (
-                        <p className="text-slate-500">
-                          {exp.reference ? `Ref/TrxID: ${exp.reference}` : ''}
+                        <p className="admin-meta line-clamp-1">
+                          {exp.reference ? `Ref: ${exp.reference}` : ''}
                           {exp.reference && exp.notes ? ' • ' : ''}
                           {exp.notes || ''}
                         </p>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono-code text-sm font-bold text-rose-700 tabular-nums">
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="font-mono-code text-[14px] font-semibold text-rose-700 tabular-nums">
                         -{formatPoisha(exp.amountPoisha, exp.currency)}
                       </span>
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() => handleDeleteExpense(exp.id)}
-                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 cursor-pointer"
-                      >
-                        Delete
-                      </button>
+
+                      {confirmingDelete ? (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            onClick={() => handleDeleteExpense(exp.id)}
+                            className="rounded-md bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700 cursor-pointer"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteExpenseId(null)}
+                            className="rounded-md border border-[var(--admin-border)] px-2 py-1 text-xs text-[var(--admin-muted)] hover:text-[var(--admin-text)] cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => setConfirmDeleteExpenseId(exp.id)}
+                          className="rounded-md border border-[var(--admin-border)] px-2.5 py-1 text-xs font-medium text-[var(--admin-muted)] hover:text-rose-700 hover:bg-rose-50 cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
-        </div>
+        </section>
       )}
 
-      {/* TAB 4: CUSTOMER TRANSACTION LEDGER & VERIFICATION QUEUE */}
+      {/* TAB 5: CUSTOMER TRANSACTION LEDGER & VERIFICATION QUEUE */}
       {activeTab === 'ledger' && (
-        <div className="atelier-card p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div className="flex flex-wrap items-center gap-1.5">
+        <section className="admin-card p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--admin-border)] pb-4">
+            <div className="inline-flex flex-wrap rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-1 gap-1 self-start">
               {[
-                { id: 'ALL' as const, label: `All Entries (${report.transactions.length})` },
+                { id: 'ALL' as const, label: `All (${report.transactions.length})` },
                 {
                   id: 'PENDING' as const,
-                  label: `Pending Verification (${summary.pendingReceiptsCount})`,
+                  label: `Pending Verify (${summary.pendingReceiptsCount})`,
                 },
-                { id: 'VERIFIED' as const, label: 'Verified Receipts' },
+                { id: 'VERIFIED' as const, label: 'Verified' },
                 { id: 'REFUND' as const, label: 'Refunds' },
                 { id: 'REJECTED' as const, label: 'Rejected' },
               ].map((st) => (
@@ -1363,10 +1528,10 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                   type="button"
                   onClick={() => setLedgerSubFilter(st.id)}
                   className={cn(
-                    'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                    'rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer tabular-nums',
                     ledgerSubFilter === st.id
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                      ? 'bg-[var(--admin-surface)] text-[var(--admin-text)] border border-[var(--admin-border)]'
+                      : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)]',
                   )}
                 >
                   {st.label}
@@ -1375,69 +1540,75 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
             </div>
 
             <div className="relative w-full sm:w-64">
-              <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <SearchIcon className="w-3.5 h-3.5 text-[var(--admin-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search TrxID, booking ref, client..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 py-1.5 text-xs text-slate-900 outline-none focus:border-indigo-500 focus:bg-white"
+                placeholder="Search TrxID, ref, client..."
+                className="w-full h-8 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] pl-8 pr-3 text-xs text-[var(--admin-text)] outline-none focus:border-[var(--admin-accent)]"
               />
             </div>
           </div>
 
           {filteredTransactions.length === 0 ? (
-            <p className="text-xs text-slate-500 py-10 text-center">
+            <p className="admin-meta py-10 text-center">
               No payment ledger entries match this filter.
             </p>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[var(--admin-border)]">
               {filteredTransactions.map((t) => {
-                const methodMeta = METHOD_LABELS[t.method];
+                const methodMeta = METHOD_META[t.method];
                 return (
-                  <div key={t.id} className="py-3.5 space-y-2 text-xs">
+                  <div key={t.id} className="py-3.5 space-y-2 text-[13px]">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="space-y-0.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={cn(
-                              'rounded-md border px-2 py-0.5 text-[11px] font-bold',
-                              methodMeta.badgeClass,
-                            )}
-                          >
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                          <span className="inline-flex items-center gap-1.5 font-medium text-[var(--admin-text)]">
+                            <span
+                              className="h-2 w-2 rounded-full shrink-0"
+                              style={{ backgroundColor: methodMeta.color }}
+                            />
                             {methodMeta.label}
                           </span>
-                          <span className="font-semibold text-slate-900">{t.type}</span>
+                          <span className="text-[var(--admin-muted)] capitalize">
+                            {t.type.toLowerCase()}
+                          </span>
                           {t.transactionRef && (
-                            <span className="font-mono-code rounded bg-slate-100 px-2 py-0.5 text-slate-700">
+                            <span className="font-mono-code rounded border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] px-1.5 py-0.5 text-[11px] text-[var(--admin-text)] tabular-nums">
                               TrxID: {t.transactionRef}
                             </span>
                           )}
-                          <Link
-                            href={`/admin/bookings/${t.booking.id}`}
-                            className="font-mono-code font-semibold text-indigo-600 hover:underline"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDrawerState({ bookingId: t.booking.id, focus: 'payments' })
+                            }
+                            className="font-mono-code font-semibold text-[var(--admin-accent)] hover:underline cursor-pointer tabular-nums"
                           >
                             {t.booking.reference}
-                          </Link>
-                          <span className="text-slate-600">• {t.booking.clientName}</span>
+                          </button>
+                          <span className="text-[var(--admin-muted)]">
+                            • {t.booking.clientName}
+                          </span>
                         </div>
-                        <p className="text-slate-500">
-                          {t.booking.eventTitle} • Recorded{' '}
-                          {formatDateTimeInTz(t.createdAt, timezone)}
-                          {t.reason ? ` • Note: ${t.reason}` : ''}
+                        <p className="admin-meta line-clamp-1 tabular-nums">
+                          {t.booking.eventTitle} • {formatDateTimeInTz(t.createdAt, timezone)}
+                          {t.reason ? ` • ${t.reason}` : ''}
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-3 shrink-0">
                         <span
                           className={cn(
-                            'font-mono-code text-sm font-bold tabular-nums',
-                            t.type === 'REFUND' ? 'text-rose-700' : 'text-slate-900',
+                            'font-mono-code text-[14px] font-semibold tabular-nums',
+                            t.type === 'REFUND' ? 'text-rose-700' : 'text-[var(--admin-text)]',
                           )}
                         >
                           {t.type === 'REFUND' ? '-' : ''}
                           {formatPoisha(t.amountPoisha, t.currency)}
                         </span>
+
                         <StatusBadge status={t.verificationState} />
 
                         {t.verificationState === 'PENDING' &&
@@ -1447,9 +1618,9 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                                 type="button"
                                 disabled={isPending}
                                 onClick={() => handleVerifyEntry(t.id)}
-                                className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700 cursor-pointer"
+                                className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 cursor-pointer"
                               >
-                                Verify ✓
+                                Verify
                               </button>
                               <button
                                 type="button"
@@ -1457,7 +1628,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                                 onClick={() =>
                                   setRejectingEntryId(rejectingEntryId === t.id ? null : t.id)
                                 }
-                                className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 cursor-pointer"
+                                className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100 cursor-pointer"
                               >
                                 Reject
                               </button>
@@ -1469,19 +1640,19 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                     {rejectingEntryId === t.id && (
                       <form
                         onSubmit={(e) => handleRejectEntry(e, t.id)}
-                        className="rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 flex flex-wrap items-center gap-2"
+                        className="rounded-lg border border-rose-200 bg-rose-50/70 p-2.5 flex flex-wrap items-center gap-2"
                       >
                         <input
                           required
                           value={rejectReason}
                           onChange={(e) => setRejectReason(e.target.value)}
                           placeholder="Reason for rejecting this receipt (e.g. invalid TrxID)"
-                          className="flex-1 min-w-[200px] rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs"
+                          className="flex-1 min-w-[200px] h-8 rounded-md border border-rose-200 bg-[var(--admin-surface)] px-2.5 text-xs text-[var(--admin-text)] outline-none"
                         />
                         <button
                           type="submit"
                           disabled={isPending}
-                          className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+                          className="h-8 rounded-md bg-rose-600 px-3 text-xs font-semibold text-white hover:bg-rose-700 cursor-pointer"
                         >
                           Confirm Reject
                         </button>
@@ -1492,27 +1663,24 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
               })}
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {/* RECORD EXPENSE MODAL */}
       {showExpenseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1020]/55 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-xl rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-surface)] p-5 sm:p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--admin-border)] pb-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900">
-                  Record Studio or Event Expense
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Deducted from studio revenue to calculate final net profit (never alters customer
-                  booking due balance).
+                <h2 className="admin-section-title">Record Studio or Event Expense</h2>
+                <p className="admin-meta mt-0.5">
+                  Deducted from studio profit without altering customer booking dues.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowExpenseModal(false)}
-                className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100"
+                className="rounded-lg px-2 py-1 text-xs font-semibold text-[var(--admin-muted)] hover:bg-[var(--admin-surface-subtle)] cursor-pointer"
               >
                 ✕
               </button>
@@ -1521,7 +1689,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
             <form onSubmit={handleRecordExpense} className="space-y-3.5">
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-medium text-[var(--admin-muted)] mb-1">
                     Expense Category *
                   </label>
                   <select
@@ -1538,7 +1706,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-medium text-[var(--admin-muted)] mb-1">
                     Amount ({currency}) *
                   </label>
                   <input
@@ -1548,37 +1716,37 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                     value={expAmountTk}
                     onChange={(e) => setExpAmountTk(e.target.value)}
                     placeholder="e.g. 5000"
-                    className={`${inputClass} font-mono-code`}
+                    className={`${inputClass} font-mono-code tabular-nums`}
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-medium text-[var(--admin-muted)] mb-1">
                     Expense Title / Purpose *
                   </label>
                   <input
                     required
                     value={expTitle}
                     onChange={(e) => setExpTitle(e.target.value)}
-                    placeholder="e.g. Freelance Cinematographer Payout / 40-Page Album Print"
+                    placeholder="e.g. Freelance Cinematographer Payout / Album Print"
                     className={inputClass}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Vendor / Payee Name
+                  <label className="block text-[12px] font-medium text-[var(--admin-muted)] mb-1">
+                    Vendor / Payee
                   </label>
                   <input
                     value={expVendor}
                     onChange={(e) => setExpVendor(e.target.value)}
-                    placeholder="e.g. Tanvir Films / Dhaka Color Lab"
+                    placeholder="e.g. Tanvir Films / Color Lab"
                     className={inputClass}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-medium text-[var(--admin-muted)] mb-1">
                     Expense Date *
                   </label>
                   <input
@@ -1591,7 +1759,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-medium text-[var(--admin-muted)] mb-1">
                     Payment Method
                   </label>
                   <select
@@ -1607,19 +1775,19 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-medium text-[var(--admin-muted)] mb-1">
                     TrxID / Voucher Ref
                   </label>
                   <input
                     value={expRef}
                     onChange={(e) => setExpRef(e.target.value)}
-                    placeholder="Optional receipt or TrxID"
+                    placeholder="Optional reference"
                     className={inputClass}
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-medium text-[var(--admin-muted)] mb-1">
                     Link to Specific Event Booking (Optional)
                   </label>
                   <select
@@ -1627,7 +1795,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                     onChange={(e) => setExpBookingId(e.target.value)}
                     className={inputClass}
                   >
-                    <option value="">General Studio Overhead (Not tied to a single booking)</option>
+                    <option value="">General Studio Overhead (Not tied to a booking)</option>
                     {report.receivables.map((b) => (
                       <option key={b.bookingId} value={b.bookingId}>
                         {b.reference} — {b.eventTitle} ({b.clientName})
@@ -1637,7 +1805,7 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-medium text-[var(--admin-muted)] mb-1">
                     Notes (Optional)
                   </label>
                   <input
@@ -1653,14 +1821,14 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
                 <button
                   type="button"
                   onClick={() => setShowExpenseModal(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600"
+                  className="rounded-lg border border-[var(--admin-border)] px-4 py-2 text-xs font-medium text-[var(--admin-muted)] hover:text-[var(--admin-text)] cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="rounded-xl bg-rose-600 px-5 py-2 text-xs font-semibold text-white hover:bg-rose-700 cursor-pointer"
+                  className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-xs font-semibold text-[#FCFDFD] hover:bg-[var(--admin-accent-hover)] cursor-pointer"
                 >
                   {isPending ? 'Saving...' : 'Save Expense'}
                 </button>
@@ -1669,6 +1837,18 @@ export function FinancialReportWorkspace({ initialReport }: FinancialReportWorks
           </div>
         </div>
       )}
+
+      {/* Slide-over Quick Booking & Payment Drawer */}
+      <BookingQuickDrawer
+        bookingId={drawerState?.bookingId ?? null}
+        focusSection={drawerState?.focus ?? 'overview'}
+        timezone={timezone}
+        onClose={() => setDrawerState(null)}
+        onMutated={() => {
+          refreshReport();
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

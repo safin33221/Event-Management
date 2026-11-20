@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AutomationAlerts,
   Booking,
   EventSession,
+  FinancialReportData,
   Inquiry,
   Quote,
   StudioSettings,
@@ -15,12 +16,20 @@ import { cn, formatDateTimeInTz, formatLocalDate, formatPoisha } from '@/lib/uti
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import {
   ArrowRightIcon,
+  BarChartIcon,
   CalendarIcon,
   CheckCircleIcon,
   ReceiptIcon,
   SparklesIcon,
   UsersIcon,
 } from '@/components/shared/Icons';
+import {
+  BreakdownDonutChart,
+  formatCompactPoisha,
+  formatMonthShort,
+  GroupedBarChart,
+  HorizontalRankBars,
+} from './AdminCharts';
 import { BookingQuickDrawer } from './BookingQuickDrawer';
 
 interface AdminOverviewProps {
@@ -30,9 +39,47 @@ interface AdminOverviewProps {
   bookings: Booking[];
   upcomingSessions: EventSession[];
   alerts?: AutomationAlerts | null;
+  financialReport?: FinancialReportData | null;
+  windowStartDate?: string;
 }
 
 type AlertTab = 'payments' | 'confirm' | 'unscheduled' | 'deliverables';
+type TrendChartMode = 'cashflow' | 'activity' | 'shoots';
+type MixChartMode = 'status' | 'categories' | 'funnel';
+
+const CHART_PALETTE = ['#2563EB', '#6D28D9', '#10B981', '#F59E0B', '#64748B'];
+
+function toLocalMonthKey(dateInput: string, timezone: string): string | null {
+  const d = new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+    }).formatToParts(d);
+    const y = parts.find((p) => p.type === 'year')?.value;
+    const m = parts.find((p) => p.type === 'month')?.value;
+    return y && m ? `${y}-${m}` : null;
+  } catch {
+    return d.toISOString().slice(0, 7);
+  }
+}
+
+function toLocalDateKey(dateInput: string | Date, timezone: string): string {
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  if (Number.isNaN(d.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
 
 export function AdminOverview({
   settings,
@@ -41,10 +88,14 @@ export function AdminOverview({
   bookings,
   upcomingSessions,
   alerts,
+  financialReport,
+  windowStartDate,
 }: AdminOverviewProps) {
   const router = useRouter();
   const currency = settings?.currency || 'BDT';
   const timezone = settings?.timezone || 'Asia/Dhaka';
+  const [fallbackDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const anchorDate = windowStartDate || fallbackDate;
 
   const newInquiriesCount = inquiries.filter((i) => i.status === 'NEW').length;
   const openQuotesCount = quotes.filter(
@@ -57,6 +108,218 @@ export function AdminOverview({
   const totalAgreedPoisha = bookings
     .filter((b) => b.status !== 'CANCELLED')
     .reduce((acc, b) => acc + b.agreedTotalPoisha, 0);
+
+  const hasCashflowData = Boolean(
+    financialReport && financialReport.byMonth.length > 0,
+  );
+
+  const [trendMode, setTrendMode] = useState<TrendChartMode>(
+    hasCashflowData ? 'cashflow' : 'activity',
+  );
+  const [mixMode, setMixMode] = useState<MixChartMode>('status');
+
+  const cashflowChartData = useMemo(() => {
+    if (!financialReport) return [];
+    return [...financialReport.byMonth]
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-6)
+      .map((m) => {
+        const expenses = m.expensesPoisha ?? 0;
+        const profit = m.netCashProfitPoisha ?? m.netCollectedPoisha - expenses;
+        return {
+          label: formatMonthShort(m.month),
+          sublabel: m.month,
+          values: [m.netCollectedPoisha, expenses, profit],
+        };
+      });
+  }, [financialReport]);
+
+  const activityChartData = useMemo(() => {
+    const keys: string[] = [];
+    const anchor = new Date(`${anchorDate}T12:00:00.000Z`);
+    const base = Number.isNaN(anchor.getTime()) ? new Date(0) : anchor;
+    for (let offset = 5; offset >= 0; offset--) {
+      const ref = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() - offset, 15));
+      keys.push(ref.toISOString().slice(0, 7));
+    }
+    const map = new Map<string, { inquiries: number; bookings: number }>();
+    for (const k of keys) map.set(k, { inquiries: 0, bookings: 0 });
+
+    for (const inq of inquiries) {
+      const mk = toLocalMonthKey(inq.createdAt, timezone);
+      if (mk && map.has(mk)) {
+        map.get(mk)!.inquiries += 1;
+      }
+    }
+    for (const b of bookings) {
+      if (b.status === 'CANCELLED') continue;
+      const mk = toLocalMonthKey(b.createdAt, timezone);
+      if (mk && map.has(mk)) {
+        map.get(mk)!.bookings += 1;
+      }
+    }
+
+    return keys.map((k) => {
+      const entry = map.get(k)!;
+      return {
+        label: formatMonthShort(k),
+        sublabel: k,
+        values: [entry.inquiries, entry.bookings],
+      };
+    });
+  }, [inquiries, bookings, timezone, anchorDate]);
+
+  const shootLoadChartData = useMemo(() => {
+    const countByDay = new Map<string, number>();
+    for (const s of upcomingSessions) {
+      if (s.status === 'CANCELLED') continue;
+      const dk = s.agencyLocalDate || toLocalDateKey(s.startAt, timezone);
+      if (dk) {
+        countByDay.set(dk, (countByDay.get(dk) ?? 0) + 1);
+      }
+    }
+
+    const days: Array<{ label: string; sublabel: string; values: number[] }> = [];
+    const parsed = Date.parse(`${anchorDate}T12:00:00.000Z`);
+    const baseMs = Number.isNaN(parsed) ? 0 : parsed;
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(baseMs + i * 24 * 60 * 60 * 1000);
+      const dk = toLocalDateKey(d, timezone);
+      const short = new Intl.DateTimeFormat('en-GB', {
+        timeZone: timezone,
+        day: '2-digit',
+        month: 'short',
+      }).format(d);
+      days.push({
+        label: short.split(' ')[0] || short,
+        sublabel: short,
+        values: [countByDay.get(dk) ?? 0],
+      });
+    }
+    return days;
+  }, [upcomingSessions, timezone, anchorDate]);
+
+  const bookingStatusSegments = useMemo(() => {
+    const buckets: Array<{
+      id: Booking['status'];
+      label: string;
+      color: string;
+    }> = [
+      { id: 'CONFIRMED', label: 'Confirmed', color: '#10B981' },
+      { id: 'PENDING_CONFIRMATION', label: 'Pending Confirm', color: '#F59E0B' },
+      { id: 'COMPLETED', label: 'Completed', color: '#2563EB' },
+      { id: 'CANCELLED', label: 'Cancelled', color: '#FB7185' },
+    ];
+
+    return buckets.map((bucket) => {
+      const matched = bookings.filter((b) => b.status === bucket.id);
+      const sumPoisha = matched.reduce((acc, b) => acc + b.agreedTotalPoisha, 0);
+      return {
+        id: bucket.id,
+        label: bucket.label,
+        value: matched.length,
+        displayValue: String(matched.length),
+        hint: matched.length > 0 ? formatPoisha(sumPoisha, currency) : undefined,
+        color: bucket.color,
+      };
+    });
+  }, [bookings, currency]);
+
+  const categorySegments = useMemo(() => {
+    if (financialReport && financialReport.byEventType.length > 0) {
+      return financialReport.byEventType.slice(0, 5).map((et, idx) => ({
+        id: et.eventTypeId,
+        label: et.eventTypeName,
+        value: et.agreedTotalPoisha,
+        displayValue: formatCompactPoisha(et.agreedTotalPoisha, currency),
+        hint: `${et.bookingsCount} ${et.bookingsCount === 1 ? 'booking' : 'bookings'}`,
+        color: CHART_PALETTE[idx % CHART_PALETTE.length],
+      }));
+    }
+
+    const agg = new Map<string, { name: string; totalPoisha: number; count: number }>();
+    for (const b of bookings) {
+      if (b.status === 'CANCELLED') continue;
+      const key = b.eventType?.id || 'custom';
+      const name = b.eventType?.name || 'Custom Event';
+      const prev = agg.get(key) || { name, totalPoisha: 0, count: 0 };
+      prev.totalPoisha += b.agreedTotalPoisha;
+      prev.count += 1;
+      agg.set(key, prev);
+    }
+
+    return Array.from(agg.entries())
+      .sort((a, b) => b[1].totalPoisha - a[1].totalPoisha)
+      .slice(0, 5)
+      .map(([id, entry], idx) => ({
+        id,
+        label: entry.name,
+        value: entry.totalPoisha,
+        displayValue: formatCompactPoisha(entry.totalPoisha, currency),
+        hint: `${entry.count} ${entry.count === 1 ? 'booking' : 'bookings'}`,
+        color: CHART_PALETTE[idx % CHART_PALETTE.length],
+      }));
+  }, [financialReport, bookings, currency]);
+
+  const funnelItems = useMemo(() => {
+    const activeQuotesCount = quotes.filter(
+      (q) => q.status === 'SENT' || q.status === 'ACCEPTED',
+    ).length;
+    const acceptedQuotesCount = quotes.filter((q) => q.status === 'ACCEPTED').length;
+    const activeBookingsCount = bookings.filter((b) => b.status !== 'CANCELLED').length;
+    const confirmedOrDone = bookings.filter(
+      (b) => b.status === 'CONFIRMED' || b.status === 'COMPLETED',
+    ).length;
+
+    const base = Math.max(inquiries.length, activeQuotesCount, activeBookingsCount, 1);
+
+    return [
+      {
+        id: 'inq',
+        label: 'Inquiries Logged',
+        value: inquiries.length,
+        displayValue: `${inquiries.length}`,
+        percent: (inquiries.length / base) * 100,
+        subtext: `${newInquiriesCount} awaiting triage`,
+        color: '#6D28D9',
+      },
+      {
+        id: 'quotes',
+        label: 'Proposals Sent / Accepted',
+        value: activeQuotesCount,
+        displayValue: `${activeQuotesCount}`,
+        percent: (activeQuotesCount / base) * 100,
+        subtext: `${acceptedQuotesCount} accepted by client`,
+        color: '#2563EB',
+      },
+      {
+        id: 'bookings',
+        label: 'Active Bookings',
+        value: activeBookingsCount,
+        displayValue: `${activeBookingsCount}`,
+        percent: (activeBookingsCount / base) * 100,
+        subtext: `${pendingConfirmCount} awaiting confirmation`,
+        color: '#F59E0B',
+      },
+      {
+        id: 'confirmed',
+        label: 'Confirmed & Completed',
+        value: confirmedOrDone,
+        displayValue: `${confirmedOrDone}`,
+        percent: (confirmedOrDone / base) * 100,
+        subtext: formatPoisha(totalAgreedPoisha, currency),
+        color: '#10B981',
+      },
+    ];
+  }, [
+    inquiries.length,
+    newInquiriesCount,
+    quotes,
+    bookings,
+    pendingConfirmCount,
+    totalAgreedPoisha,
+    currency,
+  ]);
 
   const defaultAlertTab: AlertTab =
     (alerts?.counts.pendingPayments ?? 0) > 0
@@ -88,7 +351,8 @@ export function AdminOverview({
             {settings?.displayName || 'Studio Overview'}
           </h1>
           <p className="admin-meta mt-1 tabular-nums">
-            Needs-attention queue, recent bookings, and next 14 days of shoots ({timezone})
+            Needs-attention queue, studio analytics, recent bookings, and next 14 days of shoots (
+            {timezone})
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
@@ -205,6 +469,184 @@ export function AdminOverview({
             <ArrowRightIcon className="w-3 h-3" />
           </p>
         </Link>
+      </div>
+
+      {/* Studio Analytics Charts Row */}
+      <div className="grid gap-5 lg:grid-cols-12">
+        <section className="lg:col-span-7 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)] p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--admin-border)] pb-3">
+            <div className="flex items-center gap-2.5">
+              <BarChartIcon className="w-4 h-4 text-[var(--admin-accent)] shrink-0" />
+              <div>
+                <h2 className="admin-section-title">Studio Performance Trend</h2>
+                <p className="admin-meta">
+                  {trendMode === 'cashflow'
+                    ? 'Monthly verified collections, expenses, and cash profit'
+                    : trendMode === 'activity'
+                      ? 'Last 6 months of incoming leads vs. bookings created'
+                      : 'Scheduled shoot density across the next 14 days'}
+                </p>
+              </div>
+            </div>
+
+            <div className="inline-flex flex-wrap rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-1 gap-1 shrink-0">
+              {[
+                ...(hasCashflowData
+                  ? [{ id: 'cashflow' as const, label: 'Cashflow' }]
+                  : []),
+                { id: 'activity' as const, label: 'Bookings' },
+                { id: 'shoots' as const, label: '14d Shoots' },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTrendMode(t.id)}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
+                    trendMode === t.id
+                      ? 'bg-[var(--admin-surface)] text-[var(--admin-text)] border border-[var(--admin-border)]'
+                      : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)]',
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {trendMode === 'cashflow' && financialReport && (
+            <>
+              <GroupedBarChart
+                data={cashflowChartData}
+                series={[
+                  { key: 'collected', label: 'Collected', color: '#10B981' },
+                  { key: 'expenses', label: 'Expenses', color: '#F43F5E' },
+                  { key: 'profit', label: 'Net Profit', color: '#2563EB' },
+                ]}
+                formatValue={(v) => formatPoisha(v, currency)}
+                formatAxis={(v) => formatCompactPoisha(v, currency)}
+                emptyMessage="No monthly financial transactions recorded yet."
+              />
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[12px] text-[var(--admin-muted)] tabular-nums">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span>
+                    Collection rate:{' '}
+                    <strong className="font-semibold text-[var(--admin-text)]">
+                      {financialReport.summary.collectionRatePercent.toFixed(1)}%
+                    </strong>
+                  </span>
+                  <span>
+                    Margin:{' '}
+                    <strong className="font-semibold text-[var(--admin-text)]">
+                      {(financialReport.summary.profitMarginPercent ?? 0).toFixed(1)}%
+                    </strong>
+                  </span>
+                  <span>
+                    Client due:{' '}
+                    <strong className="font-semibold text-[var(--admin-text)]">
+                      {formatPoisha(
+                        financialReport.summary.totalOutstandingDuePoisha,
+                        currency,
+                      )}
+                    </strong>
+                  </span>
+                </div>
+                <Link
+                  href="/admin/finance"
+                  className="font-medium text-[var(--admin-accent)] hover:underline"
+                >
+                  Finance report →
+                </Link>
+              </div>
+            </>
+          )}
+
+          {trendMode === 'activity' && (
+            <GroupedBarChart
+              data={activityChartData}
+              series={[
+                { key: 'inquiries', label: 'Inquiries', color: '#6D28D9' },
+                { key: 'bookings', label: 'Active Bookings', color: '#2563EB' },
+              ]}
+              formatValue={(v) => `${Math.round(v)}`}
+              formatAxis={(v) => `${Math.round(v)}`}
+              emptyMessage="No inquiry or booking records yet."
+            />
+          )}
+
+          {trendMode === 'shoots' && (
+            <GroupedBarChart
+              data={shootLoadChartData}
+              series={[{ key: 'shoots', label: 'Scheduled Shoots', color: '#2563EB' }]}
+              formatValue={(v) => `${Math.round(v)} ${v === 1 ? 'shoot' : 'shoots'}`}
+              formatAxis={(v) => `${Math.round(v)}`}
+              maxVisibleXLabels={7}
+              emptyMessage="No shoots scheduled in the next 14 days."
+            />
+          )}
+        </section>
+
+        <section className="lg:col-span-5 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)] p-4 sm:p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--admin-border)] pb-3">
+            <div>
+              <h2 className="admin-section-title">Pipeline &amp; Mix</h2>
+              <p className="admin-meta">
+                {mixMode === 'status'
+                  ? 'Distribution across booking states'
+                  : mixMode === 'categories'
+                    ? 'Top event categories by contract value'
+                    : 'Lead-to-confirmed booking conversion'}
+              </p>
+            </div>
+
+            <div className="inline-flex rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-1 gap-1 shrink-0">
+              {[
+                { id: 'status' as const, label: 'Status' },
+                { id: 'categories' as const, label: 'Events' },
+                { id: 'funnel' as const, label: 'Funnel' },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setMixMode(t.id)}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer',
+                    mixMode === t.id
+                      ? 'bg-[var(--admin-surface)] text-[var(--admin-text)] border border-[var(--admin-border)]'
+                      : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)]',
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {mixMode === 'status' && (
+            <BreakdownDonutChart
+              segments={bookingStatusSegments}
+              centerLabel="Bookings"
+              centerValue={String(bookings.length)}
+              emptyMessage="Create a quote or booking to see status breakdown."
+            />
+          )}
+
+          {mixMode === 'categories' && (
+            <BreakdownDonutChart
+              segments={categorySegments}
+              centerLabel="Pipeline"
+              centerValue={formatCompactPoisha(totalAgreedPoisha, currency)}
+              emptyMessage="No active categorized bookings yet."
+            />
+          )}
+
+          {mixMode === 'funnel' && (
+            <HorizontalRankBars
+              items={funnelItems}
+              emptyMessage="No pipeline activity recorded yet."
+            />
+          )}
+        </section>
       </div>
 
       {/* Needs Your Attention — Interactive Quick-Drawer Queue */}

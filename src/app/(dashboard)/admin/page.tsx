@@ -5,6 +5,7 @@ import { getAgencySettings } from '@/service/agency/agency.service';
 import { listInquiries } from '@/service/inquiries/inquiries.service';
 import { listQuotes } from '@/service/quotes/quotes.service';
 import { listBookings, getAutomationAlerts } from '@/service/bookings/bookings.service';
+import { getFinancialReport } from '@/service/payments/payments.service';
 import { getCalendar } from '@/service/schedule/schedule.service';
 import { AdminOverview } from '@/components/module/admin/AdminOverview';
 import { PageSkeleton } from '@/components/shared/PageSkeleton';
@@ -21,15 +22,18 @@ async function AdminOverviewContent() {
 
   const from = addDaysIso(0);
   const to = addDaysIso(14);
+  const canReadFinance = session.role === 'OWNER' || session.role === 'ACCOUNTANT';
 
-  const [settingsRes, inqRes, quotesRes, bookingsRes, calRes, alertsRes] = await Promise.all([
-    getAgencySettings(),
-    listInquiries(),
-    listQuotes(),
-    listBookings(),
-    getCalendar(from, to),
-    getAutomationAlerts(),
-  ]);
+  const [settingsRes, inqRes, quotesRes, bookingsRes, calRes, alertsRes, financeRes] =
+    await Promise.all([
+      getAgencySettings(),
+      listInquiries(),
+      listQuotes(),
+      listBookings(),
+      getCalendar(from, to),
+      getAutomationAlerts(),
+      canReadFinance ? getFinancialReport() : Promise.resolve(null),
+    ]);
 
   return (
     <AdminOverview
@@ -39,6 +43,8 @@ async function AdminOverviewContent() {
       bookings={bookingsRes.ok && bookingsRes.data ? bookingsRes.data.data : []}
       upcomingSessions={calRes.ok && calRes.data ? calRes.data.sessions : []}
       alerts={alertsRes.ok && alertsRes.data ? alertsRes.data : null}
+      financialReport={financeRes && financeRes.ok && financeRes.data ? financeRes.data : null}
+      windowStartDate={from}
     />
   );
 }
