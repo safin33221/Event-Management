@@ -6,6 +6,8 @@ import {
   AdjustmentType,
   BookingLedgerSummary,
   BookingStatus,
+  ExpenseCategory,
+  FinancialExpenseRow,
   FinancialReportData,
   PaymentEntry,
   PaymentMethod,
@@ -142,4 +144,40 @@ export async function getFinancialReport(filters?: {
   const res = await serverFetch.get(`/finance/report${qs}`);
   return parseApiResponse<FinancialReportData>(res);
 }
+
+export async function recordExpense(payload: {
+  category: ExpenseCategory;
+  title: string;
+  vendorOrPayee?: string;
+  amountPoisha: number;
+  method?: PaymentMethod;
+  reference?: string;
+  incurredOn?: string;
+  bookingId?: string;
+  notes?: string;
+}): Promise<ActionResult<FinancialExpenseRow>> {
+  const res = await serverFetch.post('/finance/expenses', {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await parseApiResponse<FinancialExpenseRow>(res);
+  if (result.ok) {
+    revalidatePath('/admin/finance');
+    revalidatePath('/admin');
+  }
+  return result;
+}
+
+export async function deleteExpense(
+  expenseId: string,
+): Promise<ActionResult<{ deletedExpenseId: string }>> {
+  const res = await serverFetch.delete(`/finance/expenses/${encodeURIComponent(expenseId)}`);
+  const result = await parseApiResponse<{ deletedExpenseId: string }>(res);
+  if (result.ok) {
+    revalidatePath('/admin/finance');
+    revalidatePath('/admin');
+  }
+  return result;
+}
+
 

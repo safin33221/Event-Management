@@ -645,6 +645,16 @@ export interface PaginatedResponse<T> {
   };
 }
 
+export type ExpenseCategory =
+  | 'CREW_PAYOUT'
+  | 'EQUIPMENT_RENTAL'
+  | 'ALBUM_PRINTING'
+  | 'TRANSPORT_FOOD'
+  | 'VENUE_DECOR'
+  | 'STUDIO_OVERHEAD'
+  | 'MARKETING'
+  | 'OTHER';
+
 export interface FinancialReportSummary {
   totalContractedPoisha: number;
   effectiveContractedPoisha: number;
@@ -656,6 +666,13 @@ export interface FinancialReportSummary {
   totalChargeAdjustmentsPoisha: number;
   totalOutstandingDuePoisha: number;
   totalCustomerCreditPoisha: number;
+  totalExpensesPoisha: number;
+  directBookingExpensesPoisha: number;
+  generalOverheadExpensesPoisha: number;
+  netCashProfitPoisha: number;
+  projectedNetProfitPoisha: number;
+  profitMarginPercent: number;
+  expensesCount: number;
   collectionRatePercent: number;
   activeBookingsCount: number;
   completedBookingsCount: number;
@@ -675,6 +692,13 @@ export interface FinancialMethodBreakdown {
   sharePercent: number;
 }
 
+export interface FinancialExpenseCategoryBreakdown {
+  category: ExpenseCategory;
+  amountPoisha: number;
+  count: number;
+  sharePercent: number;
+}
+
 export interface FinancialMonthBreakdown {
   month: string;
   bookingsCount: number;
@@ -682,6 +706,8 @@ export interface FinancialMonthBreakdown {
   collectedPoisha: number;
   refundedPoisha: number;
   netCollectedPoisha: number;
+  expensesPoisha: number;
+  netCashProfitPoisha: number;
 }
 
 export interface FinancialEventTypeBreakdown {
@@ -711,6 +737,8 @@ export interface FinancialBookingReceivable {
   creditNotesPoisha: number;
   outstandingDuePoisha: number;
   customerCreditPoisha: number;
+  directExpensesPoisha: number;
+  bookingNetProfitPoisha: number;
   requiredAdvancePoisha: number;
   isAdvanceMet: boolean;
 }
@@ -726,6 +754,28 @@ export interface FinancialTransactionRow extends PaymentEntry {
   };
 }
 
+export interface FinancialExpenseRow {
+  id: string;
+  bookingId: string | null;
+  category: ExpenseCategory;
+  title: string;
+  vendorOrPayee: string | null;
+  amountPoisha: number;
+  currency: string;
+  method: PaymentMethod;
+  reference: string | null;
+  incurredOn: string;
+  notes: string | null;
+  recordedById: string;
+  createdAt: string;
+  booking?: {
+    id: string;
+    reference: string;
+    eventTitle: string;
+    clientName: string;
+  } | null;
+}
+
 export interface FinancialReportData {
   currency: string;
   timezone: string;
@@ -738,9 +788,11 @@ export interface FinancialReportData {
   };
   summary: FinancialReportSummary;
   byMethod: FinancialMethodBreakdown[];
+  byExpenseCategory: FinancialExpenseCategoryBreakdown[];
   byMonth: FinancialMonthBreakdown[];
   byEventType: FinancialEventTypeBreakdown[];
   receivables: FinancialBookingReceivable[];
   transactions: FinancialTransactionRow[];
+  expenses: FinancialExpenseRow[];
 }
 
